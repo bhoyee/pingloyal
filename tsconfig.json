@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pingloyal/types": ["./packages/types/src/index.ts"],
+      "@pingloyal/types/*": ["./packages/types/src/*"],
+      "@pingloyal/utils": ["./packages/utils/src/index.ts"],
+      "@pingloyal/utils/*": ["./packages/utils/src/*"],
+      "@pingloyal/zod-schemas": ["./packages/zod-schemas/src/index.ts"],
+      "@pingloyal/zod-schemas/*": ["./packages/zod-schemas/src/*"]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "apps",
+    "packages/*/dist",
+    "packages/*/node_modules"
+  ]
+}

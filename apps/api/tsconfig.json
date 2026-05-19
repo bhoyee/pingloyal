@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@pingloyal/types": ["../../packages/types/src/index.ts"],
+      "@pingloyal/types/*": ["../../packages/types/src/*"],
+      "@pingloyal/utils": ["../../packages/utils/src/index.ts"],
+      "@pingloyal/utils/*": ["../../packages/utils/src/*"],
+      "@pingloyal/zod-schemas": ["../../packages/zod-schemas/src/index.ts"],
+      "@pingloyal/zod-schemas/*": ["../../packages/zod-schemas/src/*"]
+    }
+  }
+}
