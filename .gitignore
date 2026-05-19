@@ -1,7 +1,29 @@
-node_modules/
+# Environment files — NEVER commit these
 .env
 .env.local
+.env.development
 .env.production
+.env.test
+
+# Dependencies
+node_modules/
+
+# Build outputs
 dist/
 .next/
+build/
+
+# TypeScript incremental compilation cache
+*.tsbuildinfo
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
