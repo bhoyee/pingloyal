@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 // Compiled file lives at dist/database/; project root is ../../../../ from there.
 // Try local app .env first, then monorepo root.
@@ -20,6 +21,7 @@ export const AppDataSource = new DataSource({
   entities: [path.join(__dirname, '../**/*.entity.js')],
   migrations: [path.join(__dirname, './migrations/*.js')],
   migrationsTableName: 'typeorm_migrations',
+  namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
 });
