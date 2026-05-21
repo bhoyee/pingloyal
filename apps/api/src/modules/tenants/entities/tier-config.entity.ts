@@ -22,10 +22,10 @@ export class TierConfig {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   tierName: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   tierLabel: string;
 
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })

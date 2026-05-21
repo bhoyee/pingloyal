@@ -27,10 +27,10 @@ export class Subscription {
   @Column({ type: 'varchar', length: 30, default: PlanTier.STARTER })
   planTier: PlanTier;
 
-  @Column({ length: 20, default: 'monthly' })
+  @Column({ type: 'varchar', length: 20, default: 'monthly' })
   billingCycle: string;
 
-  @Column({ length: 3, default: 'NGN' })
+  @Column({ type: 'varchar', length: 3, default: 'NGN' })
   currency: string;
 
   @Column({ type: 'numeric', precision: 10, scale: 2, default: 8000 })
@@ -52,10 +52,10 @@ export class Subscription {
   @Column({ type: 'timestamptz', nullable: true })
   gracePeriodStartedAt: Date | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   paystackSubCode: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   stripeSubId: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })

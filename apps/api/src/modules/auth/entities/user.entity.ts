@@ -25,14 +25,14 @@ export class User {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   email: string;
 
   @Exclude()
   @Column({ type: 'text' })
   hashedPassword: string;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   fullName: string;
 
   @Column({ type: 'varchar', length: 30, default: UserRole.OWNER })

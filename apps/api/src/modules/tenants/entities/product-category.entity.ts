@@ -22,10 +22,10 @@ export class ProductCategory {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   slug: string;
 
   @Column({ default: true })

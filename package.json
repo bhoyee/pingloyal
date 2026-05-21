@@ -9,6 +9,7 @@
   "scripts": {
     "dev:api": "npm run start:dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
+    "build:packages": "npm run build --workspaces --if-present --ignore-scripts=false -- --workspace=packages/types --workspace=packages/utils --workspace=packages/zod-schemas",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
     "test": "npm run test --workspaces --if-present",

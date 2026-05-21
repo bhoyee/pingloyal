@@ -19,14 +19,6 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "@pingloyal/types": ["../../packages/types/src/index.ts"],
-      "@pingloyal/types/*": ["../../packages/types/src/*"],
-      "@pingloyal/utils": ["../../packages/utils/src/index.ts"],
-      "@pingloyal/utils/*": ["../../packages/utils/src/*"],
-      "@pingloyal/zod-schemas": ["../../packages/zod-schemas/src/index.ts"],
-      "@pingloyal/zod-schemas/*": ["../../packages/zod-schemas/src/*"]
-    }
+    "forceConsistentCasingInFileNames": true
   }
 }
