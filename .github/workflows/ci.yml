@@ -1,0 +1,247 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# Cancel in-progress runs on the same ref to avoid wasted minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. LINT — runs first; everything else depends on this passing
+  # ─────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint & Type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run type-check
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. UNIT TESTS — runs after lint (parallel with integration-tests)
+  # ─────────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests with coverage
+        run: |
+          npm run test:unit -- \
+            --coverage \
+            --coverageThreshold '{"global":{"lines":70,"functions":70,"branches":60}}'
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-coverage
+          path: apps/api/coverage/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. INTEGRATION TESTS — runs after lint (parallel with unit-tests)
+  # ─────────────────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pingloyal_test
+          POSTGRES_USER: pingloyal
+          POSTGRES_PASSWORD: testpassword123
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://pingloyal:testpassword123@localhost:5432/pingloyal_test
+      REDIS_URL: redis://localhost:6379
+      # RS256 key pair — stored as GitHub Secrets
+      JWT_PRIVATE_KEY: ${{ secrets.TEST_JWT_PRIVATE_KEY }}
+      JWT_PUBLIC_KEY: ${{ secrets.TEST_JWT_PUBLIC_KEY }}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      # Encryption
+      ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+      # Gupshup placeholders (real values not needed for integration tests)
+      GUPSHUP_PARTNER_KEY: test-gupshup-partner-key
+      GUPSHUP_PARTNER_ID: test-gupshup-partner-id
+      GUPSHUP_PARTNER_API_URL: https://partner.gupshup.io/partner
+      GUPSHUP_API_URL: https://api.gupshup.io/sm/api/v1
+      WA_APP_SECRET: test-wa-app-secret-32-characters-ok
+      # Payment placeholders
+      PAYSTACK_SECRET_KEY: sk_test_placeholder
+      # Storage placeholders
+      R2_BUCKET: test-bucket
+      R2_ACCOUNT_ID: test-account
+      R2_ACCESS_KEY: test-access-key
+      R2_SECRET_KEY: test-secret-key
+      # Email placeholder
+      RESEND_API_KEY: re_test_placeholder
+      # App
+      FRONTEND_URL: http://localhost:3001
+      PORT: 3000
+      LOG_LEVEL: error
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API (required for TypeORM CLI + migration runner)
+        run: npm run build
+        working-directory: apps/api
+
+      - name: Run database migrations
+        run: npm run migration:run
+        working-directory: apps/api
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. E2E TESTS — runs after unit-tests AND integration-tests both pass
+  # ─────────────────────────────────────────────────────────────────────────────
+  e2e-tests:
+    name: E2E Tests
+    needs: [unit-tests, integration-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: pingloyal_test
+          POSTGRES_USER: pingloyal
+          POSTGRES_PASSWORD: testpassword123
+        ports:
+          - '5432:5432'
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://pingloyal:testpassword123@localhost:5432/pingloyal_test
+      REDIS_URL: redis://localhost:6379
+      JWT_PRIVATE_KEY: ${{ secrets.TEST_JWT_PRIVATE_KEY }}
+      JWT_PUBLIC_KEY: ${{ secrets.TEST_JWT_PUBLIC_KEY }}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      ENCRYPTION_KEY: ${{ secrets.TEST_ENCRYPTION_KEY }}
+      GUPSHUP_PARTNER_KEY: test-gupshup-partner-key
+      GUPSHUP_PARTNER_ID: test-gupshup-partner-id
+      GUPSHUP_PARTNER_API_URL: https://partner.gupshup.io/partner
+      GUPSHUP_API_URL: https://api.gupshup.io/sm/api/v1
+      WA_APP_SECRET: test-wa-app-secret-32-characters-ok
+      PAYSTACK_SECRET_KEY: sk_test_placeholder
+      R2_BUCKET: test-bucket
+      R2_ACCOUNT_ID: test-account
+      R2_ACCESS_KEY: test-access-key
+      R2_SECRET_KEY: test-secret-key
+      RESEND_API_KEY: re_test_placeholder
+      FRONTEND_URL: http://localhost:3001
+      PORT: 3000
+      LOG_LEVEL: error
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run build
+        working-directory: apps/api
+
+      - name: Run database migrations
+        run: npm run migration:run
+        working-directory: apps/api
+
+      - name: Run E2E tests
+        run: npm run test:e2e

@@ -1,0 +1,170 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# REQUIRED GITHUB SECRETS
+# Configure at: Settings → Secrets and variables → Actions
+#
+# For CI (integration tests):
+#   TEST_JWT_PRIVATE_KEY   — RSA private key base64-encoded (generate a test pair)
+#   TEST_JWT_PUBLIC_KEY    — RSA public key base64-encoded (must match PRIVATE_KEY)
+#   TEST_ENCRYPTION_KEY    — 64-character hex string (32 bytes AES-256)
+#
+# For deployment:
+#   VPS_HOST               — IP address of the Hetzner VPS
+#   VPS_USER               — SSH username (e.g. deploy)
+#   SSH_PRIVATE_KEY        — Full PEM content of the private SSH key for VPS access
+#   PRODUCTION_API_URL     — https://api.pingloyal.com
+#
+# Production env vars are set on the VPS at /opt/pingloyal/.env.production
+# (NOT as GitHub Secrets — the VPS reads them at runtime):
+#   DATABASE_URL, REDIS_URL, JWT_PRIVATE_KEY, JWT_PUBLIC_KEY,
+#   ENCRYPTION_KEY, GUPSHUP_PARTNER_KEY, GUPSHUP_PARTNER_ID,
+#   WA_APP_SECRET, PAYSTACK_SECRET_KEY, R2_BUCKET, R2_ACCOUNT_ID,
+#   R2_ACCESS_KEY, R2_SECRET_KEY, RESEND_API_KEY, FRONTEND_URL,
+#   SENTRY_DSN, NODE_ENV=production
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]   # Only deploys when code reaches main
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. DEPLOY API — SSH into VPS, pull, rebuild Docker, run migrations, verify
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    environment: production   # Creates a GitHub environment for optional approvals
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy API to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/pingloyal
+
+            echo "🔄 Pulling latest code..."
+            git pull origin main
+
+            echo "🐳 Building Docker images..."
+            docker compose -f docker-compose.production.yml build api worker
+
+            echo "🚀 Starting updated containers..."
+            docker compose -f docker-compose.production.yml up -d --no-deps api worker
+
+            echo "⏳ Waiting for API to start..."
+            sleep 10
+
+            echo "🗄️  Running database migrations..."
+            docker compose -f docker-compose.production.yml exec -T api \
+              node dist/database/run-migrations.js
+
+            echo "🏥 Health check..."
+            curl --fail --silent --max-time 10 http://localhost:3000/api/v1/health \
+              || (echo "❌ Health check failed" && exit 1)
+
+            echo "✅ API deployment verified successfully"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ API deployment to production succeeded"
+          else
+            echo "❌ API deployment failed — previous version still running"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. DEPLOY WEB — builds Next.js, syncs to VPS, restarts PM2 process
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Web
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Build Next.js
+        run: |
+          npm ci
+          npm run build:web
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+
+      - name: Ensure target directory exists on VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p /opt/pingloyal/apps/web/.next
+
+      - name: Sync Next.js build to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "apps/web/.next,apps/web/public,apps/web/package.json"
+          target: /opt/pingloyal/
+
+      - name: Restart web process on VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/pingloyal/apps/web
+
+            echo "📦 Installing production dependencies..."
+            npm ci --only=production
+
+            echo "🔄 Restarting web process..."
+            pm2 restart pingloyal-web 2>/dev/null \
+              || pm2 start npm --name pingloyal-web -- start -- -p 3001
+            pm2 save
+
+            echo "⏳ Waiting for web to start..."
+            sleep 5
+
+            echo "🏥 Health check..."
+            curl --fail --silent --max-time 10 http://localhost:3001 \
+              || (echo "❌ Web health check failed" && exit 1)
+
+            echo "✅ Web deployment verified successfully"
+
+      - name: Notify web deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Web deployment to production succeeded"
+          else
+            echo "❌ Web deployment failed — previous version still running"
+          fi

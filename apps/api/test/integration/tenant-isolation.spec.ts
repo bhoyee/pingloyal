@@ -19,7 +19,7 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
-import request from 'supertest';
+import request, { type Response as SupertestResponse } from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { Public } from '../../src/common/decorators/public.decorator';
 import { SkipSubscriptionCheck } from '../../src/common/decorators/skip-subscription-check.decorator';
