@@ -6,13 +6,14 @@ import {
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './common/redis/redis.module';
-import { AuthModule } from './auth/auth.module';
+import { FullAuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -36,21 +37,22 @@ import { createWinstonConfig } from './common/logger/winston.config';
         process.env.LOG_LEVEL ?? 'info',
       ),
     ),
+    // Login throttler: 5 attempts per 15 min (used by AuthController)
+    ThrottlerModule.forRoot([
+      { name: 'login', ttl: 15 * 60 * 1000, limit: 5 },
+    ]),
     DatabaseModule,
     RedisModule,
-    AuthModule,
+    FullAuthModule,
     HealthModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    // ── Global guards (order matters — JWT runs before Subscription) ──────────
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: SubscriptionGuard },
-    // ── Global interceptors ───────────────────────────────────────────────────
     { provide: APP_INTERCEPTOR, useClass: TenantScopeInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
-    // ── Global exception filter ───────────────────────────────────────────────
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })
