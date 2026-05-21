@@ -7,9 +7,9 @@ export const envValidationSchema = Joi.object({
   // ── Redis ─────────────────────────────────────────────────────────────────
   REDIS_URL: Joi.string().uri().required(),
 
-  // ── JWT ───────────────────────────────────────────────────────────────────
-  JWT_SECRET: Joi.string().min(32).required(),
-  JWT_REFRESH_SECRET: Joi.string().min(32).required(),
+  // ── JWT RS256 key pair ────────────────────────────────────────────────────
+  JWT_PRIVATE_KEY: Joi.string().required(),
+  JWT_PUBLIC_KEY: Joi.string().required(),
   JWT_EXPIRES_IN: Joi.string().required().default('15m'),
   JWT_REFRESH_EXPIRES_IN: Joi.string().required().default('30d'),
 
@@ -25,7 +25,6 @@ export const envValidationSchema = Joi.object({
 
   // ── Payments ──────────────────────────────────────────────────────────────
   PAYSTACK_SECRET_KEY: Joi.string().required(),
-  // allow('') so dotenv's KEY= (empty string) is treated as absent
   STRIPE_SECRET_KEY: Joi.string().allow('').optional(),
   STRIPE_WEBHOOK_SECRET: Joi.string().allow('').optional(),
 

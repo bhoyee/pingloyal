@@ -8,8 +8,8 @@
 # Dependencies
 node_modules/
 
-# Build outputs
-dist/
+# Build outputs — app artifacts only (packages/*/dist/ IS committed — needed at runtime)
+apps/*/dist/
 .next/
 build/
 

@@ -34,7 +34,7 @@ export class Integration {
   @Column({ type: 'text', nullable: true })
   apiKeyEncrypted: string | null;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   webhookSecret: string | null;
 
   @Column({ type: 'int', default: 5 })
@@ -46,7 +46,7 @@ export class Integration {
   @Column({ type: 'timestamptz', nullable: true })
   lastSyncedAt: Date | null;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   lastSyncCursor: string | null;
 
   @Column({

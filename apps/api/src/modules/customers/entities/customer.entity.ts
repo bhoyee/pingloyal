@@ -25,13 +25,13 @@ export class Customer {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   externalId: string | null;
 
-  @Column({ length: 255 })
+  @Column({ type: 'varchar', length: 255 })
   fullName: string;
 
-  @Column({ length: 20 })
+  @Column({ type: 'varchar', length: 20 })
   phoneE164: string;
 
   @Column({ type: 'date', nullable: true })

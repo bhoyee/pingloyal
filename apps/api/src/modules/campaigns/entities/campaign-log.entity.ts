@@ -36,7 +36,7 @@ export class CampaignLog {
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   waMessageId: string | null;
 
   @Column({

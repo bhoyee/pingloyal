@@ -19,7 +19,7 @@ export class Transaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 255, unique: true })
+  @Column({ type: 'varchar', length: 255, unique: true })
   idempotencyKey: string;
 
   @Index()
@@ -58,7 +58,7 @@ export class Transaction {
   })
   source: TransactionSource;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   externalTransactionId: string | null;
 
   @Column({ type: 'text', nullable: true })

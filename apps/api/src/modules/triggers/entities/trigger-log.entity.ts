@@ -32,7 +32,7 @@ export class TriggerLog {
   @Column({ type: 'varchar', length: 50 })
   triggerType: TriggerType;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   waMessageId: string | null;
 
   @Column({ type: 'varchar', length: 30, default: TriggerStatus.SENT })
