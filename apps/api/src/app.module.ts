@@ -38,9 +38,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
       ),
     ),
     // Login throttler: 5 attempts per 15 min (used by AuthController)
-    ThrottlerModule.forRoot([
-      { name: 'login', ttl: 15 * 60 * 1000, limit: 5 },
-    ]),
+    ThrottlerModule.forRoot([{ name: 'login', ttl: 15 * 60 * 1000, limit: 5 }]),
     DatabaseModule,
     RedisModule,
     FullAuthModule,

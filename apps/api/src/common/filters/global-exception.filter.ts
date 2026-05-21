@@ -35,14 +35,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message =
         typeof body === 'string'
           ? body
-          : (body as { message?: string }).message ?? exception.message;
+          : ((body as { message?: string }).message ?? exception.message);
       errorName = exception.name;
       stack = exception.stack;
     } else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       // Never leak internal error details in production
       message = isProd ? 'Internal server error' : (exception as Error).message;
-      errorName = isProd ? 'InternalServerError' : (exception as Error).name ?? 'Error';
+      errorName = isProd
+        ? 'InternalServerError'
+        : ((exception as Error).name ?? 'Error');
       stack = (exception as Error).stack;
     }
 
@@ -54,7 +56,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const requestId = request.id ?? 'unknown';
     const path = request.url;
 
-    this.logger.error!(message, {
+    this.logger.error(message, {
       context: 'GlobalExceptionFilter',
       statusCode,
       path,

@@ -14,7 +14,9 @@ AppDataSource.initialize()
     console.log('[migrations] Connecting to database...');
     const pending = await AppDataSource.showMigrations();
     if (!pending) {
-      console.log('[migrations] All migrations already applied — nothing to run');
+      console.log(
+        '[migrations] All migrations already applied — nothing to run',
+      );
       await AppDataSource.destroy();
       process.exit(0);
     }

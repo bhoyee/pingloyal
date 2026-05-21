@@ -55,9 +55,7 @@ export class CreateTransactions1700000000006 implements MigrationInterface {
     await queryRunner.query(
       `DROP INDEX IF EXISTS idx_transactions_tenant_customer`,
     );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_transactions_tenant_id`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_transactions_tenant_id`);
     await queryRunner.query(`DROP TABLE transactions`);
   }
 }

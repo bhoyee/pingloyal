@@ -1,11 +1,6 @@
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -47,7 +42,12 @@ export interface AuthTokens {
 
 export interface AuthResponse extends AuthTokens {
   user: { id: string; email: string; fullName: string; role: UserRole };
-  tenant: { id: string; businessName: string; slug: string; planTier: PlanTier };
+  tenant: {
+    id: string;
+    businessName: string;
+    slug: string;
+    planTier: PlanTier;
+  };
 }
 
 @Injectable()
@@ -164,7 +164,10 @@ export class AuthService {
       throw new UnauthorizedException('Account is inactive');
     }
 
-    const passwordMatch = await bcrypt.compare(dto.password, user.hashedPassword);
+    const passwordMatch = await bcrypt.compare(
+      dto.password,
+      user.hashedPassword,
+    );
     if (!passwordMatch) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -280,10 +283,7 @@ export class AuthService {
       } as Parameters<typeof this.jwtService.sign>[1],
     );
 
-    const hash = crypto
-      .createHash('sha256')
-      .update(refreshToken)
-      .digest('hex');
+    const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const ttl = this.parseTtl(
       this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
     );

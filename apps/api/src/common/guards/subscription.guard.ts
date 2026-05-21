@@ -77,15 +77,15 @@ export class SubscriptionGuard implements CanActivate {
       `SELECT subscription_status, trial_ends_at FROM tenants WHERE id = $1`,
       [tenantId],
     );
-    const row = rows[0] ?? { subscription_status: 'trialing', trial_ends_at: null };
+    const row = rows[0] ?? {
+      subscription_status: 'trialing',
+      trial_ends_at: null,
+    };
     await this.redis.setex(cacheKey, 60, JSON.stringify(row));
     return row;
   }
 
-  private evaluate(
-    sub: TenantSubscriptionRow,
-    method: string,
-  ): boolean {
+  private evaluate(sub: TenantSubscriptionRow, method: string): boolean {
     const status = sub.subscription_status;
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(
       method.toUpperCase(),
