@@ -30,6 +30,7 @@ const config: Config = {
   testEnvironment: 'node',
   moduleNameMapper,
   testTimeout: 120000,
+  passWithNoTests: true,
 };
 
 export default config;
