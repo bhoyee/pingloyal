@@ -15,6 +15,7 @@ import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './common/redis/redis.module';
 import { FullAuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -45,6 +46,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     RedisModule,
     FullAuthModule,
     TenantsModule,
+    WhatsappModule,
     HealthModule,
   ],
   controllers: [AppController],
