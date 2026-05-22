@@ -14,8 +14,10 @@ import { envValidationSchema } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './common/redis/redis.module';
 import { FullAuthModule } from './modules/auth/auth.module';
+import { TenantsModule } from './modules/tenants/tenants.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { TenantScopeInterceptor } from './common/interceptors/tenant-scope.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -42,12 +44,14 @@ import { createWinstonConfig } from './common/logger/winston.config';
     DatabaseModule,
     RedisModule,
     FullAuthModule,
+    TenantsModule,
     HealthModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: SubscriptionGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantScopeInterceptor },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
