@@ -8,7 +8,10 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { IntegrationConnectionType, IntegrationSyncStatus } from '@pingloyal/types';
+import {
+  IntegrationConnectionType,
+  IntegrationSyncStatus,
+} from '@pingloyal/types';
 import { Tenant } from '../../tenants/entities/tenant.entity';
 
 @Entity('integrations')

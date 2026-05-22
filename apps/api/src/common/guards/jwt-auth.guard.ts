@@ -32,6 +32,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     if (err || !user) {
       throw new UnauthorizedException('Invalid or expired token');
     }
-    return user as TUser;
+    return user;
   }
 }

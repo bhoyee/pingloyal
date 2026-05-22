@@ -26,9 +26,7 @@ export class CreateTierConfigs1700000000002 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_tier_configs_tenant_id`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_tier_configs_tenant_id`);
     await queryRunner.query(`DROP TABLE tier_configs`);
   }
 }

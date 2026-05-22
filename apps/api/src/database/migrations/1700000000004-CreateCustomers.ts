@@ -54,21 +54,13 @@ export class CreateCustomers1700000000004 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_customers_date_of_birth`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_customers_date_of_birth`);
     await queryRunner.query(
       `DROP INDEX IF EXISTS idx_customers_tenant_last_purchase`,
     );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_customers_tenant_tier`,
-    );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_customers_tenant_phone`,
-    );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_customers_tenant_id`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_customers_tenant_tier`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_customers_tenant_phone`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_customers_tenant_id`);
     await queryRunner.query(`DROP TABLE customers`);
   }
 }

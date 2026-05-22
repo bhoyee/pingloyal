@@ -19,14 +19,13 @@ import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
-import request from 'supertest';
+import request, { type Response as SupertestResponse } from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { Public } from '../../src/common/decorators/public.decorator';
 import { SkipSubscriptionCheck } from '../../src/common/decorators/skip-subscription-check.decorator';
 import {
   CreateTenantResult,
   TestHelperCtx,
-  authenticatedRequest,
   bootstrapTestApp,
   clearTestData,
   createTestCustomer,
@@ -103,7 +102,9 @@ describe('Tenant Isolation', () => {
     it('two tenants can register with the same email address', async () => {
       const sharedEmail = `shared-${Date.now()}@isolation.test`;
 
-      const regA = await request(app.getHttpServer())
+      const regA = await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .post('/api/v1/auth/register')
         .send({
           businessName: 'Same Email Store Alpha',
@@ -113,7 +114,9 @@ describe('Tenant Isolation', () => {
           country: 'NG',
         });
 
-      const regB = await request(app.getHttpServer())
+      const regB = await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      )
         .post('/api/v1/auth/register')
         .send({
           businessName: 'Same Email Store Beta',
@@ -126,27 +129,29 @@ describe('Tenant Isolation', () => {
       expect(regA.status).toBe(201);
       expect(regB.status).toBe(201);
 
+      type RegisterBody = {
+        tenant: { id: string };
+        user: { id: string; email: string };
+      };
+      const bodyA = regA.body as RegisterBody;
+      const bodyB = regB.body as RegisterBody;
+
       // Different tenants — different tenant IDs
-      expect(regA.body.tenant.id).not.toBe(regB.body.tenant.id);
+      expect(bodyA.tenant.id).not.toBe(bodyB.tenant.id);
       // Different users — different user IDs
-      expect(regA.body.user.id).not.toBe(regB.body.user.id);
+      expect(bodyA.user.id).not.toBe(bodyB.user.id);
       // Both have the same email but different tenant scopes
-      expect(regA.body.user.email).toBe(sharedEmail);
-      expect(regB.body.user.email).toBe(sharedEmail);
+      expect(bodyA.user.email).toBe(sharedEmail);
+      expect(bodyB.user.email).toBe(sharedEmail);
 
       // Track for cleanup
-      createdTenantIds.push(regA.body.tenant.id, regB.body.tenant.id);
+      createdTenantIds.push(bodyA.tenant.id, bodyB.tenant.id);
     });
 
     it("Tenant B's JWT tenantId is B's tenant — cannot masquerade as Tenant A", () => {
-      const payloadA = ctx.jwtService.decode(tenantAResult.token) as {
-        sub: string;
-        tenantId: string;
-      };
-      const payloadB = ctx.jwtService.decode(tenantBResult.token) as {
-        sub: string;
-        tenantId: string;
-      };
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+      const payloadA = ctx.jwtService.decode(tenantAResult.token);
+      const payloadB = ctx.jwtService.decode(tenantBResult.token);
 
       expect(payloadA.tenantId).toBe(tenantAResult.tenant.id);
       expect(payloadB.tenantId).toBe(tenantBResult.tenant.id);
@@ -155,6 +160,7 @@ describe('Tenant Isolation', () => {
       // And the user subjects are also different
       expect(payloadA.sub).toBe(tenantAResult.user.id);
       expect(payloadB.sub).toBe(tenantBResult.user.id);
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
     });
   });
 
@@ -248,13 +254,25 @@ describe('Tenant Isolation', () => {
 
   // ─── GROUP 10: Exception filter ─────────────────────────────────────────────
   describe('Group 10 — Exception filter', () => {
+    type ErrorBody = {
+      statusCode: number;
+      message: string;
+      error: string;
+      timestamp: string;
+      path: string;
+      requestId: string;
+      stack?: string;
+    };
+
     it('unhandled 500 error returns consistent JSON shape', async () => {
-      const response = await request(app.getHttpServer()).get(
-        '/api/v1/_test-error/throw',
-      );
+      const response = await request(
+        app.getHttpServer() as Parameters<typeof request>[0],
+      ).get('/api/v1/_test-error/throw');
+      const body = response.body as ErrorBody;
 
       expect(response.status).toBe(500);
-      expect(response.body).toMatchObject({
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+      expect(body).toMatchObject({
         statusCode: 500,
         message: expect.any(String),
         error: expect.any(String),
@@ -262,12 +280,10 @@ describe('Tenant Isolation', () => {
         path: expect.any(String),
         requestId: expect.any(String),
       });
-      // Timestamp must be a valid ISO date
-      expect(new Date(response.body.timestamp as string).getTime()).toBeGreaterThan(0);
-      // Path must reflect the request URL
-      expect(response.body.path).toBe('/api/v1/_test-error/throw');
-      // requestId must be a UUID
-      expect(response.body.requestId).toMatch(
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+      expect(new Date(body.timestamp).getTime()).toBeGreaterThan(0);
+      expect(body.path).toBe('/api/v1/_test-error/throw');
+      expect(body.requestId).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
       );
     });
@@ -278,19 +294,19 @@ describe('Tenant Isolation', () => {
 
       let response: SupertestResponse;
       try {
-        response = await request(app.getHttpServer()).get(
-          '/api/v1/_test-error/throw',
-        );
+        response = await request(
+          app.getHttpServer() as Parameters<typeof request>[0],
+        ).get('/api/v1/_test-error/throw');
       } finally {
         process.env.NODE_ENV = prevEnv;
       }
 
+      const body = response!.body as ErrorBody;
       expect(response!.status).toBe(500);
-      expect(response!.body.stack).toBeUndefined();
-      expect(JSON.stringify(response!.body)).not.toContain('at Object.');
-      expect(JSON.stringify(response!.body)).not.toContain('at TestErrorController');
-      // Production message is generic — does not leak internal details
-      expect(response!.body.message).toBe('Internal server error');
+      expect(body.stack).toBeUndefined();
+      expect(JSON.stringify(body)).not.toContain('at Object.');
+      expect(JSON.stringify(body)).not.toContain('at TestErrorController');
+      expect(body.message).toBe('Internal server error');
     });
 
     it('stack trace IS included in development response body', async () => {
@@ -299,16 +315,17 @@ describe('Tenant Isolation', () => {
 
       let response: SupertestResponse;
       try {
-        response = await request(app.getHttpServer()).get(
-          '/api/v1/_test-error/throw',
-        );
+        response = await request(
+          app.getHttpServer() as Parameters<typeof request>[0],
+        ).get('/api/v1/_test-error/throw');
       } finally {
         process.env.NODE_ENV = prevEnv;
       }
 
+      const body = response!.body as ErrorBody;
       expect(response!.status).toBe(500);
-      expect(typeof response!.body.stack).toBe('string');
-      expect(response!.body.stack).toContain('Error: Test unhandled error');
+      expect(typeof body.stack).toBe('string');
+      expect(body.stack).toContain('Error: Test unhandled error');
     });
   });
 

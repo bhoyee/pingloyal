@@ -151,7 +151,9 @@ export async function createTestTenant(
 export async function createTestCustomer(
   ctx: Pick<TestHelperCtx, 'dataSource'>,
   tenantId: string,
-  overrides: Partial<Pick<Customer, 'phoneE164' | 'fullName' | 'waOptedIn' | 'source'>> = {},
+  overrides: Partial<
+    Pick<Customer, 'phoneE164' | 'fullName' | 'waOptedIn' | 'source'>
+  > = {},
 ): Promise<Customer> {
   const repo = ctx.dataSource.getRepository(Customer);
   const customer = repo.create({
@@ -198,7 +200,7 @@ export async function createTestTransaction(
  * Returns a supertest wrapper with the Bearer token pre-set on every method.
  */
 export function authenticatedRequest(app: INestApplication, token: string) {
-  const base = request(app.getHttpServer());
+  const base = request(app.getHttpServer() as Parameters<typeof request>[0]);
   const auth = `Bearer ${token}`;
   return {
     get: (path: string) => base.get(path).set('Authorization', auth),
@@ -242,10 +244,9 @@ export async function clearTestData(
     );
   }
 
-  await dataSource.query(
-    `DELETE FROM tenants WHERE id = ANY($1::uuid[])`,
-    [tenantIds],
-  );
+  await dataSource.query(`DELETE FROM tenants WHERE id = ANY($1::uuid[])`, [
+    tenantIds,
+  ]);
 }
 
 /**

@@ -36,7 +36,7 @@ export class LoggingInterceptor implements NestInterceptor {
       tap(() => {
         const response = context.switchToHttp().getResponse<Response>();
         const duration = Date.now() - start;
-        this.logger.log!(
+        this.logger.log(
           maskPhones(
             `${method} ${path} ${response.statusCode} ${duration}ms tenant=${tenantId}`,
           ),
@@ -46,7 +46,7 @@ export class LoggingInterceptor implements NestInterceptor {
       catchError((error: unknown) => {
         const duration = Date.now() - start;
         const msg = error instanceof Error ? error.message : String(error);
-        this.logger.error!(
+        this.logger.error(
           maskPhones(
             `${method} ${path} ERROR ${duration}ms tenant=${tenantId} — ${msg}`,
           ),

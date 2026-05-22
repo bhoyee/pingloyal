@@ -9,28 +9,23 @@ const moduleNameMapper = {
   '^@pingloyal/zod-schemas/(.*)$': '<rootDir>/../../packages/zod-schemas/src/$1',
 };
 
-// Switch to CommonJS + plain Node resolution so ts-jest can handle the
-// nodenext source files without triggering nodenext-only compiler flags.
-const tsJestTransform = {
-  '^.+\\.(t|j)s$': [
-    'ts-jest',
-    {
-      tsconfig: {
-        module: 'commonjs',
-        moduleResolution: 'node',
-        resolvePackageJsonExports: false,
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-      },
-    },
-  ],
+const tsJestOptions = {
+  tsconfig: {
+    module: 'commonjs',
+    moduleResolution: 'node',
+    resolvePackageJsonExports: false,
+    esModuleInterop: true,
+    allowSyntheticDefaultImports: true,
+  },
 };
 
 const config: Config = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
   testMatch: ['<rootDir>/test/integration/**/*.spec.ts'],
-  transform: tsJestTransform,
+  transform: {
+    '^.+\\.(t|j)s$': ['ts-jest', tsJestOptions] as [string, unknown],
+  },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: './coverage/integration',
   testEnvironment: 'node',

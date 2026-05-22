@@ -1,0 +1,23 @@
+# PingLoyal CODEOWNERS
+# Every PR must be reviewed by at least one code owner.
+# GitHub enforces this when branch protection requires CODEOWNER review.
+#
+# Format: <pattern> <@github-username> [<@github-username>...]
+
+# All files — both founders review everything
+* @bhoyee
+
+# CI/CD changes require extra scrutiny
+.github/ @bhoyee
+
+# Critical security surface — guards, auth, encryption
+apps/api/src/common/guards/ @bhoyee
+apps/api/src/common/filters/ @bhoyee
+apps/api/src/modules/auth/ @bhoyee
+apps/api/src/config/ @bhoyee
+
+# Database schema — migrations are irreversible
+apps/api/src/database/migrations/ @bhoyee
+
+# Shared packages used by all apps
+packages/ @bhoyee

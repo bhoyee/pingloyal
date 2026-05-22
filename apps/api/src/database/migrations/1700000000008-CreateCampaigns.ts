@@ -41,15 +41,9 @@ export class CreateCampaigns1700000000008 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_campaigns_scheduled_at`,
-    );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_campaigns_tenant_status`,
-    );
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_campaigns_tenant_id`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_campaigns_scheduled_at`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_campaigns_tenant_status`);
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_campaigns_tenant_id`);
     await queryRunner.query(`DROP TABLE campaigns`);
   }
 }

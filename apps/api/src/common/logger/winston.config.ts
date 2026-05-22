@@ -37,11 +37,13 @@ export function createWinstonConfig(
       winston.format.colorize({ all: true }),
       winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
       winston.format.errors({ stack: true }),
-      winston.format.printf(({ timestamp, level, context, message, requestId }) => {
-        const ctx = context ? `[${context}]` : '[App]';
-        const rid = requestId ? ` rid=${requestId}` : '';
-        return `[${timestamp as string}] ${level} ${ctx}${rid} ${message as string}`;
-      }),
+      winston.format.printf(
+        ({ timestamp, level, context, message, requestId }) => {
+          const ctx = context ? `[${context as string}]` : '[App]';
+          const rid = requestId ? ` rid=${requestId as string}` : '';
+          return `[${timestamp as string}] ${level} ${ctx}${rid} ${message as string}`;
+        },
+      ),
     ),
     transports: [new winston.transports.Console()],
   };
