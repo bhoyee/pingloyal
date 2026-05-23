@@ -6,7 +6,7 @@ import {
   ConflictException,
   HttpException,
 } from '@nestjs/common';
-import { WaVerificationStatus } from '@pingloyal/types';
+import { WaBusinessCategory, WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { WaOnboardingService } from '../../src/modules/whatsapp/wa-onboarding.service';
@@ -69,7 +69,7 @@ describe('WaOnboardingService', () => {
   const validDto = {
     phoneNumber: '+2348012345678',
     displayName: 'Test Store',
-    category: 'Grocery & Supermarkets' as const,
+    category: WaBusinessCategory.GROCERY_SUPERMARKET,
     description: 'A test grocery store for unit testing purposes',
     website: undefined,
   };

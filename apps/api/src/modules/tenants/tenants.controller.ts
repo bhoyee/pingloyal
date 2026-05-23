@@ -7,8 +7,13 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import 'multer';
 import { UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -71,5 +76,24 @@ export class TenantsController {
   @Roles(UserRole.OWNER)
   getWhatsappStatus(@Req() req: { user: RequestUser }) {
     return this.tenantsService.getWhatsappStatus(req.user.tenantId);
+  }
+
+  @Get('qr-code')
+  @Roles(UserRole.OWNER)
+  getQrCode(@Req() req: { user: RequestUser }, @Query('force') force?: string) {
+    return this.tenantsService.getOrGenerateQrCode(
+      req.user.tenantId,
+      force === 'true',
+    );
+  }
+
+  @Post('logo')
+  @Roles(UserRole.OWNER)
+  @UseInterceptors(FileInterceptor('file', { storage: undefined }))
+  uploadLogo(
+    @Req() req: { user: RequestUser },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.tenantsService.uploadLogo(req.user.tenantId, file);
   }
 }

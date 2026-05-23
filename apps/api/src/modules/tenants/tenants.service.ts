@@ -1,14 +1,26 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
   NotFoundException,
+  PayloadTooLargeException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import Redis from 'ioredis';
+import * as QRCode from 'qrcode';
+import sharp from 'sharp';
+
+interface UploadedFile {
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 import { WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
+import { R2Service } from '../storage/r2.service';
 import { Tenant } from './entities/tenant.entity';
 import { ProductCategory } from './entities/product-category.entity';
 import { TierConfig } from './entities/tier-config.entity';
@@ -27,9 +39,20 @@ export class TenantsService {
     private readonly tierConfigRepo: Repository<TierConfig>,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly r2: R2Service,
+    private readonly config: ConfigService,
   ) {}
 
   // ── Cache helpers ──────────────────────────────────────────────────────────
+
+  private keyFromUrl(url: string): string | null {
+    try {
+      const path = new URL(url).pathname;
+      return path.startsWith('/') ? path.slice(1) : path;
+    } catch {
+      return null;
+    }
+  }
 
   private async invalidateTenantCache(tenantId: string): Promise<void> {
     await Promise.all([
@@ -201,6 +224,83 @@ export class TenantsService {
     return this.toWhatsappStatus(tenant);
   }
 
+  // ── GET /tenants/qr-code ──────────────────────────────────────────────────
+
+  async getOrGenerateQrCode(
+    tenantId: string,
+    force = false,
+  ): Promise<QrCodeResponse> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const registrationUrl = `${this.config.getOrThrow<string>('FRONTEND_URL')}/register/${tenant.slug}`;
+
+    if (tenant.qrCodeUrl && !force) {
+      return { qrCodeUrl: tenant.qrCodeUrl, registrationUrl };
+    }
+
+    const buffer = await QRCode.toBuffer(registrationUrl, {
+      type: 'png',
+      margin: 2,
+      width: 400,
+      color: { dark: '#0F1E35', light: '#FFFFFF' },
+    });
+
+    const key = `qr-codes/${tenantId}/${Date.now()}.png`;
+
+    if (force && tenant.qrCodeUrl) {
+      const oldKey = this.keyFromUrl(tenant.qrCodeUrl);
+      if (oldKey) {
+        await this.r2.deleteFile(oldKey).catch(() => undefined);
+      }
+    }
+
+    const qrCodeUrl = await this.r2.uploadFile({
+      key,
+      buffer,
+      contentType: 'image/png',
+      cacheControl: 'public, max-age=31536000',
+    });
+
+    await this.tenantRepo.update(tenantId, { qrCodeUrl });
+    await this.invalidateTenantCache(tenantId);
+
+    return { qrCodeUrl, registrationUrl };
+  }
+
+  // ── POST /tenants/logo ────────────────────────────────────────────────────
+
+  async uploadLogo(
+    tenantId: string,
+    file: UploadedFile,
+  ): Promise<LogoResponse> {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Only JPEG, PNG, and WebP images allowed');
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      throw new PayloadTooLargeException('Logo must be under 2 MB');
+    }
+
+    const processed = await sharp(file.buffer)
+      .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+      .png({ quality: 90 })
+      .toBuffer();
+
+    const key = `logos/${tenantId}/logo.png`;
+    const logoUrl = await this.r2.uploadFile({
+      key,
+      buffer: processed,
+      contentType: 'image/png',
+      cacheControl: 'public, max-age=31536000',
+    });
+
+    await this.tenantRepo.update(tenantId, { logoUrl });
+    await this.invalidateTenantCache(tenantId);
+
+    return { logoUrl };
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private toSlug(name: string): string {
@@ -262,6 +362,15 @@ export interface WhatsappStatusResponse {
   phoneNumber: string | null;
   category: string | null;
   verifiedAt: Date | null;
+}
+
+export interface QrCodeResponse {
+  qrCodeUrl: string;
+  registrationUrl: string;
+}
+
+export interface LogoResponse {
+  logoUrl: string;
 }
 
 export interface TenantFullResponse {
