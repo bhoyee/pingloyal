@@ -10,5 +10,6 @@ declare namespace Express {
   interface Request {
     id: string;
     tenantId?: string;
+    rawBody?: Buffer;
   }
 }
