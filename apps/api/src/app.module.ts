@@ -17,6 +17,7 @@ import { FullAuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
+import { CustomersModule } from './modules/customers/customers.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -40,14 +41,19 @@ import { createWinstonConfig } from './common/logger/winston.config';
         process.env.LOG_LEVEL ?? 'info',
       ),
     ),
-    // Login throttler: 5 attempts per 15 min (used by AuthController)
-    ThrottlerModule.forRoot([{ name: 'login', ttl: 15 * 60 * 1000, limit: 5 }]),
+    // login: 5 attempts per 15 min (AuthController)
+    // default: 10 requests per 60 s (RegisterController + any future public endpoint)
+    ThrottlerModule.forRoot([
+      { name: 'login', ttl: 15 * 60 * 1000, limit: 5 },
+      { name: 'default', ttl: 60_000, limit: 10 },
+    ]),
     DatabaseModule,
     RedisModule,
     FullAuthModule,
     TenantsModule,
     WhatsappModule,
     HealthModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [
