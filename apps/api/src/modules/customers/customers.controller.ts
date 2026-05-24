@@ -36,6 +36,11 @@ import { ImportService } from './import.service';
 export class RegisterController {
   constructor(private readonly customersService: CustomersService) {}
 
+  @Get(':slug/tenant-info')
+  getTenantInfo(@Param('slug') slug: string) {
+    return this.customersService.getTenantInfo(slug);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ThrottlerGuard)

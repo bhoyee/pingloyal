@@ -288,3 +288,52 @@ describe('CustomersService – register', () => {
     );
   });
 });
+
+describe('CustomersService – getTenantInfo', () => {
+  let service: CustomersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CustomersService,
+        { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
+        { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
+        { provide: REDIS_CLIENT, useValue: mockRedis },
+        { provide: QueueService, useValue: mockQueue },
+      ],
+    }).compile();
+
+    service = module.get(CustomersService);
+    jest.clearAllMocks();
+  });
+
+  // ── 58. Returns tenant info fields for a known slug ───────────────────────────
+  it('T58 — returns public tenant info for a known slug', async () => {
+    mockTenantRepo.findOne.mockResolvedValue({
+      businessName: 'Test Store',
+      logoUrl: null,
+      qrCodeUrl: null,
+      currency: 'NGN',
+      pointsThreshold: 1000,
+      rewardValue: 500,
+      waVerificationStatus: WaVerificationStatus.VERIFIED,
+    });
+
+    const result = await service.getTenantInfo('test-store');
+
+    expect(result.businessName).toBe('Test Store');
+    expect(result.currency).toBe('NGN');
+    expect(result.pointsThreshold).toBe(1000);
+    expect(result.rewardValue).toBe(500);
+    expect(result.waVerificationStatus).toBe(WaVerificationStatus.VERIFIED);
+  });
+
+  // ── 59. Throws NotFoundException for unknown slug ─────────────────────────────
+  it('T59 — throws NotFoundException for an unknown slug', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.getTenantInfo('no-such-store')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});

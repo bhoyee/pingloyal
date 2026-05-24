@@ -1,12 +1,14 @@
-const API_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+
+const API_URL = API_BASE_URL;
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('access_token');
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
@@ -14,6 +16,22 @@ class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+export async function publicGet<T>(path: string): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError('Network error', 0);
+  }
+  if (!res.ok) {
+    throw new ApiError(`HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<T>;
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -105,4 +123,14 @@ export interface WaStatus {
 export interface QrCodeResult {
   qrCodeUrl: string;
   registrationUrl: string;
+}
+
+export interface TenantInfo {
+  businessName: string;
+  logoUrl: string | null;
+  qrCodeUrl: string | null;
+  currency: string;
+  pointsThreshold: number;
+  rewardValue: number;
+  waVerificationStatus: string;
 }
