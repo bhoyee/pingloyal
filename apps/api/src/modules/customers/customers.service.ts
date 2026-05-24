@@ -28,6 +28,16 @@ export interface RegisterCustomerResult {
   isNew: boolean;
 }
 
+export interface TenantInfoResult {
+  businessName: string;
+  logoUrl: string | null;
+  qrCodeUrl: string | null;
+  currency: string;
+  pointsThreshold: number;
+  rewardValue: number;
+  waVerificationStatus: WaVerificationStatus;
+}
+
 @Injectable()
 export class CustomersService {
   private readonly logger = new Logger(CustomersService.name);
@@ -156,5 +166,32 @@ export class CustomersService {
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async getTenantInfo(slug: string): Promise<TenantInfoResult> {
+    const tenant = await this.tenantRepo.findOne({
+      where: { slug },
+      select: [
+        'businessName',
+        'logoUrl',
+        'qrCodeUrl',
+        'currency',
+        'pointsThreshold',
+        'rewardValue',
+        'waVerificationStatus',
+      ],
+    });
+    if (!tenant) {
+      throw new NotFoundException(`Tenant not found: ${slug}`);
+    }
+    return {
+      businessName: tenant.businessName,
+      logoUrl: tenant.logoUrl,
+      qrCodeUrl: tenant.qrCodeUrl,
+      currency: tenant.currency,
+      pointsThreshold: tenant.pointsThreshold,
+      rewardValue: tenant.rewardValue,
+      waVerificationStatus: tenant.waVerificationStatus,
+    };
   }
 }
