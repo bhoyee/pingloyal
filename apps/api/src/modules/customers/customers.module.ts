@@ -8,11 +8,13 @@ import {
   CustomersController,
   RegisterController,
 } from './customers.controller';
+import { ImportService } from './import.service';
+import { ImportListener } from './import.listener';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant, Customer]), QueueModule],
   controllers: [RegisterController, CustomersController],
-  providers: [CustomersService],
+  providers: [CustomersService, ImportService, ImportListener],
   exports: [CustomersService],
 })
 export class CustomersModule {}

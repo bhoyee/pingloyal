@@ -3,14 +3,19 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
+  StreamableFile,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
 import { UserRole } from '@pingloyal/types';
@@ -21,6 +26,7 @@ import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { CustomersService } from './customers.service';
+import { ImportService } from './import.service';
 
 // ── Public registration endpoint ──────────────────────────────────────────────
 
@@ -49,12 +55,48 @@ export class RegisterController {
 
 @Controller('customers')
 export class CustomersController {
-  constructor(private readonly customersService: CustomersService) {}
+  constructor(
+    private readonly customersService: CustomersService,
+    private readonly importService: ImportService,
+  ) {}
 
   @Get()
   @Roles(UserRole.OWNER, UserRole.MANAGER)
   findAll(@CurrentUser() user: RequestUser) {
     return this.customersService.findAll(user.tenantId);
+  }
+
+  // ── CSV import endpoints (before /:id to avoid route shadowing) ──────────────
+
+  @Get('import/template')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Header('Content-Type', 'text/csv')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="customers-import-template.csv"',
+  )
+  getImportTemplate(): StreamableFile {
+    return new StreamableFile(this.importService.buildTemplate());
+  }
+
+  @Post('import')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseInterceptors(FileInterceptor('file'))
+  startImport(
+    @CurrentUser() user: RequestUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.importService.startImport(user.tenantId, file);
+  }
+
+  @Get('import/:jobId')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  getImportStatus(
+    @CurrentUser() user: RequestUser,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+  ) {
+    return this.importService.getJobStatus(user.tenantId, jobId);
   }
 
   @Get(':id')
