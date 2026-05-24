@@ -100,13 +100,20 @@ export class ImportService {
     };
     await this.redis.setex(jobKey, JOB_TTL_S, JSON.stringify(initial));
 
-    const payload: ImportProcessPayload = { jobId, tenantId, buffer: file.buffer };
+    const payload: ImportProcessPayload = {
+      jobId,
+      tenantId,
+      buffer: file.buffer,
+    };
     this.emitter.emit(IMPORT_PROCESS_EVENT, payload);
 
     return { jobId, status: 'pending', message: 'Import started' };
   }
 
-  async getJobStatus(tenantId: string, jobId: string): Promise<ImportJobStatus> {
+  async getJobStatus(
+    tenantId: string,
+    jobId: string,
+  ): Promise<ImportJobStatus> {
     const raw = await this.redis.get(`import:${tenantId}:${jobId}`);
     if (!raw) {
       throw new NotFoundException(`Import job not found: ${jobId}`);
@@ -131,7 +138,9 @@ export class ImportService {
     const { jobId, tenantId, buffer } = payload;
     const jobKey = `import:${tenantId}:${jobId}`;
 
-    const updateJob = async (patch: Partial<ImportJobStatus>): Promise<void> => {
+    const updateJob = async (
+      patch: Partial<ImportJobStatus>,
+    ): Promise<void> => {
       const existing = await this.redis.get(jobKey);
       const current: ImportJobStatus = existing
         ? (JSON.parse(existing) as ImportJobStatus)
@@ -145,7 +154,11 @@ export class ImportService {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-      const merged = { ...current, ...patch, updatedAt: new Date().toISOString() };
+      const merged = {
+        ...current,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
       await this.redis.setex(jobKey, JOB_TTL_S, JSON.stringify(merged));
     };
 
@@ -162,7 +175,7 @@ export class ImportService {
           trim: true,
           comment: '#',
           bom: true,
-        }) as Record<string, string>[];
+        });
       } catch (e) {
         await updateJob({
           status: 'failed',
@@ -212,7 +225,9 @@ export class ImportService {
             row: rowNum,
             phone: rawPhone,
             reason:
-              e instanceof PhoneNormalisationError ? e.message : 'Invalid phone number',
+              e instanceof PhoneNormalisationError
+                ? e.message
+                : 'Invalid phone number',
           });
           continue;
         }
@@ -285,8 +300,12 @@ export class ImportService {
         existingPhoneSet = new Set(existing.map((c) => c.phoneE164));
       }
 
-      const toInsert = dedupedRows.filter((r) => !existingPhoneSet.has(r.phoneE164));
-      const toUpdate = dedupedRows.filter((r) => existingPhoneSet.has(r.phoneE164));
+      const toInsert = dedupedRows.filter(
+        (r) => !existingPhoneSet.has(r.phoneE164),
+      );
+      const toUpdate = dedupedRows.filter((r) =>
+        existingPhoneSet.has(r.phoneE164),
+      );
 
       // Pre-generate IDs for new customers so we can reference them for ledger seeding
       const newCustomerData = toInsert.map((r) => ({

@@ -1,10 +1,8 @@
-import {
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   ImportService,
   IMPORT_PROCESS_EVENT,
+  type ImportJobStatus,
 } from '../../src/modules/customers/import.service';
 import { CustomerSource, PointsLedgerReason } from '@pingloyal/types';
 
@@ -36,7 +34,9 @@ const qbMock = {
   insert: jest.fn().mockReturnThis(),
   into: jest.fn().mockReturnThis(),
   values: jest.fn().mockReturnThis(),
-  execute: jest.fn().mockResolvedValue({ identifiers: [], raw: [], generatedMaps: [] }),
+  execute: jest
+    .fn()
+    .mockResolvedValue({ identifiers: [], raw: [], generatedMaps: [] }),
 };
 
 const emMock = {
@@ -47,27 +47,29 @@ const emMock = {
 const dataSourceMock = {
   transaction: jest
     .fn()
-    .mockImplementation(
-      async (cb: (em: typeof emMock) => Promise<void>) => cb(emMock),
+    .mockImplementation(async (cb: (em: typeof emMock) => Promise<void>) =>
+      cb(emMock),
     ),
 };
 
 const customerRepoMock = {
-  find: jest.fn().mockResolvedValue([]),
+  find: jest.fn<Promise<Array<{ phoneE164: string }>>, [unknown]>(),
 };
 
 const redisMock = {
-  get: jest.fn().mockResolvedValue(null),
-  setex: jest.fn().mockResolvedValue('OK'),
+  get: jest.fn<Promise<string | null>, [key: string]>(),
+  setex: jest.fn<Promise<'OK'>, [key: string, ttl: number, value: string]>(),
 };
 
 const emitterMock = {
-  emit: jest.fn(),
+  emit: jest.fn<boolean, [event: string, payload: unknown]>(),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
+function makeFile(
+  overrides: Partial<Express.Multer.File> = {},
+): Express.Multer.File {
   return {
     fieldname: 'file',
     originalname: 'customers.csv',
@@ -75,7 +77,7 @@ function makeFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.
     mimetype: 'text/csv',
     size: 100,
     buffer: Buffer.from('data'),
-    stream: null as any,
+    stream: null as never,
     destination: '',
     filename: '',
     path: '',
@@ -85,20 +87,23 @@ function makeFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.
 
 function makeService(): ImportService {
   return new ImportService(
-    customerRepoMock as any,
-    dataSourceMock as any,
-    redisMock as any,
-    emitterMock as any,
+    customerRepoMock as never,
+    dataSourceMock as never,
+    redisMock as never,
+    emitterMock as never,
   );
 }
 
 function makePayload(rows: Record<string, string>[]) {
   mockCsvParse.mockReturnValue(rows);
-  return {
-    jobId: 'job-001',
-    tenantId: 'tenant-001',
-    buffer: Buffer.from(''),
-  };
+  return { jobId: 'job-001', tenantId: 'tenant-001', buffer: Buffer.from('') };
+}
+
+/** Extracts the ImportJobStatus written in the most-recent redis.setex call. */
+function lastJobUpdate(): ImportJobStatus {
+  const calls = redisMock.setex.mock.calls;
+  const last = calls[calls.length - 1];
+  return JSON.parse(last[2]) as ImportJobStatus;
 }
 
 const INITIAL_JOB_JSON = JSON.stringify({
@@ -120,7 +125,11 @@ beforeEach(() => {
   redisMock.setex.mockResolvedValue('OK');
   customerRepoMock.find.mockResolvedValue([]);
   emMock.query.mockResolvedValue([]);
-  qbMock.execute.mockResolvedValue({ identifiers: [], raw: [], generatedMaps: [] });
+  qbMock.execute.mockResolvedValue({
+    identifiers: [],
+    raw: [],
+    generatedMaps: [],
+  });
 });
 
 // ── startImport ───────────────────────────────────────────────────────────────
@@ -129,7 +138,7 @@ describe('startImport', () => {
   it('T42 — throws BadRequestException when no file provided', async () => {
     const service = makeService();
     await expect(
-      service.startImport('tenant-1', undefined as any),
+      service.startImport('tenant-1', undefined as never),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -177,13 +186,13 @@ describe('getJobStatus', () => {
   it('T46 — throws NotFoundException when job key absent from Redis', async () => {
     redisMock.get.mockResolvedValue(null);
     const service = makeService();
-    await expect(service.getJobStatus('tenant-1', 'no-such-job')).rejects.toThrow(
-      NotFoundException,
-    );
+    await expect(
+      service.getJobStatus('tenant-1', 'no-such-job'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('T47 — returns parsed status from Redis', async () => {
-    const stored = {
+    const stored: ImportJobStatus = {
       status: 'done',
       total: 10,
       inserted: 8,
@@ -210,11 +219,13 @@ describe('processImport — row validation', () => {
 
     await service.processImport(payload);
 
-    const finalCall = redisMock.setex.mock.calls.at(-1);
-    const finalJob = JSON.parse(finalCall[2] as string);
-    expect(finalJob.status).toBe('done');
-    expect(finalJob.skipped).toBe(1);
-    expect(finalJob.errors[0]).toMatchObject({ row: 2, reason: 'full_name is required' });
+    const job = lastJobUpdate();
+    expect(job.status).toBe('done');
+    expect(job.skipped).toBe(1);
+    expect(job.errors[0]).toMatchObject({
+      row: 2,
+      reason: 'full_name is required',
+    });
   });
 
   it('T49 — records error and skips row with missing phone', async () => {
@@ -223,10 +234,12 @@ describe('processImport — row validation', () => {
 
     await service.processImport(payload);
 
-    const finalCall = redisMock.setex.mock.calls.at(-1);
-    const finalJob = JSON.parse(finalCall[2] as string);
-    expect(finalJob.skipped).toBe(1);
-    expect(finalJob.errors[0]).toMatchObject({ row: 2, reason: 'phone is required' });
+    const job = lastJobUpdate();
+    expect(job.skipped).toBe(1);
+    expect(job.errors[0]).toMatchObject({
+      row: 2,
+      reason: 'phone is required',
+    });
   });
 
   it('T50 — records error and skips row with invalid phone', async () => {
@@ -238,10 +251,9 @@ describe('processImport — row validation', () => {
 
     await service.processImport(payload);
 
-    const finalCall = redisMock.setex.mock.calls.at(-1);
-    const finalJob = JSON.parse(finalCall[2] as string);
-    expect(finalJob.skipped).toBe(1);
-    expect(finalJob.errors[0].reason).toContain('Cannot normalise');
+    const job = lastJobUpdate();
+    expect(job.skipped).toBe(1);
+    expect(job.errors[0].reason).toContain('Cannot normalise');
   });
 });
 
@@ -250,27 +262,34 @@ describe('processImport — row validation', () => {
 describe('processImport — upsert logic', () => {
   it('T51 — inserts new customer with correct fields', async () => {
     mockNormalisePhone.mockReturnValue('+2348012345678');
-    customerRepoMock.find.mockResolvedValue([]); // no existing
+    customerRepoMock.find.mockResolvedValue([]);
 
     const service = makeService();
     const payload = makePayload([
-      { full_name: 'Ada Okonkwo', phone: '08012345678', points_balance: '0', wa_opted_in: 'true' },
+      {
+        full_name: 'Ada Okonkwo',
+        phone: '08012345678',
+        points_balance: '0',
+        wa_opted_in: 'true',
+      },
     ]);
 
     await service.processImport(payload);
 
     expect(qbMock.insert).toHaveBeenCalled();
-    const insertedValues: Array<Record<string, unknown>> = qbMock.values.mock.calls[0][0];
+    const insertedValues = (
+      qbMock.values.mock.calls as Array<[Array<Record<string, unknown>>]>
+    )[0][0];
     const first = insertedValues[0];
-    expect(first.fullName).toBe('Ada Okonkwo');
-    expect(first.phoneE164).toBe('+2348012345678');
-    expect(first.waOptedIn).toBe(true);
-    expect(first.source).toBe(CustomerSource.CSV_IMPORT);
+    expect(first['fullName']).toBe('Ada Okonkwo');
+    expect(first['phoneE164']).toBe('+2348012345678');
+    expect(first['waOptedIn']).toBe(true);
+    expect(first['source']).toBe(CustomerSource.CSV_IMPORT);
 
-    const finalJob = JSON.parse(redisMock.setex.mock.calls.at(-1)[2] as string);
-    expect(finalJob.status).toBe('done');
-    expect(finalJob.inserted).toBe(1);
-    expect(finalJob.updated).toBe(0);
+    const job = lastJobUpdate();
+    expect(job.status).toBe('done');
+    expect(job.inserted).toBe(1);
+    expect(job.updated).toBe(0);
   });
 
   it('T52 — updates existing customer; does not overwrite points or wa_opted_in', async () => {
@@ -292,20 +311,22 @@ describe('processImport — upsert logic', () => {
     // Should NOT call queryBuilder insert
     expect(qbMock.execute).not.toHaveBeenCalled();
 
-    // Should call raw UPDATE query
-    const updateCalls = emMock.query.mock.calls.filter(
-      ([sql]: [string]) => sql.includes('UPDATE customers') && sql.includes('unnest'),
+    // Should call raw UPDATE query — em.query(sql, [phones, names, dobs, extIds, tenantId])
+    const queryCalls = emMock.query.mock.calls as Array<[string, unknown[]]>;
+    const updateCalls = queryCalls.filter(
+      ([sql]) => sql.includes('UPDATE customers') && sql.includes('unnest'),
     );
     expect(updateCalls.length).toBeGreaterThan(0);
-    const [sql, params] = updateCalls[0] as [string, unknown[][]];
-    expect(sql).not.toContain('points_balance');
-    expect(sql).not.toContain('wa_opted_in');
-    // The names array is params[1]
-    expect((params[1] as string[])[0]).toBe('Ada Updated');
+    const [updateSql, updateParams] = updateCalls[0];
+    const [phones, names] = updateParams as [string[], string[]];
+    expect(updateSql).not.toContain('points_balance');
+    expect(updateSql).not.toContain('wa_opted_in');
+    expect(names[0]).toBe('Ada Updated');
+    expect(phones[0]).toBe('+2348012345678');
 
-    const finalJob = JSON.parse(redisMock.setex.mock.calls.at(-1)[2] as string);
-    expect(finalJob.updated).toBe(1);
-    expect(finalJob.inserted).toBe(0);
+    const job = lastJobUpdate();
+    expect(job.updated).toBe(1);
+    expect(job.inserted).toBe(0);
   });
 });
 
@@ -323,14 +344,21 @@ describe('processImport — ledger seeding', () => {
 
     await service.processImport(payload);
 
-    const ledgerCalls = emMock.query.mock.calls.filter(
-      ([sql]: [string]) => sql.includes('points_ledger'),
+    const queryCalls = emMock.query.mock.calls as Array<[string, ...unknown[]]>;
+    const ledgerCalls = queryCalls.filter(([sql]) =>
+      sql.includes('points_ledger'),
     );
-    expect(ledgerCalls.length).toBe(1);
-    const [, params] = ledgerCalls[0] as [string, string[]];
-    expect(params[3]).toBe(150); // delta
-    expect(params[4]).toBe(PointsLedgerReason.IMPORT_SEED);
-    expect(params[5]).toBe(150); // balance_after
+    expect(ledgerCalls).toHaveLength(1);
+
+    // em.query(sql, [id, tenantId, customerId, delta, reason, balanceAfter])
+    const [, ledgerParams] = ledgerCalls[0] as [
+      string,
+      [string, string, string, number, string, number],
+    ];
+    const [, , , delta, reason, balanceAfter] = ledgerParams;
+    expect(delta).toBe(150);
+    expect(reason).toBe(PointsLedgerReason.IMPORT_SEED);
+    expect(balanceAfter).toBe(150);
   });
 
   it('T54 — does NOT seed ledger for existing (updated) customer', async () => {
@@ -344,8 +372,9 @@ describe('processImport — ledger seeding', () => {
 
     await service.processImport(payload);
 
-    const ledgerCalls = emMock.query.mock.calls.filter(
-      ([sql]: [string]) => sql.includes('points_ledger'),
+    const queryCalls = emMock.query.mock.calls as Array<[string, ...unknown[]]>;
+    const ledgerCalls = queryCalls.filter(([sql]) =>
+      sql.includes('points_ledger'),
     );
     expect(ledgerCalls).toHaveLength(0);
   });
@@ -359,21 +388,35 @@ describe('processImport — failure paths', () => {
       throw new Error('unexpected end of file');
     });
     const service = makeService();
-    await service.processImport({ jobId: 'j1', tenantId: 't1', buffer: Buffer.from('') });
+    await service.processImport({
+      jobId: 'j1',
+      tenantId: 't1',
+      buffer: Buffer.from(''),
+    });
 
-    const finalJob = JSON.parse(redisMock.setex.mock.calls.at(-1)[2] as string);
-    expect(finalJob.status).toBe('failed');
-    expect(finalJob.errors[0].reason).toContain('CSV parse error');
+    const job = lastJobUpdate();
+    expect(job.status).toBe('failed');
+    expect(job.errors[0].reason).toContain('CSV parse error');
   });
 
   it('T56 — sets status=failed when CSV has more than 5,000 data rows', async () => {
-    mockCsvParse.mockReturnValue(new Array(5_001).fill({ full_name: 'X', phone: '123' }));
+    const rows = new Array(5_001)
+      .fill(null)
+      .map(() => ({ full_name: 'X', phone: '123' })) as Record<
+      string,
+      string
+    >[];
+    mockCsvParse.mockReturnValue(rows);
     const service = makeService();
-    await service.processImport({ jobId: 'j1', tenantId: 't1', buffer: Buffer.from('') });
+    await service.processImport({
+      jobId: 'j1',
+      tenantId: 't1',
+      buffer: Buffer.from(''),
+    });
 
-    const finalJob = JSON.parse(redisMock.setex.mock.calls.at(-1)[2] as string);
-    expect(finalJob.status).toBe('failed');
-    expect(finalJob.errors[0].reason).toContain('5001');
+    const job = lastJobUpdate();
+    expect(job.status).toBe('failed');
+    expect(job.errors[0].reason).toContain('5001');
   });
 });
 

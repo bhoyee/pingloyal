@@ -71,7 +71,10 @@ export class CustomersController {
   @Get('import/template')
   @Roles(UserRole.OWNER, UserRole.MANAGER)
   @Header('Content-Type', 'text/csv')
-  @Header('Content-Disposition', 'attachment; filename="customers-import-template.csv"')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="customers-import-template.csv"',
+  )
   getImportTemplate(): StreamableFile {
     return new StreamableFile(this.importService.buildTemplate());
   }
