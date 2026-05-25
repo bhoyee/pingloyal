@@ -81,12 +81,11 @@ export class TierService {
 
     // If no tiers configured, null out all customers' tier_id
     if (tiers.length === 0) {
-      // PostgreSQL UPDATE returns [null, rowCount] via TypeORM raw query
-      const result = (await em.query(
+      await em.query(
         'UPDATE customers SET tier_id = NULL, updated_at = NOW() WHERE tenant_id = $1 AND is_active = true',
         [tenantId],
-      )) as [null, number];
-      return { updated: result[1] ?? 0 };
+      );
+      return { updated: 0 };
     }
 
     // Step 2 — Load all active customers in batches of 100
