@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -50,6 +51,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
       { name: 'default', ttl: 60_000, limit: 10 },
     ]),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
     FullAuthModule,
