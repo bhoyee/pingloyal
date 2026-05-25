@@ -6,6 +6,7 @@ import { ProductCategory } from './entities/product-category.entity';
 import { TierConfig } from './entities/tier-config.entity';
 import { TenantsController } from './tenants.controller';
 import { TenantsService } from './tenants.service';
+import { TierService } from './tier.service';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { TenantsService } from './tenants.service';
     StorageModule,
   ],
   controllers: [TenantsController],
-  providers: [TenantsService],
-  exports: [TenantsService],
+  providers: [TenantsService, TierService],
+  exports: [TenantsService, TierService],
 })
 export class TenantsModule {}

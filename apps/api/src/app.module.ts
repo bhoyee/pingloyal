@@ -19,6 +19,7 @@ import { TenantsModule } from './modules/tenants/tenants.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -56,6 +57,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     WhatsappModule,
     HealthModule,
     CustomersModule,
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [
