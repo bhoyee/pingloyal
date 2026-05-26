@@ -8,12 +8,14 @@ import React, {
   useCallback,
 } from 'react';
 import { cashierApi, type TenantMe } from '../../../lib/api';
+import { getPendingCount } from '../../../lib/offline-queue';
 
 interface CashierContextValue {
   tenant: TenantMe | null;
   isLoading: boolean;
   offlineQueueCount: number;
   tenantSlug: string | null;
+  refreshOfflineCount: () => void;
 }
 
 const CashierContext = createContext<CashierContextValue>({
@@ -21,6 +23,7 @@ const CashierContext = createContext<CashierContextValue>({
   isLoading: true,
   offlineQueueCount: 0,
   tenantSlug: null,
+  refreshOfflineCount: () => undefined,
 });
 
 export function CashierProvider({ children }: { children: React.ReactNode }) {
@@ -43,28 +46,21 @@ export function CashierProvider({ children }: { children: React.ReactNode }) {
     void loadTenant();
   }, [loadTenant]);
 
-  // Count pending offline items from localStorage
-  useEffect(() => {
-    function syncCount() {
-      try {
-        const queue = JSON.parse(
-          localStorage.getItem('cashier_offline_queue') ?? '[]',
-        ) as unknown[];
-        setOfflineQueueCount(Array.isArray(queue) ? queue.length : 0);
-      } catch {
-        setOfflineQueueCount(0);
-      }
-    }
-    syncCount();
-    window.addEventListener('storage', syncCount);
-    return () => window.removeEventListener('storage', syncCount);
+  const refreshOfflineCount = useCallback(() => {
+    getPendingCount()
+      .then(setOfflineQueueCount)
+      .catch(() => setOfflineQueueCount(0));
   }, []);
+
+  useEffect(() => {
+    refreshOfflineCount();
+  }, [refreshOfflineCount]);
 
   const tenantSlug = tenant?.slug ?? null;
 
   return (
     <CashierContext.Provider
-      value={{ tenant, isLoading, offlineQueueCount, tenantSlug }}
+      value={{ tenant, isLoading, offlineQueueCount, tenantSlug, refreshOfflineCount }}
     >
       {children}
     </CashierContext.Provider>
