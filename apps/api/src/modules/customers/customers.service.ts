@@ -8,7 +8,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
-import { normalisePhone, PhoneNormalisationError } from '@pingloyal/utils';
+import {
+  normalisePhone,
+  maskPhone,
+  PhoneNormalisationError,
+} from '@pingloyal/utils';
 import { CustomerSource, WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { QueueService } from '../../common/queue/queue.service';
@@ -26,6 +30,18 @@ export interface RegisterCustomerResult {
   waOptedIn: boolean;
   pointsBalance: number;
   isNew: boolean;
+}
+
+export interface CustomerLookupResult {
+  id: string;
+  fullName: string;
+  phoneE164: string;
+  pointsBalance: number;
+  tierId: string | null;
+  tier: string | null;
+  lastPurchaseAt: string | null;
+  purchaseCount: number;
+  progressPercent: number;
 }
 
 export interface TenantInfoResult {
@@ -166,6 +182,48 @@ export class CustomersService {
       where: { tenantId, isActive: true },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async lookup(
+    tenantId: string,
+    rawPhone: string,
+  ): Promise<CustomerLookupResult> {
+    let phoneE164: string;
+    try {
+      phoneE164 = normalisePhone(rawPhone);
+    } catch (err) {
+      if (err instanceof PhoneNormalisationError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+
+    const customer = await this.customerRepo.findOne({
+      where: { tenantId, phoneE164, isActive: true },
+      relations: ['tier'],
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const tenant = await this.tenantRepo.findOne({
+      where: { id: tenantId },
+      select: ['pointsThreshold'],
+    });
+    const threshold = tenant?.pointsThreshold ?? 1000;
+
+    return {
+      id: customer.id,
+      fullName: customer.fullName,
+      phoneE164: maskPhone(phoneE164),
+      pointsBalance: customer.pointsBalance,
+      tierId: customer.tierId,
+      tier: customer.tier?.tierLabel ?? null,
+      lastPurchaseAt: customer.lastPurchaseAt?.toISOString() ?? null,
+      purchaseCount: customer.purchaseCount,
+      progressPercent: Math.min(
+        100,
+        Math.round((customer.pointsBalance / threshold) * 100),
+      ),
+    };
   }
 
   async getTenantInfo(slug: string): Promise<TenantInfoResult> {

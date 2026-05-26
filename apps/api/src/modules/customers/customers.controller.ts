@@ -10,6 +10,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   StreamableFile,
   UploadedFile,
   UseGuards,
@@ -102,6 +103,17 @@ export class CustomersController {
     @Param('jobId', ParseUUIDPipe) jobId: string,
   ) {
     return this.importService.getJobStatus(user.tenantId, jobId);
+  }
+
+  @Get('lookup')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  lookup(@CurrentUser() user: RequestUser, @Query('phone') phone: string) {
+    if (!phone) {
+      throw new BadRequestException('phone query parameter is required');
+    }
+    return this.customersService.lookup(user.tenantId, phone);
   }
 
   @Get(':id')
