@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cashierApi, ApiError, type CustomerLookupResult } from '../../lib/api';
 import { useCashier } from './context/cashier-context';
@@ -24,6 +25,7 @@ function isOnline(): boolean {
 }
 
 export default function CashierPage() {
+  const router = useRouter();
   const { tenant, tenantSlug, offlineQueueCount } = useCashier();
   const [phoneInput, setPhoneInput] = useState('');
   const [state, setState] = useState<LookupState>({ status: 'empty' });
@@ -89,6 +91,11 @@ export default function CashierPage() {
     setPhoneInput('');
     setState({ status: 'empty' });
     if (debounceRef.current) clearTimeout(debounceRef.current);
+  }
+
+  function handleLogPurchase(customer: CustomerLookupResult) {
+    sessionStorage.setItem('cashier_selected_customer', JSON.stringify(customer));
+    router.push(`/cashier/transaction?customerId=${customer.id}`);
   }
 
   return (
@@ -195,7 +202,16 @@ export default function CashierPage() {
         )}
 
         {state.status === 'found' && (
-          <CustomerCard customer={state.customer} />
+          <div className="space-y-3">
+            <CustomerCard customer={state.customer} />
+            <button
+              type="button"
+              onClick={() => handleLogPurchase(state.customer)}
+              className="w-full bg-green-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-green-700 transition-colors"
+            >
+              Log Purchase →
+            </button>
+          </div>
         )}
       </div>
     </div>

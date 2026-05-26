@@ -135,6 +135,27 @@ export interface TenantInfo {
   waVerificationStatus: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface TransactionResult {
+  id: string;
+  amount: string;
+  pointsEarned: number;
+  alreadyProcessed: boolean;
+  customer: {
+    id: string;
+    fullName: string;
+    pointsBalance: number;
+    progressPercent: number;
+    tier: string | null;
+  };
+  createdAt: string;
+}
+
 export interface CustomerLookupResult {
   id: string;
   fullName: string;
