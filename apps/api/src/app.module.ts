@@ -15,6 +15,7 @@ import { AppService } from './app.service';
 import { envValidationSchema } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './common/redis/redis.module';
+import { QueueModule } from './queue/queue.module';
 import { FullAuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
@@ -54,6 +55,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     ScheduleModule.forRoot(),
     DatabaseModule,
     RedisModule,
+    QueueModule,
     FullAuthModule,
     TenantsModule,
     WhatsappModule,

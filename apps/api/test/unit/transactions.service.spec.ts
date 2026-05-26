@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { getQueueToken } from '@nestjs/bullmq';
 import {
   TransactionsService,
   calculatePointsEarned,
@@ -109,8 +109,12 @@ const mockTierService = {
   recalculate: jest.fn().mockResolvedValue(undefined),
 };
 
-const mockEventEmitter = {
-  emit: jest.fn(),
+const mockWaMessagesQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+};
+
+const mockTriggerCheckQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-2' }),
 };
 
 // ── Test suite ────────────────────────────────────────────────────────────────
@@ -160,7 +164,14 @@ describe('TransactionsService', () => {
         { provide: getDataSourceToken(), useValue: mockDataSource },
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: TierService, useValue: mockTierService },
-        { provide: EventEmitter2, useValue: mockEventEmitter },
+        {
+          provide: getQueueToken('wa-messages'),
+          useValue: mockWaMessagesQueue,
+        },
+        {
+          provide: getQueueToken('trigger-check'),
+          useValue: mockTriggerCheckQueue,
+        },
       ],
     }).compile();
 
@@ -265,33 +276,37 @@ describe('TransactionsService', () => {
     );
   });
 
-  it('T16: emits queue.trigger.check event after DB commit', async () => {
+  it('T16: adds check-triggers job to triggerCheckQueue after DB commit', async () => {
     mockTxRepo.findOne.mockResolvedValueOnce(null);
     mockCustomerRepo.findOne.mockResolvedValueOnce(mockCustomer);
     mockTxRepo.findOneOrFail.mockResolvedValueOnce(mockTransaction);
 
     await service.create(TENANT_ID, USER_ID, BASE_DTO);
+    await new Promise((r) => setImmediate(r));
 
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'queue.trigger.check',
+    expect(mockTriggerCheckQueue.add).toHaveBeenCalledWith(
+      'check-triggers',
       expect.objectContaining({ tenantId: TENANT_ID, customerId: CUSTOMER_ID }),
+      expect.any(Object),
     );
   });
 
-  it('T17: emits queue.wa.message event after DB commit', async () => {
+  it('T17: adds send-message job to waMessagesQueue after DB commit', async () => {
     mockTxRepo.findOne.mockResolvedValueOnce(null);
     mockCustomerRepo.findOne.mockResolvedValueOnce(mockCustomer);
     mockTxRepo.findOneOrFail.mockResolvedValueOnce(mockTransaction);
 
     await service.create(TENANT_ID, USER_ID, BASE_DTO);
+    await new Promise((r) => setImmediate(r));
 
-    expect(mockEventEmitter.emit).toHaveBeenCalledWith(
-      'queue.wa.message',
+    expect(mockWaMessagesQueue.add).toHaveBeenCalledWith(
+      'send-message',
       expect.objectContaining({
         type: 'purchase_confirmation',
         tenantId: TENANT_ID,
         customerId: CUSTOMER_ID,
       }),
+      expect.any(Object),
     );
   });
 

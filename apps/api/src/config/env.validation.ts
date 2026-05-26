@@ -42,6 +42,10 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(3000),
   FRONTEND_URL: Joi.string().uri().required(),
 
+  // ── Queue dashboard ───────────────────────────────────────────────────────
+  ADMIN_QUEUE_USER: Joi.string().required(),
+  ADMIN_QUEUE_PASS: Joi.string().min(8).required(),
+
   // ── Optional ──────────────────────────────────────────────────────────────
   SENTRY_DSN: Joi.string().uri().allow('').optional(),
   LOG_LEVEL: Joi.string()

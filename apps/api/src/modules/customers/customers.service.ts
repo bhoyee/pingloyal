@@ -8,10 +8,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { normalisePhone, PhoneNormalisationError } from '@pingloyal/utils';
 import { CustomerSource, WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
-import { QueueService } from '../../common/queue/queue.service';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from './entities/customer.entity';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
@@ -47,7 +48,7 @@ export class CustomersService {
     @InjectRepository(Customer)
     private readonly customerRepo: Repository<Customer>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    private readonly queue: QueueService,
+    @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
   ) {}
 
   async register(
@@ -118,11 +119,16 @@ export class CustomersService {
     // ── WhatsApp welcome trigger gate ──────────────────────────────────────────
     if (dto.waOptedIn && isNew) {
       if (tenant.waVerificationStatus === WaVerificationStatus.VERIFIED) {
-        await this.queue.enqueueWelcomeTrigger({
-          customerId: customer.id,
-          tenantId: tenant.id,
-          phoneE164,
-        });
+        await this.waMessagesQueue.add(
+          'send-message',
+          {
+            type: 'welcome',
+            tenantId: tenant.id,
+            customerId: customer.id,
+            data: { phoneE164 },
+          },
+          { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+        );
       } else {
         this.logger.warn(
           `Skipping welcome trigger — tenant ${tenant.id} WhatsApp not verified ` +
