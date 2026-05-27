@@ -134,6 +134,9 @@ jobs:
       R2_SECRET_KEY: test-secret-key
       # Email placeholder
       RESEND_API_KEY: re_test_placeholder
+      # Queue dashboard
+      ADMIN_QUEUE_USER: admin
+      ADMIN_QUEUE_PASS: testpassword123
       # App
       FRONTEND_URL: http://localhost:3001
       PORT: 3000
@@ -218,6 +221,9 @@ jobs:
       R2_ACCESS_KEY: test-access-key
       R2_SECRET_KEY: test-secret-key
       RESEND_API_KEY: re_test_placeholder
+      # Queue dashboard
+      ADMIN_QUEUE_USER: admin
+      ADMIN_QUEUE_PASS: testpassword123
       FRONTEND_URL: http://localhost:3001
       PORT: 3000
       LOG_LEVEL: error

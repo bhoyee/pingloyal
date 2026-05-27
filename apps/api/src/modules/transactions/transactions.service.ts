@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
 import { PointsLedgerReason, TransactionSource } from '@pingloyal/types';
 import { TenantsService } from '../tenants/tenants.service';
@@ -75,7 +76,8 @@ export class TransactionsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly tenantsService: TenantsService,
     private readonly tierService: TierService,
-    private readonly eventEmitter: EventEmitter2,
+    @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
+    @InjectQueue('trigger-check') private readonly triggerCheckQueue: Queue,
   ) {}
 
   // ── POST /transactions ──────────────────────────────────────────────────────
@@ -207,38 +209,39 @@ export class TransactionsService {
       relations: ['customer', 'customer.tier'],
     });
 
-    // Step 5 — Fire-and-forget events (OUTSIDE the DB transaction)
-    // These will be replaced with real BullMQ queue.add() calls in the
-    // queues module. Do NOT await these — a failed emit must never cause
-    // the HTTP response to fail after a committed transaction.
+    // Step 5 — Fire-and-forget queue jobs (OUTSIDE the DB transaction).
+    // Do NOT await — a failed enqueue must never fail the HTTP response
+    // after a committed transaction.
 
-    // TODO Prompt 21: replace with triggerCheckQueue.add('check-triggers', payload)
-    try {
-      this.eventEmitter.emit('queue.trigger.check', {
-        tenantId,
-        customerId: dto.customerId,
-        transactionId,
-      });
-    } catch (err) {
-      this.logger.error(`Failed to emit queue.trigger.check: ${String(err)}`);
-    }
+    this.triggerCheckQueue
+      .add(
+        'check-triggers',
+        { tenantId, customerId: dto.customerId, transactionId },
+        { attempts: 2, backoff: { type: 'fixed', delay: 2000 } },
+      )
+      .catch((err: unknown) =>
+        this.logger.error(`Failed to enqueue check-triggers: ${String(err)}`),
+      );
 
-    // TODO Prompt 21: replace with waMessagesQueue.add('send-message', payload)
-    try {
-      this.eventEmitter.emit('queue.wa.message', {
-        type: 'purchase_confirmation',
-        tenantId,
-        customerId: dto.customerId,
-        data: {
-          pointsEarned: pointsEarned.toString(),
-          newBalance: newBalance.toString(),
-          threshold: String(tenant.pointsThreshold),
-          rewardValue: String(tenant.rewardValue),
+    this.waMessagesQueue
+      .add(
+        'send-message',
+        {
+          type: 'purchase_confirmation',
+          tenantId,
+          customerId: dto.customerId,
+          data: {
+            pointsEarned: pointsEarned.toString(),
+            newBalance: newBalance.toString(),
+            threshold: String(tenant.pointsThreshold),
+            rewardValue: String(tenant.rewardValue),
+          },
         },
-      });
-    } catch (err) {
-      this.logger.error(`Failed to emit queue.wa.message: ${String(err)}`);
-    }
+        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+      )
+      .catch((err: unknown) =>
+        this.logger.error(`Failed to enqueue send-message: ${String(err)}`),
+      );
 
     return this.buildResult(savedTx, tenant.pointsThreshold, false);
   }

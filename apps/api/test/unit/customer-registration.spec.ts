@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { WaVerificationStatus, CustomerSource } from '@pingloyal/types';
+import { getQueueToken } from '@nestjs/bullmq';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { Customer } from '../../src/modules/customers/entities/customer.entity';
-import { QueueService } from '../../src/common/queue/queue.service';
 import { CustomersService } from '../../src/modules/customers/customers.service';
 import type { RegisterCustomerDto } from '../../src/modules/customers/dto/register-customer.dto';
 
@@ -39,8 +39,8 @@ const mockRedis = {
   get: jest.fn(),
   setex: jest.fn().mockResolvedValue('OK'),
 };
-const mockQueue = {
-  enqueueWelcomeTrigger: jest.fn().mockResolvedValue(undefined),
+const mockWaMessagesQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-1' }),
 };
 
 const TENANT_VERIFIED: Partial<Tenant> = {
@@ -75,7 +75,10 @@ describe('CustomersService – register', () => {
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
         { provide: REDIS_CLIENT, useValue: mockRedis },
-        { provide: QueueService, useValue: mockQueue },
+        {
+          provide: getQueueToken('wa-messages'),
+          useValue: mockWaMessagesQueue,
+        },
       ],
     }).compile();
 
@@ -87,7 +90,7 @@ describe('CustomersService – register', () => {
     // Default: no idempotency cache hit
     mockRedis.get.mockResolvedValue(null);
     mockRedis.setex.mockResolvedValue('OK');
-    mockQueue.enqueueWelcomeTrigger.mockResolvedValue(undefined);
+    mockWaMessagesQueue.add.mockResolvedValue({ id: 'job-1' });
   });
 
   // ── 32. Returns cached idempotency result from Redis ──────────────────────────
@@ -192,12 +195,14 @@ describe('CustomersService – register', () => {
 
     await service.register(BASE_DTO, IDEM_KEY);
 
-    expect(mockQueue.enqueueWelcomeTrigger).toHaveBeenCalledWith(
+    expect(mockWaMessagesQueue.add).toHaveBeenCalledWith(
+      'send-message',
       expect.objectContaining({
+        type: 'welcome',
         customerId: 'cust-new',
         tenantId: 'tenant-uuid-1',
-        phoneE164: E164,
       }),
+      expect.any(Object),
     );
   });
 
@@ -218,7 +223,7 @@ describe('CustomersService – register', () => {
 
     await service.register({ ...BASE_DTO, waOptedIn: false }, IDEM_KEY);
 
-    expect(mockQueue.enqueueWelcomeTrigger).not.toHaveBeenCalled();
+    expect(mockWaMessagesQueue.add).not.toHaveBeenCalled();
   });
 
   // ── 39. Skips welcome trigger (no error) when WA not verified ─────────────────
@@ -238,7 +243,7 @@ describe('CustomersService – register', () => {
 
     // Must NOT throw even though WA is not verified
     await expect(service.register(BASE_DTO, IDEM_KEY)).resolves.not.toThrow();
-    expect(mockQueue.enqueueWelcomeTrigger).not.toHaveBeenCalled();
+    expect(mockWaMessagesQueue.add).not.toHaveBeenCalled();
   });
 
   // ── 40. Updates existing customer opt-in when previously opted out ────────────
@@ -299,7 +304,10 @@ describe('CustomersService – getTenantInfo', () => {
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
         { provide: REDIS_CLIENT, useValue: mockRedis },
-        { provide: QueueService, useValue: mockQueue },
+        {
+          provide: getQueueToken('wa-messages'),
+          useValue: mockWaMessagesQueue,
+        },
       ],
     }).compile();
 

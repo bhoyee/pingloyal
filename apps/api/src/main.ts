@@ -6,14 +6,37 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 dotenv.config({ path: path.join(process.cwd(), '../../.env') });
 
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, RequestMethod } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
 import helmet from 'helmet';
 import compression from 'compression';
 import * as Sentry from '@sentry/node';
+import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { createWinstonConfig } from './common/logger/winston.config';
+
+function basicAuth(req: Request, res: Response, next: NextFunction): void {
+  const auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Queue Dashboard"');
+    res.status(401).send('Authentication required');
+    return;
+  }
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString();
+  const colonIdx = decoded.indexOf(':');
+  const username = decoded.slice(0, colonIdx);
+  const password = decoded.slice(colonIdx + 1);
+  if (
+    username === process.env.ADMIN_QUEUE_USER &&
+    password === process.env.ADMIN_QUEUE_PASS
+  ) {
+    next();
+    return;
+  }
+  res.setHeader('WWW-Authenticate', 'Basic realm="Queue Dashboard"');
+  res.status(401).send('Invalid credentials');
+}
 
 async function bootstrap(): Promise<void> {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
@@ -42,8 +65,13 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  // Global route prefix
-  app.setGlobalPrefix('api/v1');
+  // Global route prefix — exclude /admin so Bull Board is reachable without prefix
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'admin/(.*)', method: RequestMethod.ALL }],
+  });
+
+  // Basic auth guard for queue dashboard
+  app.use('/admin', basicAuth);
 
   // Global validation pipe
   app.useGlobalPipes(

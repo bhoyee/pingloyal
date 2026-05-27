@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { QueueModule } from '../../common/queue/queue.module';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from './entities/customer.entity';
 import { CustomersService } from './customers.service';
@@ -12,7 +11,7 @@ import { ImportService } from './import.service';
 import { ImportListener } from './import.listener';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tenant, Customer]), QueueModule],
+  imports: [TypeOrmModule.forFeature([Tenant, Customer])],
   controllers: [RegisterController, CustomersController],
   providers: [CustomersService, ImportService, ImportListener],
   exports: [CustomersService],
