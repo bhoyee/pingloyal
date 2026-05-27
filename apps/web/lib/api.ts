@@ -134,3 +134,91 @@ export interface TenantInfo {
   rewardValue: number;
   waVerificationStatus: string;
 }
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface TransactionResult {
+  id: string;
+  amount: string;
+  pointsEarned: number;
+  alreadyProcessed: boolean;
+  customer: {
+    id: string;
+    fullName: string;
+    pointsBalance: number;
+    progressPercent: number;
+    tier: string | null;
+  };
+  createdAt: string;
+}
+
+export interface CustomerLookupResult {
+  id: string;
+  fullName: string;
+  phoneE164: string;
+  pointsBalance: number;
+  tierId: string | null;
+  tier: string | null;
+  lastPurchaseAt: string | null;
+  purchaseCount: number;
+  progressPercent: number;
+}
+
+// ── Cashier API (uses cashier_token, redirects to /cashier/login on 401) ──────
+
+function getCashierToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('cashier_token');
+}
+
+async function cashierRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = getCashierToken();
+
+  if (!token) {
+    window.location.href = '/cashier/login';
+    throw new ApiError('No auth token', 401);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new ApiError('Network error — check your connection', 0);
+  }
+
+  if (res.status === 401) {
+    localStorage.removeItem('cashier_token');
+    window.location.href = '/cashier/login';
+    throw new ApiError('Session expired', 401);
+  }
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg =
+      typeof body.message === 'string' ? body.message : `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export const cashierApi = {
+  get: <T>(path: string) => cashierRequest<T>(path),
+  post: <T>(path: string, body: unknown) =>
+    cashierRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+};
