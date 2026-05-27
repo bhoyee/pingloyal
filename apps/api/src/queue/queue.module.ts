@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
@@ -86,13 +86,6 @@ export const QUEUE_NAMES = {
     CampaignSendProcessor,
     IntegrationSyncProcessor,
   ],
-  exports: [
-    BullModule,
-    getQueueToken(QUEUE_NAMES.WA_MESSAGES),
-    getQueueToken(QUEUE_NAMES.TRIGGER_CHECK),
-    getQueueToken(QUEUE_NAMES.CAMPAIGN_SEND),
-    getQueueToken(QUEUE_NAMES.INTEGRATION_SYNC),
-    getQueueToken(QUEUE_NAMES.SCHEDULED_JOBS),
-  ],
+  exports: [BullModule],
 })
 export class QueueModule {}
