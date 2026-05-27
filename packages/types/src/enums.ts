@@ -82,6 +82,7 @@ export enum SkipReason {
   NOT_OPTED_IN = 'not_opted_in',
   WALLET_EMPTY = 'wallet_empty',
   RECENTLY_SENT = 'recently_sent',
+  WA_NOT_CONNECTED = 'wa_not_connected',
 }
 
 export enum IntegrationConnectionType {

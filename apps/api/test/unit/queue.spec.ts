@@ -1,9 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import * as Sentry from '@sentry/node';
 import { WaMessageProcessor } from '../../src/queue/processors/wa-message.processor';
 import { TriggerCheckProcessor } from '../../src/queue/processors/trigger-check.processor';
 import { QUEUE_NAMES } from '../../src/queue/queue.module';
+import { TenantsService } from '../../src/modules/tenants/tenants.service';
+import { BspService } from '../../src/modules/whatsapp/bsp.service';
+import { WalletService } from '../../src/modules/billing/wallet.service';
+import { MessageBuilderService } from '../../src/queue/message-builder.service';
+import { Customer } from '../../src/modules/customers/entities/customer.entity';
+import { TriggerLog } from '../../src/modules/triggers/entities/trigger-log.entity';
+import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
+import { CampaignLog } from '../../src/modules/campaigns/entities/campaign-log.entity';
+import { WaVerificationStatus } from '@pingloyal/types';
 import type { Job } from 'bullmq';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -47,23 +57,46 @@ it('T1 — QUEUE_NAMES exports all 5 required queue names', () => {
   expect(QUEUE_NAMES.SCHEDULED_JOBS).toBe('scheduled-jobs');
 });
 
-// ── T2-T3: Processor instantiation with mocked queue ─────────────────────────
+// ── T2-T3: Processor instantiation with mocked dependencies ──────────────────
 
 describe('WaMessageProcessor', () => {
   let processor: WaMessageProcessor;
 
+  const mockTenantService = {
+    findOne: jest.fn().mockResolvedValue({
+      id: 't1',
+      waVerificationStatus: WaVerificationStatus.VERIFIED,
+      gupshupApiKey: 'k',
+      gupshupAppId: 'a',
+      waPhoneNumber: '+234',
+      businessName: 'S',
+      pointsThreshold: 1000,
+      rewardValue: 500,
+    }),
+  };
+
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WaMessageProcessor,
-        { provide: getQueueToken('wa-messages'), useValue: { add: jest.fn() } },
+        { provide: TenantsService, useValue: mockTenantService },
+        { provide: BspService, useValue: { sendMessage: jest.fn() } },
+        { provide: WalletService, useValue: { deductMarketing: jest.fn(), creditWallet: jest.fn() } },
+        { provide: MessageBuilderService, useValue: { build: jest.fn() } },
+        { provide: getRepositoryToken(Customer), useValue: { findOne: jest.fn() } },
+        { provide: getRepositoryToken(TriggerLog), useValue: { create: jest.fn((d: unknown) => d), save: jest.fn() } },
+        { provide: getRepositoryToken(Campaign), useValue: { increment: jest.fn() } },
+        { provide: getRepositoryToken(CampaignLog), useValue: { update: jest.fn() } },
       ],
     }).compile();
 
     processor = module.get(WaMessageProcessor);
   });
 
-  it('T2 — process() resolves without throwing (placeholder)', async () => {
+  it('T2 — process() returns early when tenantId is missing (no throw)', async () => {
+    // makeJob has no tenantId → findOne(undefined) throws → processor logs and returns
+    mockTenantService.findOne.mockRejectedValueOnce(new Error('Tenant not found'));
     const job = makeJob();
     await expect(processor.process(job)).resolves.toBeUndefined();
   });
