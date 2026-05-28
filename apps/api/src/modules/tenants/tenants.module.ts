@@ -18,6 +18,6 @@ import { QuarterlyResetCron } from './quarterly-reset.cron';
   ],
   controllers: [TenantsController],
   providers: [TenantsService, TierService, QuarterlyResetCron],
-  exports: [TenantsService, TierService],
+  exports: [TenantsService, TierService, QuarterlyResetCron],
 })
 export class TenantsModule {}
