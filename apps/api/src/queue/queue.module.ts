@@ -1,13 +1,23 @@
 import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { redisConfig } from './redis.config';
+import { TenantsModule } from '../modules/tenants/tenants.module';
+import { WhatsappModule } from '../modules/whatsapp/whatsapp.module';
+import { Customer } from '../modules/customers/entities/customer.entity';
+import { TriggerLog } from '../modules/triggers/entities/trigger-log.entity';
+import { WalletTransaction } from '../modules/billing/entities/wallet-transaction.entity';
+import { Campaign } from '../modules/campaigns/entities/campaign.entity';
+import { CampaignLog } from '../modules/campaigns/entities/campaign-log.entity';
 import { WaMessageProcessor } from './processors/wa-message.processor';
 import { TriggerCheckProcessor } from './processors/trigger-check.processor';
 import { CampaignSendProcessor } from './processors/campaign-send.processor';
 import { IntegrationSyncProcessor } from './processors/integration-sync.processor';
+import { WalletService } from '../modules/billing/wallet.service';
+import { MessageBuilderService } from './message-builder.service';
 
 export const QUEUE_NAMES = {
   WA_MESSAGES: 'wa-messages',
@@ -79,13 +89,24 @@ export const QUEUE_NAMES = {
       { name: QUEUE_NAMES.INTEGRATION_SYNC, adapter: BullMQAdapter },
       { name: QUEUE_NAMES.SCHEDULED_JOBS, adapter: BullMQAdapter },
     ),
+    TypeOrmModule.forFeature([
+      Customer,
+      TriggerLog,
+      WalletTransaction,
+      Campaign,
+      CampaignLog,
+    ]),
+    TenantsModule,
+    WhatsappModule,
   ],
   providers: [
     WaMessageProcessor,
     TriggerCheckProcessor,
     CampaignSendProcessor,
     IntegrationSyncProcessor,
+    WalletService,
+    MessageBuilderService,
   ],
-  exports: [BullModule],
+  exports: [BullModule, WalletService, MessageBuilderService],
 })
 export class QueueModule {}
