@@ -159,7 +159,11 @@ export class WaMessageProcessor extends WorkerHost {
             errorMessage: 'wallet_empty',
             failedAt: new Date(),
           });
-          await this.campaignRepo.increment({ id: campaignId }, 'failedCount', 1);
+          await this.campaignRepo.increment(
+            { id: campaignId },
+            'failedCount',
+            1,
+          );
         }
         return;
       }
@@ -200,9 +204,17 @@ export class WaMessageProcessor extends WorkerHost {
     } catch (err: unknown) {
       // Step 9 — BSP error: log, refund if marketing, re-throw for BullMQ retry
       const errMsg =
-        err instanceof Error ? err.message.slice(0, 100) : String(err).slice(0, 100);
+        err instanceof Error
+          ? err.message.slice(0, 100)
+          : String(err).slice(0, 100);
 
-      await this.logTrigger(tenantId, customerId, type, TriggerStatus.FAILED, errMsg);
+      await this.logTrigger(
+        tenantId,
+        customerId,
+        type,
+        TriggerStatus.FAILED,
+        errMsg,
+      );
 
       if (walletDeducted) {
         await this.walletService.creditWallet(

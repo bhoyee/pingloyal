@@ -7,9 +7,7 @@ import { WalletTransaction } from './entities/wallet-transaction.entity';
 
 @Injectable()
 export class WalletService {
-  constructor(
-    @InjectDataSource() private readonly dataSource: DataSource,
-  ) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async deductMarketing(
     tenantId: string,
@@ -30,7 +28,11 @@ export class WalletService {
       if (current < amount) return { success: false, newBalance: current };
 
       const newBalance = parseFloat((current - amount).toFixed(2));
-      await em.update(Tenant, { id: tenantId }, { marketingWalletBalance: newBalance });
+      await em.update(
+        Tenant,
+        { id: tenantId },
+        { marketingWalletBalance: newBalance },
+      );
 
       await em.save(
         em.create(WalletTransaction, {
@@ -64,7 +66,11 @@ export class WalletService {
       const newBalance = parseFloat(
         (Number(tenant.marketingWalletBalance) + amount).toFixed(2),
       );
-      await em.update(Tenant, { id: tenantId }, { marketingWalletBalance: newBalance });
+      await em.update(
+        Tenant,
+        { id: tenantId },
+        { marketingWalletBalance: newBalance },
+      );
 
       await em.save(
         em.create(WalletTransaction, {
@@ -89,7 +95,9 @@ export class WalletService {
       case TriggerType.CAMPAIGN_MESSAGE:
         return WalletTransactionType.DEBIT_CAMPAIGN;
       default:
-        throw new Error(`No wallet transaction type for trigger: ${triggerType}`);
+        throw new Error(
+          `No wallet transaction type for trigger: ${triggerType}`,
+        );
     }
   }
 }

@@ -46,14 +46,16 @@ const mockCustomer = {
   isActive: true,
 } as unknown as Customer;
 
-function makeJob(overrides: Partial<{
-  type: TriggerType;
-  tenantId: string;
-  customerId: string | null;
-  data: Record<string, string>;
-  campaignLogId?: string;
-  campaignId?: string;
-}> = {}): Job {
+function makeJob(
+  overrides: Partial<{
+    type: TriggerType;
+    tenantId: string;
+    customerId: string | null;
+    data: Record<string, string>;
+    campaignLogId?: string;
+    campaignId?: string;
+  }> = {},
+): Job {
   return {
     id: 'job-test-1',
     data: {
@@ -91,8 +93,13 @@ describe('WaMessageProcessor', () => {
     // Sensible defaults — override per test as needed
     mockTenantService.findOne.mockResolvedValue(mockTenant);
     mockCustomerRepo.findOne.mockResolvedValue(mockCustomer);
-    mockBspService.sendMessage.mockResolvedValue({ messageId: 'wa-msg-default' });
-    mockWalletService.deductMarketing.mockResolvedValue({ success: true, newBalance: 1170 });
+    mockBspService.sendMessage.mockResolvedValue({
+      messageId: 'wa-msg-default',
+    });
+    mockWalletService.deductMarketing.mockResolvedValue({
+      success: true,
+      newBalance: 1170,
+    });
     mockWalletService.creditWallet.mockResolvedValue(undefined);
     mockMessageBuilder.build.mockReturnValue({
       templateName: 'pingloyal_purchase_confirm',
@@ -111,9 +118,15 @@ describe('WaMessageProcessor', () => {
         { provide: WalletService, useValue: mockWalletService },
         { provide: MessageBuilderService, useValue: mockMessageBuilder },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
-        { provide: getRepositoryToken(TriggerLog), useValue: mockTriggerLogRepo },
+        {
+          provide: getRepositoryToken(TriggerLog),
+          useValue: mockTriggerLogRepo,
+        },
         { provide: getRepositoryToken(Campaign), useValue: mockCampaignRepo },
-        { provide: getRepositoryToken(CampaignLog), useValue: mockCampaignLogRepo },
+        {
+          provide: getRepositoryToken(CampaignLog),
+          useValue: mockCampaignLogRepo,
+        },
       ],
     }).compile();
 
@@ -123,9 +136,14 @@ describe('WaMessageProcessor', () => {
   // ── Hard gate tests ────────────────────────────────────────────────────────
 
   it('T1 — waOptedIn=false → BSP never called, trigger_log skipped with not_opted_in', async () => {
-    mockCustomerRepo.findOne.mockResolvedValue({ ...mockCustomer, waOptedIn: false });
+    mockCustomerRepo.findOne.mockResolvedValue({
+      ...mockCustomer,
+      waOptedIn: false,
+    });
 
-    await processor.process(makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }));
+    await processor.process(
+      makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }),
+    );
 
     expect(mockBspService.sendMessage).not.toHaveBeenCalled();
     expect(mockTriggerLogRepo.save).toHaveBeenCalledTimes(1);
@@ -143,7 +161,9 @@ describe('WaMessageProcessor', () => {
       waVerificationStatus: WaVerificationStatus.PENDING,
     });
 
-    await processor.process(makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }));
+    await processor.process(
+      makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }),
+    );
 
     expect(mockBspService.sendMessage).not.toHaveBeenCalled();
     expect(mockTriggerLogRepo.save).toHaveBeenCalledTimes(1);
@@ -169,7 +189,10 @@ describe('WaMessageProcessor', () => {
   // ── Wallet gate tests ──────────────────────────────────────────────────────
 
   it('T4 — BIRTHDAY + wallet empty → BSP never called, trigger_log skipped wallet_empty', async () => {
-    mockWalletService.deductMarketing.mockResolvedValue({ success: false, newBalance: 0 });
+    mockWalletService.deductMarketing.mockResolvedValue({
+      success: false,
+      newBalance: 0,
+    });
     mockMessageBuilder.build.mockReturnValue({
       templateName: 'pingloyal_birthday',
       variables: ['Test', 'Test Store'],
@@ -210,7 +233,9 @@ describe('WaMessageProcessor', () => {
       templateName: 'pingloyal_welcome',
       variables: ['Test', 'Test Store', '1000', '500'],
     });
-    mockBspService.sendMessage.mockResolvedValue({ messageId: 'msg-welcome-1' });
+    mockBspService.sendMessage.mockResolvedValue({
+      messageId: 'msg-welcome-1',
+    });
 
     await processor.process(makeJob({ type: TriggerType.WELCOME, data: {} }));
 
@@ -232,7 +257,9 @@ describe('WaMessageProcessor', () => {
   it('T8 — BSP success → trigger_log status=sent, waMessageId stored', async () => {
     mockBspService.sendMessage.mockResolvedValue({ messageId: 'wa-msg-xyz' });
 
-    await processor.process(makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }));
+    await processor.process(
+      makeJob({ type: TriggerType.PURCHASE_CONFIRMATION }),
+    );
 
     expect(mockTriggerLogRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -314,7 +341,10 @@ describe('WaMessageProcessor', () => {
   });
 
   it('T12 — campaignLogId + wallet_empty → campaign_log status=failed, failedCount incremented', async () => {
-    mockWalletService.deductMarketing.mockResolvedValue({ success: false, newBalance: 0 });
+    mockWalletService.deductMarketing.mockResolvedValue({
+      success: false,
+      newBalance: 0,
+    });
 
     await processor.process(
       makeJob({
@@ -393,23 +423,33 @@ describe('MessageBuilderService', () => {
     const result = builder.build(TriggerType.WELCOME, customer, tenant, {});
     expect(result.templateName).toBe('pingloyal_welcome');
     expect(result.variables).toHaveLength(4);
-    expect(result.variables[0]).toBe('Ada');          // firstName
-    expect(result.variables[1]).toBe('My Store');     // businessName
-    expect(result.variables[2]).toBe('1000');         // threshold
-    expect(result.variables[3]).toBe('500');          // rewardValue
+    expect(result.variables[0]).toBe('Ada'); // firstName
+    expect(result.variables[1]).toBe('My Store'); // businessName
+    expect(result.variables[2]).toBe('1000'); // threshold
+    expect(result.variables[3]).toBe('500'); // rewardValue
   });
 
   it('T15 — PURCHASE_CONFIRMATION → 6 variables, pctToGoal at index 4', () => {
     const data = { pointsEarned: '10', newBalance: '110' };
-    const result = builder.build(TriggerType.PURCHASE_CONFIRMATION, customer, tenant, data);
+    const result = builder.build(
+      TriggerType.PURCHASE_CONFIRMATION,
+      customer,
+      tenant,
+      data,
+    );
     expect(result.variables).toHaveLength(6);
-    expect(result.variables[4]).toBe('11');  // 110/1000 * 100 = 11%
+    expect(result.variables[4]).toBe('11'); // 110/1000 * 100 = 11%
     expect(result.variables[5]).toBe('500'); // rewardValue
   });
 
   it('T16 — LAPSED_WINBACK → 3 variables, daysSinceVisit at index 2', () => {
     const data = { daysSinceVisit: '45' };
-    const result = builder.build(TriggerType.LAPSED_WINBACK, customer, tenant, data);
+    const result = builder.build(
+      TriggerType.LAPSED_WINBACK,
+      customer,
+      tenant,
+      data,
+    );
     expect(result.variables).toHaveLength(3);
     expect(result.variables[2]).toBe('45');
   });
@@ -422,7 +462,7 @@ describe('MessageBuilderService', () => {
     };
     const result = builder.build(
       TriggerType.WALLET_LOW_BALANCE,
-      null as unknown as Customer,
+      null,
       tenant,
       data,
     );
@@ -434,12 +474,7 @@ describe('MessageBuilderService', () => {
 
   it('T18 — Unknown trigger type → throws Error', () => {
     expect(() =>
-      builder.build(
-        'completely_unknown' as TriggerType,
-        customer,
-        tenant,
-        {},
-      ),
+      builder.build('completely_unknown' as TriggerType, customer, tenant, {}),
     ).toThrow(/Unknown trigger type/);
   });
 });

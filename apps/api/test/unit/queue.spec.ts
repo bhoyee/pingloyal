@@ -82,12 +82,27 @@ describe('WaMessageProcessor', () => {
         WaMessageProcessor,
         { provide: TenantsService, useValue: mockTenantService },
         { provide: BspService, useValue: { sendMessage: jest.fn() } },
-        { provide: WalletService, useValue: { deductMarketing: jest.fn(), creditWallet: jest.fn() } },
+        {
+          provide: WalletService,
+          useValue: { deductMarketing: jest.fn(), creditWallet: jest.fn() },
+        },
         { provide: MessageBuilderService, useValue: { build: jest.fn() } },
-        { provide: getRepositoryToken(Customer), useValue: { findOne: jest.fn() } },
-        { provide: getRepositoryToken(TriggerLog), useValue: { create: jest.fn((d: unknown) => d), save: jest.fn() } },
-        { provide: getRepositoryToken(Campaign), useValue: { increment: jest.fn() } },
-        { provide: getRepositoryToken(CampaignLog), useValue: { update: jest.fn() } },
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(TriggerLog),
+          useValue: { create: jest.fn((d: unknown) => d), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(Campaign),
+          useValue: { increment: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(CampaignLog),
+          useValue: { update: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -96,7 +111,9 @@ describe('WaMessageProcessor', () => {
 
   it('T2 — process() returns early when tenantId is missing (no throw)', async () => {
     // makeJob has no tenantId → findOne(undefined) throws → processor logs and returns
-    mockTenantService.findOne.mockRejectedValueOnce(new Error('Tenant not found'));
+    mockTenantService.findOne.mockRejectedValueOnce(
+      new Error('Tenant not found'),
+    );
     const job = makeJob();
     await expect(processor.process(job)).resolves.toBeUndefined();
   });
