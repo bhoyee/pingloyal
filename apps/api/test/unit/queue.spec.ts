@@ -179,21 +179,34 @@ describe('WaMessageProcessor', () => {
 describe('TriggerCheckProcessor', () => {
   let processor: TriggerCheckProcessor;
 
+  const mockTcTenantService = {
+    findOne: jest.fn().mockRejectedValue(new Error('not found')),
+  };
+
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TriggerCheckProcessor,
         {
-          provide: getQueueToken('trigger-check'),
+          provide: getQueueToken('wa-messages'),
           useValue: { add: jest.fn() },
         },
+        {
+          provide: getRepositoryToken(Customer),
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+            update: jest.fn(),
+          },
+        },
+        { provide: TenantsService, useValue: mockTcTenantService },
       ],
     }).compile();
 
     processor = module.get(TriggerCheckProcessor);
   });
 
-  it('T7 — process() resolves without throwing (placeholder)', async () => {
+  it('T7 — process() returns early when customer not found (no throw)', async () => {
     await expect(processor.process(makeJob())).resolves.toBeUndefined();
   });
 
