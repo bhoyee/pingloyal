@@ -194,7 +194,10 @@ describe('TriggerCheckProcessor', () => {
         },
         {
           provide: getRepositoryToken(Customer),
-          useValue: { findOne: jest.fn().mockResolvedValue(null), update: jest.fn() },
+          useValue: {
+            findOne: jest.fn().mockResolvedValue(null),
+            update: jest.fn(),
+          },
         },
         { provide: TenantsService, useValue: mockTcTenantService },
       ],

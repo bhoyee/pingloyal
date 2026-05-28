@@ -62,8 +62,7 @@ export class TriggerCheckProcessor extends WorkerHost {
       return;
     }
 
-    const pct =
-      Number(customer.pointsBalance) / Number(tenant.pointsThreshold);
+    const pct = Number(customer.pointsBalance) / Number(tenant.pointsThreshold);
     const now = Date.now();
 
     if (pct >= 0.8 && pct < 1.0) {
@@ -74,8 +73,7 @@ export class TriggerCheckProcessor extends WorkerHost {
         const pointsNeeded =
           Number(tenant.pointsThreshold) - Number(customer.pointsBalance);
         const earnRate = Number(tenant.pointsEarnRate);
-        const amountToGoal =
-          Math.ceil((pointsNeeded * earnRate) / 100) * 100;
+        const amountToGoal = Math.ceil((pointsNeeded * earnRate) / 100) * 100;
 
         await this.waQueue
           .add('send', {

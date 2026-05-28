@@ -160,10 +160,12 @@ describe('TriggerCheckProcessor', () => {
         type: TriggerType.THRESHOLD_NUDGE,
         tenantId: 't1',
         customerId: 'c1',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({ amountToGoal: '200' }),
       }),
     );
     expect(mockCustomerRepo.update).toHaveBeenCalledWith('c1', {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       nudgeSentAt: expect.any(Date),
     });
   });
@@ -195,6 +197,7 @@ describe('TriggerCheckProcessor', () => {
     expect(mockWaQueue.add).toHaveBeenCalledWith(
       'send',
       expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({ amountToGoal: '200' }),
       }),
     );
@@ -217,6 +220,7 @@ describe('TriggerCheckProcessor', () => {
       }),
     );
     expect(mockCustomerRepo.update).toHaveBeenCalledWith('c1', {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       rewardSentAt: expect.any(Date),
     });
   });
