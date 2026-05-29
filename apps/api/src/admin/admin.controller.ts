@@ -1,6 +1,7 @@
 import { Controller, Post, NotFoundException } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { BirthdayCronService } from '../modules/triggers/birthday-cron.service';
+import { LapsedCronService } from '../modules/triggers/lapsed-cron.service';
 import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
 
 @Public()
@@ -8,6 +9,7 @@ import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
 export class AdminController {
   constructor(
     private readonly birthdayCronService: BirthdayCronService,
+    private readonly lapsedCronService: LapsedCronService,
     private readonly quarterlyResetCron: QuarterlyResetCron,
   ) {}
 
@@ -38,10 +40,12 @@ export class AdminController {
   }
 
   @Post('lapsed/trigger')
-  triggerLapsedCron(): { message: string } {
+  async triggerLapsedCron(): Promise<{ message: string; duration: number }> {
     if (process.env.NODE_ENV === 'production') {
       throw new NotFoundException();
     }
-    return { message: 'Lapsed cron not yet implemented' };
+    const start = Date.now();
+    await this.lapsedCronService.runLapsedCron();
+    return { message: 'Lapsed cron triggered', duration: Date.now() - start };
   }
 }
