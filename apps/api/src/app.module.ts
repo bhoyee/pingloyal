@@ -22,6 +22,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
 import { AdminModule } from './admin/admin.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -64,6 +65,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     HealthModule,
     CustomersModule,
     TransactionsModule,
+    CampaignsModule,
     TriggersModule,
     AdminModule,
   ],
