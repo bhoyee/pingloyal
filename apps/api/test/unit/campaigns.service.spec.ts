@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { CampaignsService } from '../../src/modules/campaigns/campaigns.service';
 import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
+import { CampaignLog } from '../../src/modules/campaigns/entities/campaign-log.entity';
 import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
@@ -141,6 +142,18 @@ describe('CampaignsService', () => {
       providers: [
         CampaignsService,
         { provide: getRepositoryToken(Campaign), useValue: mockCampaignRepo },
+        {
+          provide: getRepositoryToken(CampaignLog),
+          useValue: {
+            createQueryBuilder: jest.fn().mockReturnValue({
+              insert: jest.fn().mockReturnThis(),
+              into: jest.fn().mockReturnThis(),
+              values: jest.fn().mockReturnThis(),
+              execute: jest.fn().mockResolvedValue({}),
+            }),
+            count: jest.fn().mockResolvedValue(0),
+          },
+        },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
         {
           provide: getRepositoryToken(Subscription),

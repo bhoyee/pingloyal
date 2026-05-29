@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullBoardModule } from '@bull-board/nestjs';
@@ -12,6 +12,8 @@ import { TriggerLog } from '../modules/triggers/entities/trigger-log.entity';
 import { WalletTransaction } from '../modules/billing/entities/wallet-transaction.entity';
 import { Campaign } from '../modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../modules/campaigns/entities/campaign-log.entity';
+import { TierConfig } from '../modules/tenants/entities/tier-config.entity';
+import { CampaignsModule } from '../modules/campaigns/campaigns.module';
 import { WaMessageProcessor } from './processors/wa-message.processor';
 import { TriggerCheckProcessor } from './processors/trigger-check.processor';
 import { CampaignSendProcessor } from './processors/campaign-send.processor';
@@ -95,9 +97,11 @@ export const QUEUE_NAMES = {
       WalletTransaction,
       Campaign,
       CampaignLog,
+      TierConfig,
     ]),
     TenantsModule,
     WhatsappModule,
+    forwardRef(() => CampaignsModule),
   ],
   providers: [
     WaMessageProcessor,

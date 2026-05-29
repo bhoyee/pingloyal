@@ -3,17 +3,24 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Queue } from 'bullmq';
 import type Redis from 'ioredis';
-import { CampaignStatus, WaVerificationStatus } from '@pingloyal/types';
+import {
+  CampaignLogStatus,
+  CampaignStatus,
+  WaVerificationStatus,
+} from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { TenantsService } from '../tenants/tenants.service';
 import { Campaign } from './entities/campaign.entity';
+import { CampaignLog } from './entities/campaign-log.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
@@ -41,6 +48,14 @@ export interface CampaignTemplate {
   id: string;
   name: string;
   body: string;
+}
+
+export interface DispatchResult {
+  dispatched: boolean;
+  recipientCount: number;
+  estimatedCost: number;
+  walletBalance: number;
+  walletWarning: string | null;
 }
 
 const TEMPLATES: CampaignTemplate[] = [
@@ -88,9 +103,13 @@ const TEMPLATES: CampaignTemplate[] = [
 
 @Injectable()
 export class CampaignsService {
+  private readonly logger = new Logger(CampaignsService.name);
+
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
+    @InjectRepository(CampaignLog)
+    private readonly campaignLogRepo: Repository<CampaignLog>,
     @InjectRepository(Customer)
     private readonly customerRepo: Repository<Customer>,
     @InjectRepository(Subscription)
@@ -440,5 +459,170 @@ export class CampaignsService {
 
   getTemplates(): CampaignTemplate[] {
     return TEMPLATES;
+  }
+
+  // ── Dispatch ──────────────────────────────────────────────────────────────
+
+  async dispatch(
+    tenantId: string,
+    campaignId: string,
+  ): Promise<DispatchResult> {
+    // Step 1 — Load and validate campaign
+    const campaign = await this.campaignRepo.findOne({
+      where: { id: campaignId, tenantId },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+
+    if (campaign.status === CampaignStatus.SENDING) {
+      throw new BadRequestException('Campaign is already sending');
+    }
+    if (campaign.status === CampaignStatus.SENT) {
+      throw new BadRequestException('Campaign has already been sent');
+    }
+    if (campaign.status === CampaignStatus.CANCELLED) {
+      throw new BadRequestException('Campaign has been cancelled');
+    }
+
+    // Step 2 — Verify WhatsApp is connected
+    const tenant = await this.tenantsService.findOne(tenantId);
+    if (tenant.waVerificationStatus !== WaVerificationStatus.VERIFIED) {
+      throw new BadRequestException(
+        'WhatsApp is not connected. Connect WhatsApp before sending campaigns.',
+      );
+    }
+
+    // Step 3 — Build audience (IDs only for memory efficiency)
+    const customers = await this.buildAudienceQuery(
+      tenantId,
+      campaign.segmentRules,
+      tenant.lapsedDays,
+    )
+      .select('c.id')
+      .getMany();
+    const customerIds = customers.map((c) => c.id);
+
+    // Step 4 — Wallet check
+    if (customerIds.length === 0) {
+      throw new BadRequestException('No customers match this segment');
+    }
+
+    const subscription = await this.subscriptionRepo.findOne({
+      where: { tenantId },
+    });
+    const marketingRate = Number(subscription?.marketingRate ?? 130);
+    const estimatedCost = customerIds.length * marketingRate;
+    const walletBalance = Number(tenant.marketingWalletBalance);
+
+    if (walletBalance <= 0) {
+      throw new BadRequestException(
+        'Marketing wallet is empty. Top up your wallet to send this campaign.',
+      );
+    }
+
+    let walletWarning: string | null = null;
+    if (walletBalance < estimatedCost) {
+      walletWarning = 'Wallet balance may be insufficient for all recipients';
+      this.logger.warn(
+        `Campaign ${campaignId}: wallet ₦${walletBalance} may be insufficient ` +
+          `for ${customerIds.length} recipients (estimated cost ₦${estimatedCost})`,
+      );
+    }
+
+    // Step 5 — Update campaign status
+    await this.campaignRepo.update(
+      { id: campaignId, tenantId },
+      {
+        status: CampaignStatus.SENDING,
+        totalRecipients: customerIds.length,
+        sentAt: new Date(),
+      },
+    );
+
+    // Step 6 — Bulk insert campaign_logs in batches of 1000
+    const batchSize = 1000;
+    for (let i = 0; i < customerIds.length; i += batchSize) {
+      const batch = customerIds.slice(i, i + batchSize);
+      await this.campaignLogRepo
+        .createQueryBuilder()
+        .insert()
+        .into(CampaignLog)
+        .values(
+          batch.map((customerId) => ({
+            tenantId,
+            campaign: { id: campaignId },
+            customer: { id: customerId },
+            status: CampaignLogStatus.QUEUED,
+          })),
+        )
+        .execute();
+    }
+
+    // Step 7 — Bulk add to campaign-send queue (80 jobs/sec rate limit)
+    const jobs = customerIds.map((customerId, index) => ({
+      name: 'send-campaign-message',
+      data: { tenantId, campaignId, customerId, campaignLogId: null },
+      opts: {
+        delay: Math.floor(index / 80) * 1000,
+        attempts: 3,
+        backoff: { type: 'exponential' as const, delay: 10_000 },
+      },
+    }));
+    await this.campaignSendQueue.addBulk(jobs);
+
+    return {
+      dispatched: true,
+      recipientCount: customerIds.length,
+      estimatedCost,
+      walletBalance,
+      walletWarning,
+    };
+  }
+
+  // ── Scheduled campaign checker (every minute) ─────────────────────────────
+
+  @Cron('* * * * *')
+  async checkScheduledCampaigns(): Promise<void> {
+    const due = await this.campaignRepo
+      .createQueryBuilder('c')
+      .select(['c.id', 'c.tenantId'])
+      .where('c.status = :status', { status: CampaignStatus.SCHEDULED })
+      .andWhere('c.scheduledAt <= NOW()')
+      .limit(10)
+      .getMany();
+
+    for (const campaign of due) {
+      try {
+        await this.dispatch(campaign.tenantId, campaign.id);
+        this.logger.log(
+          `Scheduled campaign triggered: campaignId=${campaign.id}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to dispatch scheduled campaign ${campaign.id}: ${String(err)}`,
+        );
+      }
+    }
+  }
+
+  // ── Internal helpers ───────────────────────────────────────────────────────
+
+  async checkCampaignCompletion(
+    campaignId: string,
+    tenantId: string,
+    totalRecipients: number,
+  ): Promise<void> {
+    const processed = await this.campaignLogRepo.count({
+      where: {
+        campaign: { id: campaignId },
+        tenantId,
+        status: In([CampaignLogStatus.SENT, CampaignLogStatus.FAILED]),
+      },
+    });
+    if (processed >= totalRecipients) {
+      await this.campaignRepo.update(
+        { id: campaignId, tenantId },
+        { status: CampaignStatus.SENT },
+      );
+    }
   }
 }
