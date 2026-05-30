@@ -47,6 +47,12 @@ export const envValidationSchema = Joi.object({
   ADMIN_QUEUE_PASS: Joi.string().min(8).required(),
 
   // ── Optional ──────────────────────────────────────────────────────────────
+  PAYSTACK_PLAN_STARTER_NGN: Joi.string().allow('').optional(),
+  PAYSTACK_PLAN_GROWTH_NGN: Joi.string().allow('').optional(),
+  PAYSTACK_PLAN_CONNECT_NGN: Joi.string().allow('').optional(),
+  STRIPE_PRICE_STARTER_GBP: Joi.string().allow('').optional(),
+  STRIPE_PRICE_GROWTH_GBP: Joi.string().allow('').optional(),
+  STRIPE_PRICE_CONNECT_GBP: Joi.string().allow('').optional(),
   SENTRY_DSN: Joi.string().uri().allow('').optional(),
   LOG_LEVEL: Joi.string()
     .valid('debug', 'info', 'warn', 'error')

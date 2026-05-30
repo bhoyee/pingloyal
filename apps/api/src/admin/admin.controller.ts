@@ -6,6 +6,7 @@ import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
 import { WaBotService } from '../modules/whatsapp/wa-bot.service';
 import { TenantsService } from '../modules/tenants/tenants.service';
 import { IntegrationSchedulerService } from '../modules/integrations/integration-scheduler.service';
+import { BillingService } from '../modules/billing/billing.service';
 
 @Public()
 @Controller('admin/crons')
@@ -50,6 +51,22 @@ export class AdminController {
     const start = Date.now();
     await this.lapsedCronService.runLapsedCron();
     return { message: 'Lapsed cron triggered', duration: Date.now() - start };
+  }
+}
+
+@Public()
+@Controller('admin/crons')
+export class AdminBillingController {
+  constructor(private readonly billingService: BillingService) {}
+
+  @Post('trial-check/trigger')
+  async triggerTrialCheck(): Promise<{ message: string; duration: number }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    const start = Date.now();
+    await this.billingService.checkExpiredTrials();
+    return { message: 'Trial check triggered', duration: Date.now() - start };
   }
 }
 

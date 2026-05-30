@@ -23,6 +23,7 @@ import { HealthModule } from './health/health.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { BillingModule } from './modules/billing/billing.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
@@ -68,6 +69,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     CustomersModule,
     TransactionsModule,
     CampaignsModule,
+    BillingModule,
     DashboardModule,
     IntegrationsModule,
     TriggersModule,
