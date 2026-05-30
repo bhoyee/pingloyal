@@ -5,6 +5,7 @@ import { LapsedCronService } from '../modules/triggers/lapsed-cron.service';
 import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
 import { WaBotService } from '../modules/whatsapp/wa-bot.service';
 import { TenantsService } from '../modules/tenants/tenants.service';
+import { IntegrationSchedulerService } from '../modules/integrations/integration-scheduler.service';
 
 @Public()
 @Controller('admin/crons')
@@ -49,6 +50,26 @@ export class AdminController {
     const start = Date.now();
     await this.lapsedCronService.runLapsedCron();
     return { message: 'Lapsed cron triggered', duration: Date.now() - start };
+  }
+}
+
+@Public()
+@Controller('admin/crons')
+export class AdminIntegrationController {
+  constructor(
+    private readonly scheduler: IntegrationSchedulerService,
+    private readonly tenantsService: TenantsService,
+  ) {}
+
+  @Post('integration-sync/trigger')
+  async triggerIntegrationSync(
+    @Body() body: { integrationId: string; tenantId: string },
+  ): Promise<{ message: string }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    await this.scheduler.triggerOnce(body.integrationId, body.tenantId);
+    return { message: 'Integration sync job queued' };
   }
 }
 

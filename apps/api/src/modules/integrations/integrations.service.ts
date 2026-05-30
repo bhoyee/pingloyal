@@ -11,7 +11,6 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, Repository } from 'typeorm';
-import { get } from 'lodash';
 import type Redis from 'ioredis';
 import {
   encrypt,
@@ -31,23 +30,7 @@ import { Customer } from '../customers/entities/customer.entity';
 import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { TransactionsService } from '../transactions/transactions.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
-
-interface FieldMapping {
-  phone: string;
-  amount: string;
-  customerName?: string;
-  categorySlug?: string;
-  transactionId?: string;
-  occurredAt?: string;
-}
-
-interface NormalisedTransaction {
-  phone: string;
-  amount: string;
-  customerName: string;
-  categorySlug: string;
-  externalTransactionId: string;
-}
+import { type FieldMapping, applyMapping } from './utils/apply-mapping.util';
 
 export interface WebhookResult {
   received: boolean;
@@ -64,26 +47,6 @@ function maskKey(value: string | null): string {
 function maskSecret(value: string | null): string {
   if (!value) return '——';
   return '••••••' + value.slice(-6);
-}
-
-function getStr(obj: Record<string, unknown>, path: string): string {
-  const val = path ? get(obj, path) : undefined;
-  if (val === null || val === undefined || typeof val === 'object') return '';
-  // eslint-disable-next-line @typescript-eslint/no-base-to-string
-  return String(val);
-}
-
-function applyMapping(
-  rawPayload: Record<string, unknown>,
-  fieldMapping: FieldMapping,
-): NormalisedTransaction {
-  return {
-    phone: getStr(rawPayload, fieldMapping.phone),
-    amount: getStr(rawPayload, fieldMapping.amount),
-    customerName: getStr(rawPayload, fieldMapping.customerName ?? ''),
-    categorySlug: getStr(rawPayload, fieldMapping.categorySlug ?? ''),
-    externalTransactionId: getStr(rawPayload, fieldMapping.transactionId ?? ''),
-  };
 }
 
 const SIG_HEADERS = [
@@ -111,6 +74,12 @@ export class IntegrationsService {
     private readonly config: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
+
+  // ── Internal raw access ────────────────────────────────────────────────────
+
+  async findRaw(tenantId: string): Promise<Integration | null> {
+    return this.integrationRepo.findOne({ where: { tenantId } });
+  }
 
   // ── GET /integrations ──────────────────────────────────────────────────────
 

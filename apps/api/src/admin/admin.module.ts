@@ -2,10 +2,19 @@ import { Module } from '@nestjs/common';
 import { TenantsModule } from '../modules/tenants/tenants.module';
 import { TriggersModule } from '../modules/triggers/triggers.module';
 import { WhatsappModule } from '../modules/whatsapp/whatsapp.module';
-import { AdminController, AdminSimulateController } from './admin.controller';
+import { IntegrationsModule } from '../modules/integrations/integrations.module';
+import {
+  AdminController,
+  AdminSimulateController,
+  AdminIntegrationController,
+} from './admin.controller';
 
 @Module({
-  imports: [TenantsModule, TriggersModule, WhatsappModule],
-  controllers: [AdminController, AdminSimulateController],
+  imports: [TenantsModule, TriggersModule, WhatsappModule, IntegrationsModule],
+  controllers: [
+    AdminController,
+    AdminSimulateController,
+    AdminIntegrationController,
+  ],
 })
 export class AdminModule {}

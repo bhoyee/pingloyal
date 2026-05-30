@@ -7,6 +7,7 @@ import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
+import { IntegrationSchedulerService } from './integration-scheduler.service';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { IntegrationsService } from './integrations.service';
     TransactionsModule,
   ],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService],
-  exports: [IntegrationsService],
+  providers: [IntegrationsService, IntegrationSchedulerService],
+  exports: [IntegrationsService, IntegrationSchedulerService],
 })
 export class IntegrationsModule {}
