@@ -16,13 +16,17 @@ import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
 import { IntegrationsService } from './integrations.service';
+import { IntegrationSchedulerService } from './integration-scheduler.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 
 @Controller('integrations')
 export class IntegrationsController {
   private readonly logger = new Logger(IntegrationsController.name);
 
-  constructor(private readonly integrationsService: IntegrationsService) {}
+  constructor(
+    private readonly integrationsService: IntegrationsService,
+    private readonly scheduler: IntegrationSchedulerService,
+  ) {}
 
   @Get()
   @Roles(UserRole.OWNER)
@@ -32,8 +36,36 @@ export class IntegrationsController {
 
   @Post()
   @Roles(UserRole.OWNER)
-  upsert(@Req() req: { user: RequestUser }, @Body() dto: CreateIntegrationDto) {
-    return this.integrationsService.upsert(req.user.tenantId, dto);
+  async upsert(
+    @Req() req: { user: RequestUser },
+    @Body() dto: CreateIntegrationDto,
+  ) {
+    const result = await this.integrationsService.upsert(
+      req.user.tenantId,
+      dto,
+    );
+    if (dto.connectionType === 'api_pull') {
+      // Load the raw integration to pass to scheduler
+      const integration = await this.integrationsService.findRaw(
+        req.user.tenantId,
+      );
+      if (integration) {
+        await this.scheduler
+          .scheduleOne(integration)
+          .catch((err) =>
+            this.logger.error(`Failed to schedule integration: ${String(err)}`),
+          );
+      }
+    } else {
+      // Non-api_pull type: remove any existing repeating job
+      const integration = await this.integrationsService.findRaw(
+        req.user.tenantId,
+      );
+      if (integration) {
+        await this.scheduler.unschedule(integration.id).catch(() => null);
+      }
+    }
+    return result;
   }
 
   @Post('test')
