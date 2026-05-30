@@ -20,6 +20,7 @@ import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription
 import { WaOnboardingDto } from './dto/wa-onboarding.dto';
 import type { GupshupWebhookPayload } from './wa-onboarding.service';
 import { WaOnboardingService } from './wa-onboarding.service';
+import { WaBotService } from './wa-bot.service';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -27,6 +28,7 @@ export class WhatsappController {
 
   constructor(
     private readonly onboardingService: WaOnboardingService,
+    private readonly botService: WaBotService,
     private readonly config: ConfigService,
   ) {}
 
@@ -65,7 +67,7 @@ export class WhatsappController {
   async gupshupWebhook(
     @Req() req: { rawBody?: Buffer; body: GupshupWebhookPayload },
   ) {
-    // Signature verification
+    // Signature verification (optional — only when header present)
     const sigHeader = (req as unknown as Record<string, Record<string, string>>)
       .headers?.['x-gupshup-signature'];
 
@@ -83,7 +85,30 @@ export class WhatsappController {
 
     try {
       const payload = req.body;
-      await this.onboardingService.handleVerificationReply(payload);
+
+      // Ignore non-message events (status updates, user events)
+      if (payload.type !== 'message') {
+        return { status: 'ok' };
+      }
+
+      // Ignore non-text messages (images, audio, etc.)
+      if (payload.payload?.type !== 'text') {
+        return { status: 'ok' };
+      }
+
+      const messageText = (payload.payload?.payload?.text ?? '').trim();
+      const senderPhone = payload.payload?.source ?? '';
+      const appId = payload.app ?? '';
+      const lower = messageText.toLowerCase();
+
+      // Verification replies → WaOnboardingService
+      if (lower === 'yes' || lower === 'no') {
+        await this.onboardingService.handleVerificationReply(payload);
+        return { status: 'ok' };
+      }
+
+      // All other text messages → WaBotService
+      await this.botService.handleInbound({ appId, senderPhone, messageText });
     } catch (err) {
       // Always return 200 to Gupshup — never let errors cause retries
       this.logger.error(

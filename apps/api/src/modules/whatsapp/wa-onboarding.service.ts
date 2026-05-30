@@ -24,9 +24,10 @@ import { waEvents } from './wa.events';
 // Gupshup inbound webhook payload (simplified)
 export interface GupshupWebhookPayload {
   app: string; // Gupshup App ID
+  type: string; // 'message' | 'message-event' | 'user-event'
   payload: {
     source: string; // sender phone E.164
-    type: string;
+    type: string; // 'text' | 'image' | 'audio' etc
     payload: { text?: string };
   };
 }

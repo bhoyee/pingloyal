@@ -151,6 +151,7 @@ describe('WaOnboardingService', () => {
 
     await service.handleVerificationReply({
       app: 'app-123',
+      type: 'message',
       payload: {
         source: '+2348012345678',
         type: 'text',
@@ -173,6 +174,7 @@ describe('WaOnboardingService', () => {
 
     await service.handleVerificationReply({
       app: 'app-456',
+      type: 'message',
       payload: {
         source: '+2348012345678',
         type: 'text',
@@ -192,6 +194,7 @@ describe('WaOnboardingService', () => {
   it('handleVerificationReply with NO → status unchanged, still awaiting_reply', async () => {
     await service.handleVerificationReply({
       app: 'app-789',
+      type: 'message',
       payload: {
         source: '+2348012345678',
         type: 'text',
@@ -209,6 +212,7 @@ describe('WaOnboardingService', () => {
     await expect(
       service.handleVerificationReply({
         app: 'unknown-app',
+        type: 'message',
         payload: {
           source: '+2348012345678',
           type: 'text',

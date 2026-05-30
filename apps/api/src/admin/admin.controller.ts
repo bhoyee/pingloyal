@@ -1,8 +1,10 @@
-import { Controller, Post, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Post, NotFoundException } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { BirthdayCronService } from '../modules/triggers/birthday-cron.service';
 import { LapsedCronService } from '../modules/triggers/lapsed-cron.service';
 import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
+import { WaBotService } from '../modules/whatsapp/wa-bot.service';
+import { TenantsService } from '../modules/tenants/tenants.service';
 
 @Public()
 @Controller('admin/crons')
@@ -47,5 +49,35 @@ export class AdminController {
     const start = Date.now();
     await this.lapsedCronService.runLapsedCron();
     return { message: 'Lapsed cron triggered', duration: Date.now() - start };
+  }
+}
+
+@Public()
+@Controller('admin/simulate')
+export class AdminSimulateController {
+  constructor(
+    private readonly waBotService: WaBotService,
+    private readonly tenantsService: TenantsService,
+  ) {}
+
+  @Post('inbound-message')
+  async simulateInbound(
+    @Body()
+    body: {
+      tenantId: string;
+      senderPhone: string;
+      messageText: string;
+    },
+  ): Promise<{ reply: string }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    const tenant = await this.tenantsService.findOne(body.tenantId);
+    await this.waBotService.handleInbound({
+      appId: tenant.gupshupAppId ?? '',
+      senderPhone: body.senderPhone,
+      messageText: body.messageText,
+    });
+    return { reply: 'Balance summary sent (simulated)' };
   }
 }
