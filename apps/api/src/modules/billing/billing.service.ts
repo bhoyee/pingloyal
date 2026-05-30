@@ -572,6 +572,7 @@ export class BillingService {
       this.redis.del(`tenant:full:${tenantId}`),
       this.redis.del(`tenant:sub:${tenantId}`),
       this.redis.del(`dashboard:summary:${tenantId}`),
+      this.redis.del(`sub:status:${tenantId}`),
     ]);
   }
 }
