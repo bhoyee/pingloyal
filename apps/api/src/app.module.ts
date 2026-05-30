@@ -24,6 +24,7 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
 import { AdminModule } from './admin/admin.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -68,6 +69,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     TransactionsModule,
     CampaignsModule,
     DashboardModule,
+    IntegrationsModule,
     TriggersModule,
     AdminModule,
   ],
