@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,7 +10,9 @@ import { DataSource, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { v4 as uuidv4 } from 'uuid';
+import type Redis from 'ioredis';
 import { PointsLedgerReason, TransactionSource } from '@pingloyal/types';
+import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { TenantsService } from '../tenants/tenants.service';
 import { TierService } from '../tenants/tier.service';
 import { Customer } from '../customers/entities/customer.entity';
@@ -78,6 +81,7 @@ export class TransactionsService {
     private readonly tierService: TierService,
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
     @InjectQueue('trigger-check') private readonly triggerCheckQueue: Queue,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   // ── POST /transactions ──────────────────────────────────────────────────────
@@ -242,6 +246,10 @@ export class TransactionsService {
       .catch((err: unknown) =>
         this.logger.error(`Failed to enqueue send-message: ${String(err)}`),
       );
+
+    void this.redis
+      .del(`dashboard:summary:${tenantId}`, `dashboard:top-spenders:${tenantId}`)
+      .catch(() => null);
 
     return this.buildResult(savedTx, tenant.pointsThreshold, false);
   }

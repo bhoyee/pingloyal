@@ -122,6 +122,7 @@ describe('T9 — TransactionsService.create enqueues check-triggers job', () => 
           provide: getQueueToken('trigger-check'),
           useValue: mockTriggerCheckQueue,
         },
+        { provide: REDIS_CLIENT, useValue: { del: jest.fn().mockResolvedValue(1) } },
       ],
     }).compile();
 
@@ -195,6 +196,7 @@ describe('T11 — CustomersService.register enqueues welcome job for verified te
   const mockRedis = {
     get: jest.fn().mockResolvedValue(null),
     setex: jest.fn().mockResolvedValue('OK'),
+    del: jest.fn().mockResolvedValue(1),
   };
 
   beforeEach(async () => {

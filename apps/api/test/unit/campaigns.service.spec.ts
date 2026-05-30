@@ -109,7 +109,7 @@ describe('CampaignsService', () => {
   let mockSubscriptionRepo: { findOne: jest.Mock };
   let mockCampaignSendQueue: { add: jest.Mock };
   let mockScheduledJobsQueue: { add: jest.Mock; getJobs: jest.Mock };
-  let mockRedis: { get: jest.Mock; set: jest.Mock };
+  let mockRedis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let mockTenantsService: { findOne: jest.Mock };
 
   beforeEach(async () => {
@@ -135,6 +135,7 @@ describe('CampaignsService', () => {
     mockRedis = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
     };
     mockTenantsService = { findOne: jest.fn().mockResolvedValue(makeTenant()) };
 

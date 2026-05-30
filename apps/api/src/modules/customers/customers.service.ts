@@ -170,6 +170,13 @@ export class CustomersService {
       JSON.stringify(result),
     );
 
+    void this.redis
+      .del(
+        `dashboard:summary:${customer.tenantId}`,
+        `dashboard:top-spenders:${customer.tenantId}`,
+      )
+      .catch(() => null);
+
     return result;
   }
 

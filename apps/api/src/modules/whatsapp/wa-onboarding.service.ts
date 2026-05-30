@@ -150,6 +150,13 @@ export class WaOnboardingService {
 
     await this.invalidateCache(tenant.id);
 
+    void this.redis
+      .del(
+        `dashboard:summary:${tenant.id}`,
+        `dashboard:top-spenders:${tenant.id}`,
+      )
+      .catch(() => null);
+
     waEvents.emit('wa.verified', { tenantId: tenant.id });
     this.logger.log(`WA verified for tenant=${tenant.id}`);
   }

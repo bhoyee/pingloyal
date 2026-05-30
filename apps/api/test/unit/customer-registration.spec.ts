@@ -38,6 +38,7 @@ const mockCustomerRepo = {
 const mockRedis = {
   get: jest.fn(),
   setex: jest.fn().mockResolvedValue('OK'),
+  del: jest.fn().mockResolvedValue(1),
 };
 const mockWaMessagesQueue = {
   add: jest.fn().mockResolvedValue({ id: 'job-1' }),
