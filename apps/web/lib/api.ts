@@ -168,6 +168,77 @@ export interface CustomerLookupResult {
   progressPercent: number;
 }
 
+// ── Campaign types ─────────────────────────────────────────────────────────────
+
+export type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled';
+
+export interface SegmentRules {
+  tierIds?: string[];
+  categoryIds?: string[];
+  minPoints?: number;
+  activityStatus?: 'all' | 'active' | 'inactive';
+}
+
+export interface Campaign {
+  id: string;
+  tenantId: string;
+  name: string;
+  messageBody: string;
+  segmentRules: SegmentRules;
+  status: CampaignStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  totalRecipients: number;
+  sentCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignStats {
+  id: string;
+  name: string;
+  status: CampaignStatus;
+  totalRecipients: number;
+  sentCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  deliveryRate: number;
+  estimatedCost: number;
+  createdAt: string;
+  scheduledAt: string | null;
+  sentAt: string | null;
+}
+
+export interface AudiencePreview {
+  count: number;
+  sampleNames: string[];
+}
+
+export interface CampaignTemplate {
+  id: string;
+  name: string;
+  body: string;
+}
+
+export interface CampaignLogRow {
+  customerId: string;
+  customerName: string;
+  status: string;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  failedAt: string | null;
+  errorMessage: string | null;
+}
+
+export interface TierConfig {
+  id: string;
+  tierName: string;
+  tierLabel: string;
+  minQuarterlySpend: number;
+}
+
 // ── Cashier API (uses cashier_token, redirects to /cashier/login on 401) ──────
 
 function getCashierToken(): string | null {
