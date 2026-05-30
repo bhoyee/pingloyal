@@ -88,7 +88,7 @@ export class TransactionsService {
 
   async create(
     tenantId: string,
-    userId: string,
+    userId: string | null,
     dto: CreateTransactionDto,
   ): Promise<TransactionResult> {
     // Step 1 — Idempotency check (before any other DB query)
