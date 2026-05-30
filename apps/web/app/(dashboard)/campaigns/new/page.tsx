@@ -16,15 +16,15 @@ import { ApiError } from '@/lib/api';
 const schema = z.object({
   name: z.string().min(2, 'Campaign name required').max(255),
   messageBody: z.string().min(10, 'Message too short').max(1024, 'Message too long'),
-  audienceMode: z.string().default('all'),
-  useCategoryFilter: z.boolean().default(false),
-  useMinPoints: z.boolean().default(false),
+  audienceMode: z.string().optional(),
+  useCategoryFilter: z.boolean().optional(),
+  useMinPoints: z.boolean().optional(),
   segmentRules: z.object({
     tierIds: z.array(z.string()).optional(),
     categoryIds: z.array(z.string()).optional(),
     minPoints: z.number().min(0).optional(),
-    activityStatus: z.enum(['all', 'active', 'inactive']).default('all'),
-  }).default({}),
+    activityStatus: z.enum(['all', 'active', 'inactive']).optional(),
+  }).optional(),
   scheduledAt: z.string().optional(),
 });
 
@@ -70,11 +70,12 @@ export default function NewCampaignPage() {
   const useMinPoints = watch('useMinPoints');
 
   // Build segment rules for API from form state
+  const rules = segmentRules ?? {};
   const effectiveSegmentRules = {
-    ...(audienceMode === 'tiers' && segmentRules.tierIds?.length ? { tierIds: segmentRules.tierIds } : {}),
-    ...(useCategoryFilter && segmentRules.categoryIds?.length ? { categoryIds: segmentRules.categoryIds } : {}),
-    ...(useMinPoints && segmentRules.minPoints ? { minPoints: segmentRules.minPoints } : {}),
-    activityStatus: segmentRules.activityStatus ?? 'all',
+    ...(audienceMode === 'tiers' && rules.tierIds?.length ? { tierIds: rules.tierIds } : {}),
+    ...(useCategoryFilter && rules.categoryIds?.length ? { categoryIds: rules.categoryIds } : {}),
+    ...(useMinPoints && rules.minPoints ? { minPoints: rules.minPoints } : {}),
+    activityStatus: rules.activityStatus ?? 'all',
   };
 
   const debouncedRules = useDebounce(effectiveSegmentRules, 1000);
