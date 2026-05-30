@@ -50,6 +50,16 @@ export interface CampaignTemplate {
   body: string;
 }
 
+export interface CampaignLogRow {
+  customerId: string;
+  customerName: string;
+  status: string;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
+  errorMessage: string | null;
+}
+
 export interface DispatchResult {
   dispatched: boolean;
   recipientCount: number;
@@ -459,6 +469,39 @@ export class CampaignsService {
 
   getTemplates(): CampaignTemplate[] {
     return TEMPLATES;
+  }
+
+  // ── Logs ──────────────────────────────────────────────────────────────────
+
+  async findLogs(
+    tenantId: string,
+    campaignId: string,
+    page: number,
+    limit: number,
+  ): Promise<{ data: CampaignLogRow[]; total: number; page: number }> {
+    await this.findOne(tenantId, campaignId);
+
+    const [logs, total] = await this.campaignLogRepo.findAndCount({
+      where: { campaign: { id: campaignId }, tenantId },
+      relations: { customer: true },
+      order: { queuedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data: logs.map((log) => ({
+        customerId: log.customer.id,
+        customerName: log.customer.fullName,
+        status: log.status,
+        sentAt: log.sentAt,
+        deliveredAt: log.deliveredAt,
+        failedAt: log.failedAt,
+        errorMessage: log.errorMessage,
+      })),
+      total,
+      page,
+    };
   }
 
   // ── Dispatch ──────────────────────────────────────────────────────────────
