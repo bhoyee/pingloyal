@@ -172,6 +172,7 @@ describe('TransactionsService', () => {
           provide: getQueueToken('trigger-check'),
           useValue: mockTriggerCheckQueue,
         },
+        { provide: 'REDIS_CLIENT', useValue: { del: jest.fn().mockResolvedValue(1) } },
       ],
     }).compile();
 

@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import type Redis from 'ioredis';
 import { TriggerType, WalletTransactionType } from '@pingloyal/types';
+import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 
 @Injectable()
 export class WalletService {
-  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly dataSource: DataSource,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
 
   async deductMarketing(
     tenantId: string,
@@ -84,6 +89,13 @@ export class WalletService {
         }),
       );
     });
+
+    void this.redis
+      .del(
+        `dashboard:summary:${tenantId}`,
+        `dashboard:top-spenders:${tenantId}`,
+      )
+      .catch(() => null);
   }
 
   private toWalletTxType(triggerType: TriggerType): WalletTransactionType {
