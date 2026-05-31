@@ -14,7 +14,10 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_EXPIRES_IN: Joi.string().required().default('30d'),
 
   // ── Encryption — exactly 64 hex chars = 32-byte AES-256-GCM key ───────────
-  ENCRYPTION_KEY: Joi.string().length(64).required(),
+  ENCRYPTION_KEY: Joi.string()
+    .length(64)
+    .pattern(/^[0-9a-fA-F]{64}$/)
+    .required(),
 
   // ── Gupshup BSP ───────────────────────────────────────────────────────────
   GUPSHUP_PARTNER_KEY: Joi.string().required(),
