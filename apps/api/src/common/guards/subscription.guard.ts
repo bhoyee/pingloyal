@@ -5,30 +5,55 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Request } from 'express';
-import Redis from 'ioredis';
+import type Redis from 'ioredis';
 import { SKIP_SUBSCRIPTION_KEY } from '../decorators/skip-subscription-check.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { REDIS_CLIENT } from '../redis/redis.constants';
 
-interface TenantSubscriptionRow {
-  subscription_status: string;
-  trial_ends_at: string | null;
+interface SubStatusCache {
+  status: string;
+  trialEndsAt: string | null;
+  planTier: string | null;
 }
 
-const EXEMPT_PATH_PREFIXES = [
-  '/api/v1/auth',
-  '/api/v1/billing',
-  '/api/v1/health',
-  '/api/docs',
+interface SubStatusRow {
+  status: string;
+  trial_ends_at: string | null;
+  plan_tier: string | null;
+}
+
+const ALWAYS_ALLOW_PATHS = ['/api/v1/auth', '/api/v1/health', '/api/docs'];
+
+const ALWAYS_ALLOW_POST_PATHS = [
+  '/api/v1/billing/subscribe',
+  '/api/v1/billing/webhook',
+  '/api/v1/customers/register',
+  '/api/v1/integrations/webhook',
 ];
+
+function throw402(error: string, message: string, action: string): never {
+  throw new HttpException(
+    {
+      statusCode: 402,
+      error,
+      message,
+      action,
+      redirectUrl: '/billing',
+    },
+    HttpStatus.PAYMENT_REQUIRED,
+  );
+}
 
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
+  private readonly logger = new Logger(SubscriptionGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -36,14 +61,12 @@ export class SubscriptionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Skip on @Public() routes
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
     if (isPublic) return true;
 
-    // Skip on @SkipSubscriptionCheck() routes
     const skip = this.reflector.getAllAndOverride<boolean>(
       SKIP_SUBSCRIPTION_KEY,
       [context.getHandler(), context.getClass()],
@@ -51,74 +74,93 @@ export class SubscriptionGuard implements CanActivate {
     if (skip) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
+    const path = request.path;
+    const method = request.method.toUpperCase();
 
-    // Skip by path pattern (auth/billing/health/docs)
-    if (EXEMPT_PATH_PREFIXES.some((p) => request.path.startsWith(p))) {
-      return true;
-    }
+    if (ALWAYS_ALLOW_PATHS.some((p) => path.startsWith(p))) return true;
 
     const tenantId = request.user?.tenantId;
-    if (!tenantId) return true; // No user context yet — JwtAuthGuard handles it
+    if (!tenantId) return true;
 
-    const subscription = await this.loadSubscription(tenantId);
-    return this.evaluate(subscription, request.method);
+    const sub = await this.loadSubscription(tenantId);
+    if (!sub) return true;
+
+    return this.evaluate(sub, method, path, tenantId);
   }
 
   private async loadSubscription(
     tenantId: string,
-  ): Promise<TenantSubscriptionRow> {
-    const cacheKey = `subscription:${tenantId}`;
+  ): Promise<SubStatusCache | null> {
+    const cacheKey = `sub:status:${tenantId}`;
     const cached = await this.redis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached) as TenantSubscriptionRow;
-    }
+    if (cached) return JSON.parse(cached) as SubStatusCache;
 
-    const rows = await this.dataSource.query<TenantSubscriptionRow[]>(
-      `SELECT subscription_status, trial_ends_at FROM tenants WHERE id = $1`,
+    const rows = await this.dataSource.query<SubStatusRow[]>(
+      `SELECT status, trial_ends_at, plan_tier
+       FROM subscriptions
+       WHERE tenant_id = $1
+       LIMIT 1`,
       [tenantId],
     );
-    const row = rows[0] ?? {
-      subscription_status: 'trialing',
-      trial_ends_at: null,
+
+    if (!rows.length) return null;
+
+    const row = rows[0];
+    const result: SubStatusCache = {
+      status: row.status,
+      trialEndsAt: row.trial_ends_at,
+      planTier: row.plan_tier,
     };
-    await this.redis.setex(cacheKey, 60, JSON.stringify(row));
-    return row;
+
+    await this.redis.setex(cacheKey, 60, JSON.stringify(result));
+    return result;
   }
 
-  private evaluate(sub: TenantSubscriptionRow, method: string): boolean {
-    const status = sub.subscription_status;
-    const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(
-      method.toUpperCase(),
+  private evaluate(
+    sub: SubStatusCache,
+    method: string,
+    path: string,
+    tenantId: string,
+  ): boolean {
+    const { status } = sub;
+    const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
+    const isExemptPost = ALWAYS_ALLOW_POST_PATHS.some((p) =>
+      path.startsWith(p),
     );
 
-    switch (status) {
-      case 'trialing': {
-        if (!sub.trial_ends_at) return true;
-        const trialEnd = new Date(sub.trial_ends_at);
-        if (trialEnd > new Date()) return true;
-        throw new HttpException(
-          'Trial period has ended — please subscribe to continue',
-          HttpStatus.PAYMENT_REQUIRED,
-        );
-      }
-      case 'active':
+    if (status === 'active') return true;
+
+    if (status === 'trialing') {
+      if (!sub.trialEndsAt || new Date(sub.trialEndsAt) > new Date())
         return true;
-
-      case 'past_due':
-        if (!isMutation) return true;
-        throw new HttpException(
-          'Account payment is past due — read-only access only',
-          HttpStatus.PAYMENT_REQUIRED,
-        );
-
-      case 'suspended':
-        throw new HttpException(
-          'Account is suspended — please contact support',
-          HttpStatus.PAYMENT_REQUIRED,
-        );
-
-      default:
-        return true;
+      throw402(
+        'Trial Expired',
+        'Your 14-day free trial has ended. Subscribe to continue using PingLoyal.',
+        'subscribe',
+      );
     }
+
+    if (status === 'past_due') {
+      if (!isMutation || isExemptPost) return true;
+      throw402(
+        'Payment Failed',
+        'Your last payment failed. Update your payment method to continue.',
+        'update_payment',
+      );
+    }
+
+    if (status === 'suspended') {
+      if (isExemptPost) return true;
+      throw402(
+        'Account Suspended',
+        'Your account is suspended. Subscribe to reactivate.',
+        'subscribe',
+      );
+    }
+
+    this.logger.warn(
+      `Unknown subscription status: ${status} for tenant ${tenantId}`,
+    );
+    return true;
   }
 }
