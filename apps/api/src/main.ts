@@ -54,7 +54,40 @@ async function bootstrap(): Promise<void> {
   });
 
   // Security headers
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy:
+        nodeEnv === 'development'
+          ? false
+          : {
+              directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: [
+                  "'self'",
+                  'data:',
+                  '*.r2.cloudflarestorage.com',
+                  '*.r2.dev',
+                  process.env.FRONTEND_URL ?? 'http://localhost:3001',
+                ],
+                connectSrc: [
+                  "'self'",
+                  process.env.FRONTEND_URL ?? 'http://localhost:3001',
+                ],
+                frameSrc: ["'none'"],
+                objectSrc: ["'none'"],
+                baseUri: ["'self'"],
+                formAction: ["'self'"],
+              },
+            },
+      hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: true },
+      noSniff: true,
+      xssFilter: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      permittedCrossDomainPolicies: false,
+    }),
+  );
 
   // Gzip compression
   app.use(compression());

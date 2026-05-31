@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(mkdir -p /c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/lib)",
+      "Bash(mkdir -p /c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/components/ui)",
+      "Bash(mkdir -p /c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/components/onboarding)",
+      "Bash(mkdir -p /c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/app/\\\\\\(dashboard\\\\\\)/onboarding/steps)",
+      "Bash(npx jest *)",
+      "Bash(grep -E \"^d|\\\\.json$|\\\\.config\")",
+      "Bash(npx tsc *)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

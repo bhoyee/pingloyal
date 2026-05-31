@@ -7,6 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { SanitiseString } from '../../../common/decorators/sanitise-string.decorator';
 
 export class RegisterCustomerDto {
   /** Tenant slug from the QR code URL */
@@ -14,6 +15,7 @@ export class RegisterCustomerDto {
   @IsNotEmpty()
   tenantSlug: string;
 
+  @SanitiseString()
   @IsString()
   @MinLength(2)
   @MaxLength(255)

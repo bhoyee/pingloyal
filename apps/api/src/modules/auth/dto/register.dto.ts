@@ -6,6 +6,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { SanitiseString } from '../../../common/decorators/sanitise-string.decorator';
 
 export enum Country {
   NG = 'NG',
@@ -14,12 +15,14 @@ export enum Country {
 
 export class RegisterDto {
   @ApiProperty({ example: 'FreshMart Lagos' })
+  @SanitiseString()
   @IsString()
   @MinLength(2)
   @MaxLength(255)
   businessName: string;
 
   @ApiProperty({ example: 'Adebayo Okafor' })
+  @SanitiseString()
   @IsString()
   @MinLength(2)
   @MaxLength(255)

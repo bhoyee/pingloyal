@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -29,6 +30,7 @@ export class TransactionsController {
 
   @Post('transactions')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  @Throttle({ transactions: { ttl: 60_000, limit: 120 } })
   @HttpCode(HttpStatus.CREATED)
   async create(
     @CurrentUser() user: RequestUser,

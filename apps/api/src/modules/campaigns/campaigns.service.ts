@@ -360,7 +360,10 @@ export class CampaignsService {
     await this.campaignSendQueue.add('process', { campaignId, tenantId });
 
     void this.redis
-      .del(`dashboard:summary:${tenantId}`, `dashboard:top-spenders:${tenantId}`)
+      .del(
+        `dashboard:summary:${tenantId}`,
+        `dashboard:top-spenders:${tenantId}`,
+      )
       .catch(() => null);
 
     return {

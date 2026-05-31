@@ -248,7 +248,10 @@ export class TransactionsService {
       );
 
     void this.redis
-      .del(`dashboard:summary:${tenantId}`, `dashboard:top-spenders:${tenantId}`)
+      .del(
+        `dashboard:summary:${tenantId}`,
+        `dashboard:top-spenders:${tenantId}`,
+      )
       .catch(() => null);
 
     return this.buildResult(savedTx, tenant.pointsThreshold, false);
