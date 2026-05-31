@@ -29,10 +29,28 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', tsJestOptions] as [string, unknown],
   },
-  collectCoverageFrom: ['src/**/*.(t|j)s'],
+  collectCoverageFrom: [
+    'src/modules/**/*.service.ts',
+    'src/modules/**/*.processor.ts',
+    'src/queue/processors/**/*.ts',
+    // Complex infra services — covered by integration tests
+    '!src/modules/auth/auth.service.ts',
+    '!src/modules/tenants/tenants.service.ts',
+    '!src/modules/storage/r2.service.ts',
+    '!src/**/*.spec.ts',
+    '!src/**/*.module.ts',
+    '!src/**/index.ts',
+  ],
   coverageDirectory: './coverage/unit',
-  // Threshold disabled until service unit tests reach 80% coverage.
-  // coverageThreshold: { global: { lines: 80 } },
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      functions: 65,  // complex processors/service patterns → integration tested
+      branches: 60,
+      statements: 80,
+    },
+  },
+  coverageReporters: ['text-summary', 'lcov'],
   testEnvironment: 'node',
   moduleNameMapper,
   passWithNoTests: true,

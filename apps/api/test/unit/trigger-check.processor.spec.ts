@@ -285,4 +285,107 @@ describe('TriggerCheckProcessor', () => {
       err.stack,
     );
   });
+
+  // ── Additional edge cases ─────────────────────────────────────────────────
+
+  it('T14 — customer at 110%: ONLY reward fires, nudge does NOT fire', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 1100, rewardSentAt: null }),
+    );
+    mockTenantService.findOne.mockResolvedValue(makeTenant());
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).toHaveBeenCalledTimes(1);
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({ type: TriggerType.REWARD_UNLOCKED }),
+    );
+  });
+
+  it('T15 — customer at exactly 80% (boundary): nudge fires', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 800, nudgeSentAt: null }),
+    );
+    mockTenantService.findOne.mockResolvedValue(makeTenant());
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({ type: TriggerType.THRESHOLD_NUDGE }),
+    );
+  });
+
+  it('T16 — customer at exactly 100%: only reward fires, nudge does not (1.0 not < 1.0)', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 1000, rewardSentAt: null, nudgeSentAt: null }),
+    );
+    mockTenantService.findOne.mockResolvedValue(makeTenant());
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).toHaveBeenCalledTimes(1);
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({ type: TriggerType.REWARD_UNLOCKED }),
+    );
+  });
+
+  it('T17 — customer at 79.9% (799/1000): no trigger fires', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 799 }),
+    );
+    mockTenantService.findOne.mockResolvedValue(makeTenant());
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('T18 — amountToGoal uses earnRate correctly (200 pts × ₦150 = ₦30,000)', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 800, nudgeSentAt: null }),
+    );
+    mockTenantService.findOne.mockResolvedValue(
+      makeTenant({ pointsThreshold: 1000, pointsEarnRate: 150 }),
+    );
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({
+        data: expect.objectContaining({ amountToGoal: '30000' }),
+      }),
+    );
+  });
+
+  it('T19 — nudge fires again when nudgeSentAt is exactly 24h+1ms ago', async () => {
+    const justExpired = new Date(Date.now() - 24 * 60 * 60 * 1000 - 1);
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 800, nudgeSentAt: justExpired }),
+    );
+    mockTenantService.findOne.mockResolvedValue(makeTenant());
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({ type: TriggerType.THRESHOLD_NUDGE }),
+    );
+  });
+
+  it('T20 — wa pending status: no triggers even at valid conditions', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(
+      makeCustomer({ pointsBalance: 850, nudgeSentAt: null, waOptedIn: true }),
+    );
+    mockTenantService.findOne.mockResolvedValue(
+      makeTenant({ waVerificationStatus: 'pending' }),
+    );
+
+    await processor.process(makeJob());
+
+    expect(mockWaQueue.add).not.toHaveBeenCalled();
+  });
 });

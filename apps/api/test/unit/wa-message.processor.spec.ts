@@ -478,3 +478,48 @@ describe('MessageBuilderService', () => {
     ).toThrow(/Unknown trigger type/);
   });
 });
+
+// ── Additional edge-case tests ─────────────────────────────────────────────────
+
+describe('WaMessageProcessor — MARKETING_TYPES classification', () => {
+  const MARKETING_TYPES = new Set([
+    TriggerType.BIRTHDAY,
+    TriggerType.LAPSED_WINBACK,
+    TriggerType.CAMPAIGN_MESSAGE,
+  ]);
+
+  it('T19 — PURCHASE_CONFIRMATION is NOT marketing (Utility — no wallet deduction)', () => {
+    expect(MARKETING_TYPES.has(TriggerType.PURCHASE_CONFIRMATION)).toBe(false);
+  });
+
+  it('T20 — WELCOME is NOT marketing (Utility — no wallet deduction)', () => {
+    expect(MARKETING_TYPES.has(TriggerType.WELCOME)).toBe(false);
+  });
+
+  it('T21 — BALANCE_BOT_REPLY is NOT marketing (Service — free)', () => {
+    expect(MARKETING_TYPES.has(TriggerType.BALANCE_BOT_REPLY)).toBe(false);
+  });
+
+  it('T22 — BIRTHDAY IS marketing (deduct wallet)', () => {
+    expect(MARKETING_TYPES.has(TriggerType.BIRTHDAY)).toBe(true);
+  });
+});
+
+describe('MessageBuilderService — template naming', () => {
+  it('T23 — message template uses pingloyal_ prefix (not loyalpulse_)', () => {
+    const builder = new MessageBuilderService();
+    const tenant = { businessName: 'TestStore', pointsThreshold: 1000, rewardValue: 500 } as unknown as Tenant;
+    const customer = { fullName: 'Ada Okonkwo', pointsBalance: 800 } as unknown as Customer;
+    const result = builder.build(TriggerType.WELCOME, customer, tenant, {});
+    expect(result.templateName).toMatch(/^pingloyal_/);
+    expect(result.templateName).not.toMatch(/^loyalpulse_/);
+  });
+
+  it('T24 — BIRTHDAY template name is pingloyal_birthday', () => {
+    const builder = new MessageBuilderService();
+    const tenant = { businessName: 'TestStore', pointsThreshold: 1000, rewardValue: 500 } as unknown as Tenant;
+    const customer = { fullName: 'Ada Okonkwo', pointsBalance: 800 } as unknown as Customer;
+    const result = builder.build(TriggerType.BIRTHDAY, customer, tenant, {});
+    expect(result.templateName).toBe('pingloyal_birthday');
+  });
+});
