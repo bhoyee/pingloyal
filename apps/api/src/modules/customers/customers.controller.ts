@@ -28,6 +28,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { CustomersService } from './customers.service';
 import { ImportService } from './import.service';
+import { ThrottleConfigs } from '../../common/throttle/throttle.config';
 
 // ── Public registration endpoint ──────────────────────────────────────────────
 
@@ -38,6 +39,7 @@ export class RegisterController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Get(':slug/tenant-info')
+  @Throttle(ThrottleConfigs.TENANT_INFO)
   getTenantInfo(@Param('slug') slug: string) {
     return this.customersService.getTenantInfo(slug);
   }
@@ -45,7 +47,7 @@ export class RegisterController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ThrottlerGuard)
-  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  @Throttle(ThrottleConfigs.CUSTOMER_REG)
   register(
     @Body() dto: RegisterCustomerDto,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

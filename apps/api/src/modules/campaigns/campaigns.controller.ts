@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -79,6 +80,7 @@ export class CampaignsController {
 
   @Post(':id/send')
   @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Throttle({ campaign_send: { ttl: 60_000, limit: 5 } })
   send(
     @CurrentTenant() tenantId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -88,6 +90,7 @@ export class CampaignsController {
 
   @Post(':id/schedule')
   @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @Throttle({ campaign_send: { ttl: 60_000, limit: 5 } })
   schedule(
     @CurrentTenant() tenantId: string,
     @Param('id', ParseUUIDPipe) id: string,

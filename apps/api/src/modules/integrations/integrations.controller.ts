@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -77,6 +78,7 @@ export class IntegrationsController {
   @Post('webhook/:tenantSlug')
   @Public()
   @SkipSubscriptionCheck()
+  @Throttle({ webhook_integration: { ttl: 60_000, limit: 200 } })
   @HttpCode(HttpStatus.OK)
   async receiveWebhook(
     @Param('tenantSlug') tenantSlug: string,

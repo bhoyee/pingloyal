@@ -17,10 +17,12 @@ import type { RequestUser } from '@pingloyal/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
+import { Throttle } from '@nestjs/throttler';
 import { WaOnboardingDto } from './dto/wa-onboarding.dto';
 import type { GupshupWebhookPayload } from './wa-onboarding.service';
 import { WaOnboardingService } from './wa-onboarding.service';
 import { WaBotService } from './wa-bot.service';
+import { ThrottleConfigs } from '../../common/throttle/throttle.config';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -34,6 +36,7 @@ export class WhatsappController {
 
   @Post('onboarding/initiate')
   @Roles(UserRole.OWNER)
+  @Throttle({ onboarding_initiate: { ttl: 3_600_000, limit: 5 } })
   initiate(@Req() req: { user: RequestUser }, @Body() dto: WaOnboardingDto) {
     return this.onboardingService.initiateOnboarding(req.user.tenantId, dto);
   }
@@ -63,6 +66,7 @@ export class WhatsappController {
   @Post('webhook/gupshup')
   @Public()
   @SkipSubscriptionCheck()
+  @Throttle(ThrottleConfigs.WEBHOOK_GUPSHUP)
   @HttpCode(HttpStatus.OK)
   async gupshupWebhook(
     @Req() req: { rawBody?: Buffer; body: GupshupWebhookPayload },
