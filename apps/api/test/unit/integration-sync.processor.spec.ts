@@ -96,7 +96,7 @@ function mockSuccessResponse(body: unknown) {
 describe('IntegrationSyncProcessor', () => {
   let processor: IntegrationSyncProcessor;
   let mockManagerQuery: jest.Mock;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let mockIntegrationRepo: Record<string, any>;
   let mockCustomerRepo: Record<string, jest.Mock>;
   let mockCategoryRepo: Record<string, jest.Mock>;

@@ -71,7 +71,8 @@ describe('WaBotService', () => {
     // Default fetch success
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 'submitted', messageId: 'wa-msg-1' }),
+      json: () =>
+        Promise.resolve({ status: 'submitted', messageId: 'wa-msg-1' }),
     });
 
     mockTenantRepo = { findOne: jest.fn().mockResolvedValue(TENANT) };

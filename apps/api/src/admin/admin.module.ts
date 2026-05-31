@@ -12,7 +12,13 @@ import {
 } from './admin.controller';
 
 @Module({
-  imports: [TenantsModule, TriggersModule, WhatsappModule, IntegrationsModule, BillingModule],
+  imports: [
+    TenantsModule,
+    TriggersModule,
+    WhatsappModule,
+    IntegrationsModule,
+    BillingModule,
+  ],
   controllers: [
     AdminController,
     AdminSimulateController,

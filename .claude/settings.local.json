@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest web --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --skip-install --no-eslint)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(node -e \"const j = require\\('joi'\\); console.log\\(j.version ?? 'no .version'\\)\")",
+      "Bash(docker compose *)",
+      "Bash(docker exec *)",
+      "Bash(git commit -m ' *)",
+      "Bash(node dist/main.js)",
+      "Bash(timeout 20 node --no-warnings dist/main.js)",
+      "PowerShell(& curl.exe -v http://localhost:3000/api/v1/health 2>&1)",
+      "Bash(node -e ' *)",
+      "Read(//tmp/**)",
+      "Bash(curl.exe -s -X POST http://localhost:3000/api/v1/auth/refresh -H 'Content-Type: application/json' -d '{\"refreshToken\":\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyNzA3NWMyYy1iZWQ2LTRhNmItYTFhMC1jOTg3NDU4OWRkMTMiLCJ0ZW5hbnRJZCI6IjBjMTMxYzg0LWE0NTUtNGVhZS04ZGNlLWYxY2JmOTA0MWE2YyIsImlhdCI6MTc3OTM5MjQwMSwiZXhwIjoxNzgxOTg0NDAxfQ.iMFbAC3uolbxGr6MIR9sfqPImFwTnOOqr4OI2p-3nDWKAD8ZHPg4YDM2j-jOXXk9xXgM3NQoRaRsd895PLT9ajpqvpgTT2tgKHyc0lMET5nS8O3U_AEnfDFHXdWwblF1CxWP-bmIApjk6u5LPpWN-iLBcsu8lUJuMqUQL33i1Ik_Bz99_-SPKtChb-i8RHfU4AgRFCh1rvBCxrxBYq7cMrbe90VSDliONr74EbkElVshzH90G1RjfuHYpB5d6l9Qwb0DHlNmu7LBxcqBq1S6qdnIzP0wTUrc7tIN-CyhfsKW8w2ikJO8y330ufW4Faqc0J2o4NZ1n3EYcXZCkERlOg\"}')",
+      "Bash(node -e \"console.log\\(require\\('@nestjs/jwt/package.json'\\).version\\)\")",
+      "Bash(npx eslint *)",
+      "Bash(npx next *)",
+      "Bash(cd \"/c/Users/bhoyee-pc/Desktop/pingloyal/apps/web\" && cat node_modules/next/package.json | grep '\"version\"' | head -1)",
+      "Read(//c/c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/node_modules/next/**)"
+    ]
+  }
+}

@@ -80,7 +80,7 @@ describe('SQL Injection Prevention', () => {
     const attempts = [
       "' OR '1'='1",
       "'; SELECT * FROM users; --",
-      "1; DROP TABLE transactions; --",
+      '1; DROP TABLE transactions; --',
       "' UNION SELECT * FROM tenants --",
     ];
 
@@ -88,9 +88,7 @@ describe('SQL Injection Prevention', () => {
       const response = await request(
         app.getHttpServer() as Parameters<typeof request>[0],
       )
-        .get(
-          `/api/v1/customers/lookup?phone=${encodeURIComponent(attempt)}`,
-        )
+        .get(`/api/v1/customers/lookup?phone=${encodeURIComponent(attempt)}`)
         .set('Authorization', `Bearer ${tenantResult.token}`);
 
       expect([400, 404]).toContain(response.status);
@@ -113,7 +111,9 @@ describe('SQL Injection Prevention', () => {
 
     expect(response.status).toBe(201);
     // HTML stripped — script tag removed
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(response.body.name).not.toContain('<script>');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(response.body.name).toContain('Weekend Promo');
   });
 });

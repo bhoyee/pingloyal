@@ -308,7 +308,7 @@ describe('BillingService', () => {
   it('T9 — invalid Stripe signature throws BadRequestException', async () => {
     // Override stripe mock to throw on constructEvent
     const Stripe = jest.requireMock<jest.Mock>('stripe');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     const stripeMock = Stripe.mock.results[0].value as {
       webhooks: { constructEvent: jest.Mock };
     };
@@ -325,7 +325,7 @@ describe('BillingService', () => {
 
   it('T10 — Stripe checkout.session.completed activates subscription', async () => {
     const Stripe = jest.requireMock<jest.Mock>('stripe');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     const stripeMock = Stripe.mock.results[0].value as {
       webhooks: { constructEvent: jest.Mock };
     };
@@ -350,7 +350,7 @@ describe('BillingService', () => {
 
   it('T11 — Stripe customer.subscription.deleted suspends tenant', async () => {
     const Stripe = jest.requireMock<jest.Mock>('stripe');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+
     const stripeMock = Stripe.mock.results[0].value as {
       webhooks: { constructEvent: jest.Mock };
     };
