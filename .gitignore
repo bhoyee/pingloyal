@@ -13,6 +13,9 @@ apps/*/dist/
 .next/
 build/
 
+# Test coverage reports
+apps/*/coverage/
+
 # TypeScript incremental compilation cache
 *.tsbuildinfo
 
