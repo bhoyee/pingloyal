@@ -39,6 +39,7 @@ export class CampaignsController {
   }
 
   @Get()
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
   findAll(@CurrentTenant() tenantId: string) {
     return this.campaignsService.findAll(tenantId);
   }
@@ -70,6 +71,7 @@ export class CampaignsController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @CurrentTenant() tenantId: string,

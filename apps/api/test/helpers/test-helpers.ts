@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -6,6 +7,8 @@ import { DataSource } from 'typeorm';
 import request from 'supertest';
 import {
   CustomerSource,
+  IntegrationConnectionType,
+  IntegrationSyncStatus,
   PlanTier,
   SubscriptionStatus,
   TenantMode,
@@ -18,6 +21,9 @@ import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { Transaction } from '../../src/modules/transactions/entities/transaction.entity';
 import { ProductCategory } from '../../src/modules/tenants/entities/product-category.entity';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
+import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
+import { Integration } from '../../src/modules/integrations/entities/integration.entity';
+import { CampaignStatus } from '@pingloyal/types';
 
 // Fewer bcrypt rounds in tests for speed (production uses 12)
 const TEST_BCRYPT_ROUNDS = 4;
@@ -247,6 +253,131 @@ export async function clearTestData(
   await dataSource.query(`DELETE FROM tenants WHERE id = ANY($1::uuid[])`, [
     tenantIds,
   ]);
+}
+
+/**
+ * Creates a user with a specific role under an existing tenant.
+ */
+export async function createTestUser(
+  ctx: Pick<TestHelperCtx, 'dataSource' | 'jwtService' | 'configService'>,
+  tenantId: string,
+  role: UserRole,
+  emailSuffix = '',
+): Promise<{ user: User; token: string }> {
+  const userRepo = ctx.dataSource.getRepository(User);
+  const stamp = Date.now();
+  const hashedPassword = await bcrypt.hash('TestPass123!', TEST_BCRYPT_ROUNDS);
+  const user = await userRepo.save(
+    userRepo.create({
+      tenantId,
+      email: `test-${role}-${stamp}${emailSuffix}@example.com`,
+      fullName: `Test ${role}`,
+      hashedPassword,
+      role,
+      isActive: true,
+    }),
+  );
+
+  const privateKey = Buffer.from(
+    ctx.configService.getOrThrow<string>('JWT_PRIVATE_KEY'),
+    'base64',
+  ).toString('utf8');
+
+  const token = ctx.jwtService.sign(
+    { sub: user.id, tenantId, role, planTier: PlanTier.STARTER },
+    { algorithm: 'RS256', privateKey, expiresIn: '1h' } as Parameters<
+      typeof ctx.jwtService.sign
+    >[1],
+  );
+
+  return { user, token };
+}
+
+/**
+ * Creates a draft campaign directly via the DB.
+ */
+export async function createTestCampaign(
+  ctx: Pick<TestHelperCtx, 'dataSource'>,
+  tenantId: string,
+  overrides: Partial<Campaign> = {},
+): Promise<Campaign> {
+  const repo = ctx.dataSource.getRepository(Campaign);
+  return repo.save(
+    repo.create({
+      tenantId,
+      name: `Test Campaign ${Date.now()}`,
+      messageBody: 'Hi {{firstName}}, special offer this weekend!',
+      segmentRules: {},
+      status: CampaignStatus.DRAFT,
+      totalRecipients: 0,
+      sentCount: 0,
+      deliveredCount: 0,
+      failedCount: 0,
+      ...overrides,
+    }),
+  );
+}
+
+/**
+ * Creates a webhook integration with a test secret.
+ */
+export async function createTestIntegration(
+  ctx: Pick<TestHelperCtx, 'dataSource'>,
+  tenantId: string,
+): Promise<Integration> {
+  const repo = ctx.dataSource.getRepository(Integration);
+  const webhookSecret = crypto.randomBytes(32).toString('hex');
+  return repo.save(
+    repo.create({
+      tenantId,
+      connectionType: IntegrationConnectionType.WEBHOOK,
+      webhookSecret,
+      pollIntervalMins: 15,
+      fieldMapping: { phone: 'customer_phone', amount: 'sale_amount' },
+      syncStatus: IntegrationSyncStatus.ACTIVE,
+    }),
+  );
+}
+
+/**
+ * Sets the marketing wallet balance for a tenant.
+ */
+export async function setWalletBalance(
+  ctx: Pick<TestHelperCtx, 'dataSource'>,
+  tenantId: string,
+  amount: number,
+): Promise<void> {
+  await ctx.dataSource.query(
+    'UPDATE tenants SET marketing_wallet_balance = $1 WHERE id = $2',
+    [amount, tenantId],
+  );
+}
+
+/**
+ * Creates an expired JWT for testing token rejection.
+ */
+export function createExpiredToken(
+  ctx: Pick<TestHelperCtx, 'jwtService' | 'configService'>,
+  userId: string,
+  tenantId: string,
+): string {
+  const privateKey = Buffer.from(
+    ctx.configService.getOrThrow<string>('JWT_PRIVATE_KEY'),
+    'base64',
+  ).toString('utf8');
+  return ctx.jwtService.sign(
+    { sub: userId, tenantId, role: UserRole.OWNER, planTier: PlanTier.STARTER },
+    { algorithm: 'RS256', privateKey, expiresIn: '-1s' } as Parameters<
+      typeof ctx.jwtService.sign
+    >[1],
+  );
+}
+
+/**
+ * Computes HMAC-SHA256 signature in the format Gupshup uses.
+ */
+export function computeHmac(body: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(body).digest('hex');
 }
 
 /**
