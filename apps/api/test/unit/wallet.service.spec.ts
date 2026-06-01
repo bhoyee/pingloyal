@@ -32,9 +32,11 @@ describe('WalletService', () => {
     };
 
     mockDataSource = {
-      transaction: jest.fn().mockImplementation(
-        async (cb: (em: typeof mockEm) => Promise<unknown>) => cb(mockEm),
-      ),
+      transaction: jest
+        .fn()
+        .mockImplementation(
+          async (cb: (em: typeof mockEm) => Promise<unknown>) => cb(mockEm),
+        ),
     };
 
     mockRedis = { del: jest.fn().mockResolvedValue(1) };
@@ -115,7 +117,13 @@ describe('WalletService', () => {
 
     it('T5 — uses pessimistic_write lock to prevent race conditions', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 130, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        130,
+        'test',
+        null,
+      );
 
       expect(mockEm.findOne).toHaveBeenCalledWith(
         expect.anything(),
@@ -125,7 +133,13 @@ describe('WalletService', () => {
 
     it('T6 — BIRTHDAY type maps to DEBIT_BIRTHDAY wallet transaction', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 130, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        130,
+        'test',
+        null,
+      );
 
       expect(mockEm.create).toHaveBeenCalledWith(
         expect.anything(),
@@ -135,7 +149,13 @@ describe('WalletService', () => {
 
     it('T7 — LAPSED_WINBACK type maps to DEBIT_LAPSED', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.LAPSED_WINBACK, 115, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.LAPSED_WINBACK,
+        115,
+        'test',
+        null,
+      );
 
       expect(mockEm.create).toHaveBeenCalledWith(
         expect.anything(),
@@ -145,7 +165,13 @@ describe('WalletService', () => {
 
     it('T8 — CAMPAIGN_MESSAGE type maps to DEBIT_CAMPAIGN', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.CAMPAIGN_MESSAGE, 115, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.CAMPAIGN_MESSAGE,
+        115,
+        'test',
+        null,
+      );
 
       expect(mockEm.create).toHaveBeenCalledWith(
         expect.anything(),
@@ -157,13 +183,25 @@ describe('WalletService', () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
 
       await expect(
-        service.deductMarketing(TENANT_ID, 'unknown' as TriggerType, 130, 'test', null),
+        service.deductMarketing(
+          TENANT_ID,
+          'unknown' as TriggerType,
+          130,
+          'test',
+          null,
+        ),
       ).rejects.toThrow();
     });
 
     it('T10 — refId stored on wallet transaction record', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 130, 'test', 'ref-123');
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        130,
+        'test',
+        'ref-123',
+      );
 
       expect(mockEm.create).toHaveBeenCalledWith(
         expect.anything(),
@@ -173,7 +211,13 @@ describe('WalletService', () => {
 
     it('T11 — stored amount is negative (debit)', async () => {
       mockEm.findOne.mockResolvedValue(makeTenantRow(5000));
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 130, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        130,
+        'test',
+        null,
+      );
 
       expect(mockEm.create).toHaveBeenCalledWith(
         expect.anything(),
@@ -211,7 +255,9 @@ describe('WalletService', () => {
 
     it('T14 — tenant not found: does nothing without throwing', async () => {
       mockEm.findOne.mockResolvedValue(null);
-      await expect(service.creditWallet(TENANT_ID, 500, 'refund')).resolves.toBeUndefined();
+      await expect(
+        service.creditWallet(TENANT_ID, 500, 'refund'),
+      ).resolves.toBeUndefined();
     });
 
     it('T15 — credit stores REFUND type transaction', async () => {

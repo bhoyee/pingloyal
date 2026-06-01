@@ -508,8 +508,15 @@ describe('WaMessageProcessor — MARKETING_TYPES classification', () => {
 describe('MessageBuilderService — template naming', () => {
   it('T23 — message template uses pingloyal_ prefix (not loyalpulse_)', () => {
     const builder = new MessageBuilderService();
-    const tenant = { businessName: 'TestStore', pointsThreshold: 1000, rewardValue: 500 } as unknown as Tenant;
-    const customer = { fullName: 'Ada Okonkwo', pointsBalance: 800 } as unknown as Customer;
+    const tenant = {
+      businessName: 'TestStore',
+      pointsThreshold: 1000,
+      rewardValue: 500,
+    } as unknown as Tenant;
+    const customer = {
+      fullName: 'Ada Okonkwo',
+      pointsBalance: 800,
+    } as unknown as Customer;
     const result = builder.build(TriggerType.WELCOME, customer, tenant, {});
     expect(result.templateName).toMatch(/^pingloyal_/);
     expect(result.templateName).not.toMatch(/^loyalpulse_/);
@@ -517,8 +524,15 @@ describe('MessageBuilderService — template naming', () => {
 
   it('T24 — BIRTHDAY template name is pingloyal_birthday', () => {
     const builder = new MessageBuilderService();
-    const tenant = { businessName: 'TestStore', pointsThreshold: 1000, rewardValue: 500 } as unknown as Tenant;
-    const customer = { fullName: 'Ada Okonkwo', pointsBalance: 800 } as unknown as Customer;
+    const tenant = {
+      businessName: 'TestStore',
+      pointsThreshold: 1000,
+      rewardValue: 500,
+    } as unknown as Tenant;
+    const customer = {
+      fullName: 'Ada Okonkwo',
+      pointsBalance: 800,
+    } as unknown as Customer;
     const result = builder.build(TriggerType.BIRTHDAY, customer, tenant, {});
     expect(result.templateName).toBe('pingloyal_birthday');
   });

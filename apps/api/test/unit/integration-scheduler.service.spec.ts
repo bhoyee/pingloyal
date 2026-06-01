@@ -9,17 +9,23 @@ import {
 } from '@pingloyal/types';
 
 jest.mock('bullmq', () => ({
-  Worker: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+  Worker: jest
+    .fn()
+    .mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
   Queue: jest.fn().mockImplementation(() => ({
     add: jest.fn(),
     getRepeatableJobs: jest.fn(),
     removeRepeatableByKey: jest.fn(),
     close: jest.fn(),
   })),
-  QueueEvents: jest.fn().mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
+  QueueEvents: jest
+    .fn()
+    .mockImplementation(() => ({ on: jest.fn(), close: jest.fn() })),
 }));
 
-function makeIntegration(overrides: Record<string, unknown> = {}): Partial<Integration> {
+function makeIntegration(
+  overrides: Record<string, unknown> = {},
+): Partial<Integration> {
   return {
     id: 'integ-1',
     tenantId: 'tenant-1',

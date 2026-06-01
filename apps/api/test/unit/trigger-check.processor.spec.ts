@@ -319,7 +319,11 @@ describe('TriggerCheckProcessor', () => {
 
   it('T16 — customer at exactly 100%: only reward fires, nudge does not (1.0 not < 1.0)', async () => {
     mockCustomerRepo.findOne.mockResolvedValue(
-      makeCustomer({ pointsBalance: 1000, rewardSentAt: null, nudgeSentAt: null }),
+      makeCustomer({
+        pointsBalance: 1000,
+        rewardSentAt: null,
+        nudgeSentAt: null,
+      }),
     );
     mockTenantService.findOne.mockResolvedValue(makeTenant());
 
@@ -356,6 +360,7 @@ describe('TriggerCheckProcessor', () => {
     expect(mockWaQueue.add).toHaveBeenCalledWith(
       'send',
       expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({ amountToGoal: '30000' }),
       }),
     );
