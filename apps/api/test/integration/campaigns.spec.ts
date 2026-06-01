@@ -77,7 +77,7 @@ describe('Campaigns', () => {
 
     // Set up wallet and WA verification for campaign sending
     await setWaVerified(ctx.dataSource, tenantA.tenant.id, redis);
-    await setWalletBalance(ctx, tenantA.tenant.id, 500_000);
+    await setWalletBalance(ctx, tenantA.tenant.id, 500_000, redis);
 
     // Create 10 opted-in customers
     for (let i = 0; i < 10; i++) {
@@ -226,7 +226,8 @@ describe('Campaigns', () => {
   // ── T6: Send with zero wallet → 400 ──────────────────────────────────────
 
   it('T6 — send campaign with empty wallet returns 400', async () => {
-    await setWalletBalance(ctx, tenantA.tenant.id, 0);
+    // Clear cache so the service sees the new wallet balance from DB
+    await setWalletBalance(ctx, tenantA.tenant.id, 0, redis);
 
     const createRes = await authenticatedRequest(app, tenantA.token)
       .post('/api/v1/campaigns')
@@ -245,8 +246,8 @@ describe('Campaigns', () => {
     expect(res.status).toBe(400);
     expect(JSON.stringify(res.body).toLowerCase()).toContain('wallet');
 
-    // Restore wallet for subsequent tests
-    await setWalletBalance(ctx, tenantA.tenant.id, 500_000);
+    // Restore wallet and clear cache for subsequent tests
+    await setWalletBalance(ctx, tenantA.tenant.id, 500_000, redis);
   }, 30_000);
 
   // ── T7: Cashier cannot list campaigns (RBAC) ──────────────────────────────

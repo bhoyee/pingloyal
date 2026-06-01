@@ -348,11 +348,18 @@ export async function setWalletBalance(
   ctx: Pick<TestHelperCtx, 'dataSource'>,
   tenantId: string,
   amount: number,
+  redis?: Redis,
 ): Promise<void> {
   await ctx.dataSource.query(
     'UPDATE tenants SET marketing_wallet_balance = $1 WHERE id = $2',
     [amount, tenantId],
   );
+  // Always clear tenant cache so services re-read the new balance from DB
+  if (redis) {
+    await redis.del(`tenant:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:full:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:sub:${tenantId}`).catch(() => null);
+  }
 }
 
 /**

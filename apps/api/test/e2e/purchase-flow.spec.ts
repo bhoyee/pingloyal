@@ -144,7 +144,7 @@ describe('Complete Purchase Flow (E2E)', () => {
 
   it('Step 3 — WA verification simulated (direct DB + cache invalidation)', async () => {
     await setWaVerified(dataSource, tenantId, redis);
-    await setWalletBalance({ dataSource }, tenantId, 500_000);
+    await setWalletBalance({ dataSource }, tenantId, 500_000, redis);
 
     const statusRes = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
