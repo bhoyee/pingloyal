@@ -25,7 +25,6 @@ import {
   createTestCustomer,
   createTestTenant,
   createTestUser,
-  getCampaignLogs,
   setWaVerified,
   setWalletBalance,
 } from '../helpers/test-helpers';
@@ -183,7 +182,7 @@ describe('Campaigns', () => {
 
   // ── T5: POST /campaigns/:id/send with audience ─────────────────────────────
 
-  it('T5 — POST /campaigns/:id/send creates campaign_logs and queues jobs', async () => {
+  it('T5 — POST /campaigns/:id/send returns 200 with recipientCount and adds fan-out job', async () => {
     await campaignSendQueue.obliterate({ force: true }).catch(() => null);
 
     // Create campaign
@@ -207,13 +206,21 @@ describe('Campaigns', () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(Number(sendRes.body.totalRecipients)).toBeGreaterThanOrEqual(10);
 
-    // Wait for dispatch
-    await new Promise((r) => setTimeout(r, 1000));
+    // Verify a fan-out job was added to the campaign-send queue
+    await new Promise((r) => setTimeout(r, 500));
+    const jobs = await campaignSendQueue.getJobs([
+      'waiting',
+      'active',
+      'delayed',
+    ]);
+    expect(jobs.length).toBeGreaterThan(0);
 
-    // Verify campaign_logs created
-    const logs = await getCampaignLogs(ctx.dataSource, campaignId);
-    expect(logs.length).toBeGreaterThan(0);
-    expect(logs.every((l) => l.status === 'queued')).toBe(true);
+    // Verify campaign status updated to 'sending'
+    const campaignRows = await ctx.dataSource.query<[{ status: string }]>(
+      'SELECT status FROM campaigns WHERE id = $1',
+      [campaignId],
+    );
+    expect(campaignRows[0].status).toBe('sending');
   }, 60_000);
 
   // ── T6: Send with zero wallet → 400 ──────────────────────────────────────
