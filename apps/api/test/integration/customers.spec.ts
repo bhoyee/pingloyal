@@ -4,6 +4,7 @@
  * Tests customer registration, idempotency, phone normalisation, and CSV import.
  * Runs against the real database.
  */
+import * as crypto from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -69,6 +70,7 @@ describe('Customer Registration', () => {
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/customers/register')
+      .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Adaeze Obi',
         phone,
@@ -101,16 +103,21 @@ describe('Customer Registration', () => {
       tenantSlug: tenantA.tenant.slug,
     };
 
+    // T2 uses the SAME idempotency key both times to test deduplication
+    const idemKey = crypto.randomUUID();
+
     const res1 = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/customers/register')
+      .set('idempotency-key', idemKey)
       .send(body);
 
     const res2 = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/customers/register')
+      .set('idempotency-key', idemKey)
       .send(body);
 
     expect(res1.status).toBe(201);
@@ -132,6 +139,7 @@ describe('Customer Registration', () => {
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/customers/register')
+      .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Test',
         phone: '08012345678',
@@ -150,6 +158,7 @@ describe('Customer Registration', () => {
     // Create customer first
     await request(app.getHttpServer() as Parameters<typeof request>[0])
       .post('/api/v1/customers/register')
+      .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Lookup Test',
         phone,

@@ -11,6 +11,7 @@
  *
  * Requires: real PostgreSQL + Redis + BullMQ (docker compose up -d)
  */
+import * as crypto from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';

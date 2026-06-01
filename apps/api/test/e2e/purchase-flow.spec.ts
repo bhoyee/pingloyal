@@ -13,6 +13,7 @@
  *
  * External services mocked: BspService (Gupshup calls)
  */
+import * as crypto from 'crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -167,6 +168,7 @@ describe('Complete Purchase Flow (E2E)', () => {
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/customers/register')
+      .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Ngozi Amaka',
         phone: '08023456789',
