@@ -181,13 +181,15 @@ describe('Complete Purchase Flow (E2E)', () => {
     customerId = res.body.id as string;
     expect(customerId).toBeDefined();
 
-    // Allow fire-and-forget to settle
-    await new Promise((r) => setTimeout(r, 500));
+    // Allow workers to process the welcome job
+    await new Promise((r) => setTimeout(r, 1500));
 
+    // wa_messages has removeOnComplete:{count:1000} so completed jobs persist
     const jobs = await waMessagesQueue.getJobs([
       'waiting',
       'active',
       'delayed',
+      'completed',
     ]);
     const welcomeJob = jobs.find(
       (j) =>
@@ -266,18 +268,22 @@ describe('Complete Purchase Flow (E2E)', () => {
     );
     expect(Number(rows[0].points_balance)).toBe(820);
 
-    // The trigger-check job is queued (processed by worker, which we can't
-    // easily invoke synchronously in integration tests — verify job creation)
-    await new Promise((r) => setTimeout(r, 500));
-    const tcJobs = await triggerCheckQueue.getJobs([
+    // trigger-check has removeOnComplete:true so jobs are deleted after processing.
+    // Verify the nudge fired by checking wa_messages (count:1000 keeps completed jobs).
+    await new Promise((r) => setTimeout(r, 2000));
+    const waJobs = await waMessagesQueue.getJobs([
       'waiting',
       'active',
       'delayed',
+      'completed',
     ]);
-    const relevantTc = tcJobs.filter(
-      (j) => (j.data as { customerId?: string }).customerId === customerId,
+    const nudgeJob = waJobs.find(
+      (j) =>
+        (j.data as { type?: string; customerId?: string }).type ===
+          TriggerType.THRESHOLD_NUDGE &&
+        (j.data as { customerId?: string }).customerId === customerId,
     );
-    expect(relevantTc.length).toBeGreaterThan(0);
+    expect(nudgeJob).toBeDefined();
   }, 30_000);
 
   // ── Step 7: Purchase to 102% → reward queued ──────────────────────────────
@@ -318,7 +324,7 @@ describe('Complete Purchase Flow (E2E)', () => {
 
   // ── Step 8: Audit trail ───────────────────────────────────────────────────
 
-  it('Step 8 — complete audit trail: 6 purchases, correct points ledger, welcome trigger', async () => {
+  it('Step 8 — complete audit trail: 7 purchases, correct points ledger, welcome trigger', async () => {
     // Customer state
     const rows = await dataSource.query<
       [
@@ -335,13 +341,13 @@ describe('Complete Purchase Flow (E2E)', () => {
     const customer = rows[0];
 
     expect(Number(customer.points_balance)).toBe(1020);
-    expect(Number(customer.purchase_count)).toBe(6);
-    expect(Number(customer.total_spend)).toBe(92_000); // 5×15000 + 7000 + 20000
+    expect(Number(customer.purchase_count)).toBe(7); // 5 (step5) + 1 (step6) + 1 (step7)
+    expect(Number(customer.total_spend)).toBe(102_000); // 5×15000 + 7000 + 20000
 
-    // Points ledger: 6 purchase entries
+    // Points ledger: 7 purchase entries
     const ledger = await getLedgerEntries(dataSource, customerId);
     const purchaseEntries = ledger.filter((l) => l.reason === 'purchase');
-    expect(purchaseEntries.length).toBe(6);
+    expect(purchaseEntries.length).toBe(7);
 
     const totalDelta = purchaseEntries.reduce(
       (sum, l) => sum + Number(l.delta),
