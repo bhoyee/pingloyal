@@ -5,7 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
+import { encrypt } from '@pingloyal/utils';
+import type Redis from 'ioredis';
 import {
+  CampaignStatus,
   CustomerSource,
   IntegrationConnectionType,
   IntegrationSyncStatus,
@@ -23,7 +26,6 @@ import { ProductCategory } from '../../src/modules/tenants/entities/product-cate
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 import { Integration } from '../../src/modules/integrations/entities/integration.entity';
-import { CampaignStatus } from '@pingloyal/types';
 
 // Fewer bcrypt rounds in tests for speed (production uses 12)
 const TEST_BCRYPT_ROUNDS = 4;
@@ -400,9 +402,6 @@ export async function bootstrapTestApp(
 }
 
 // ── Additional helpers for integration/E2E tests ──────────────────────────────
-
-import { encrypt } from '@pingloyal/utils';
-import type Redis from 'ioredis';
 
 /**
  * Sets the tenant's WA verification status to VERIFIED with test credentials.

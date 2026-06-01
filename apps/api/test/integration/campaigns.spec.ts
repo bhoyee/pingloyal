@@ -24,6 +24,7 @@ import {
   clearTestData,
   createTestCustomer,
   createTestTenant,
+  createTestUser,
   getCampaignLogs,
   setWaVerified,
   setWalletBalance,
@@ -244,8 +245,7 @@ describe('Campaigns', () => {
   // ── T7: Cashier cannot list campaigns (RBAC) ──────────────────────────────
 
   it('T7 — cashier cannot access campaign list (403)', async () => {
-    // Create cashier token directly
-    const { createTestUser } = await import('../helpers/test-helpers.js');
+    // Create cashier token using statically imported helper
     const { token: cashierToken } = await createTestUser(
       ctx,
       tenantA.tenant.id,
