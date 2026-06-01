@@ -95,10 +95,12 @@ export class SubscriptionGuard implements CanActivate {
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as SubStatusCache;
 
+    // JOIN tenants to get trial_ends_at (stored on tenants, not subscriptions)
     const rows = await this.dataSource.query<SubStatusRow[]>(
-      `SELECT status, trial_ends_at, plan_tier
-       FROM subscriptions
-       WHERE tenant_id = $1
+      `SELECT s.status, s.plan_tier, t.trial_ends_at
+       FROM subscriptions s
+       JOIN tenants t ON s.tenant_id = t.id
+       WHERE s.tenant_id = $1
        LIMIT 1`,
       [tenantId],
     );

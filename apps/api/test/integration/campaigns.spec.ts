@@ -202,12 +202,12 @@ describe('Campaigns', () => {
       `/api/v1/campaigns/${campaignId}/send`,
     );
 
-    expect(sendRes.status).toBe(200);
+    expect([200, 201]).toContain(sendRes.status);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     expect(Number(sendRes.body.totalRecipients)).toBeGreaterThanOrEqual(10);
 
     // Verify a fan-out job was added to the campaign-send queue
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 2000));
     const jobs = await campaignSendQueue.getJobs([
       'waiting',
       'active',

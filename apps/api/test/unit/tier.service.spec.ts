@@ -432,7 +432,10 @@ describe('TierService — boundary and edge cases', () => {
     const module = await Test.createTestingModule({
       providers: [
         TierService,
-        { provide: getRepositoryToken(TierConfig), useValue: mockTierConfigRepo },
+        {
+          provide: getRepositoryToken(TierConfig),
+          useValue: mockTierConfigRepo,
+        },
         { provide: REDIS_CLIENT, useValue: mockRedis },
       ],
     }).compile();
@@ -440,8 +443,17 @@ describe('TierService — boundary and edge cases', () => {
   });
 
   it('T21 — quarterly spend exactly ₦400,000 → VIP tier (boundary inclusive)', async () => {
-    mockTierConfigRepo.find.mockResolvedValue([VIP, MID, STANDARD] as TierConfig[]);
-    await service.recalculate(TENANT_ID, CUSTOMER_ID, 400_000, mockEm as unknown as EntityManager);
+    mockTierConfigRepo.find.mockResolvedValue([
+      VIP,
+      MID,
+      STANDARD,
+    ] as TierConfig[]);
+    await service.recalculate(
+      TENANT_ID,
+      CUSTOMER_ID,
+      400_000,
+      mockEm as unknown as EntityManager,
+    );
     expect(mockQueryFn).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE'),
       [VIP.id, CUSTOMER_ID, TENANT_ID],
@@ -449,8 +461,17 @@ describe('TierService — boundary and edge cases', () => {
   });
 
   it('T22 — quarterly spend ₦399,999 → Mid tier (just below VIP boundary)', async () => {
-    mockTierConfigRepo.find.mockResolvedValue([VIP, MID, STANDARD] as TierConfig[]);
-    await service.recalculate(TENANT_ID, CUSTOMER_ID, 399_999, mockEm as unknown as EntityManager);
+    mockTierConfigRepo.find.mockResolvedValue([
+      VIP,
+      MID,
+      STANDARD,
+    ] as TierConfig[]);
+    await service.recalculate(
+      TENANT_ID,
+      CUSTOMER_ID,
+      399_999,
+      mockEm as unknown as EntityManager,
+    );
     expect(mockQueryFn).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE'),
       [MID.id, CUSTOMER_ID, TENANT_ID],
@@ -463,9 +484,17 @@ describe('TierService — boundary and edge cases', () => {
       { ...VIP, minQuarterlySpend: 400_000 },
     ] as TierConfig[];
     // When em is passed, recalculate uses em.find() — mock it to return tiersWithGap
-    const emWithGap = { ...mockEm, find: jest.fn().mockResolvedValue(tiersWithGap) };
+    const emWithGap = {
+      ...mockEm,
+      find: jest.fn().mockResolvedValue(tiersWithGap),
+    };
 
-    await service.recalculate(TENANT_ID, CUSTOMER_ID, 50_000, emWithGap as unknown as EntityManager);
+    await service.recalculate(
+      TENANT_ID,
+      CUSTOMER_ID,
+      50_000,
+      emWithGap as unknown as EntityManager,
+    );
 
     // No tier matches spend of 50,000 — customer gets null tier
     expect(mockQueryFn).toHaveBeenCalledWith(
@@ -475,10 +504,17 @@ describe('TierService — boundary and edge cases', () => {
   });
 
   it('T24 — only one tier configured → any spend assigns that tier', async () => {
-    const singleTier = [{ ...STANDARD, minQuarterlySpend: 0, maxQuarterlySpend: null }] as TierConfig[];
+    const singleTier = [
+      { ...STANDARD, minQuarterlySpend: 0, maxQuarterlySpend: null },
+    ] as TierConfig[];
     mockTierConfigRepo.find.mockResolvedValue(singleTier);
 
-    await service.recalculate(TENANT_ID, CUSTOMER_ID, 99_999, mockEm as unknown as EntityManager);
+    await service.recalculate(
+      TENANT_ID,
+      CUSTOMER_ID,
+      99_999,
+      mockEm as unknown as EntityManager,
+    );
     expect(mockQueryFn).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE'),
       [STANDARD.id, CUSTOMER_ID, TENANT_ID],

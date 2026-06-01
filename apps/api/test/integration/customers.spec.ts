@@ -69,7 +69,7 @@ describe('Customer Registration', () => {
     const res = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Adaeze Obi',
@@ -109,14 +109,14 @@ describe('Customer Registration', () => {
     const res1 = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', idemKey)
       .send(body);
 
     const res2 = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', idemKey)
       .send(body);
 
@@ -138,7 +138,7 @@ describe('Customer Registration', () => {
     const res = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Test',
@@ -157,7 +157,7 @@ describe('Customer Registration', () => {
 
     // Create customer first
     await request(app.getHttpServer() as Parameters<typeof request>[0])
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Lookup Test',

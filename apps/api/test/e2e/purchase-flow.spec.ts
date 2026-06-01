@@ -167,7 +167,7 @@ describe('Complete Purchase Flow (E2E)', () => {
     const res = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
-      .post('/api/v1/customers/register')
+      .post('/api/v1/register')
       .set('idempotency-key', crypto.randomUUID())
       .send({
         fullName: 'Ngozi Amaka',

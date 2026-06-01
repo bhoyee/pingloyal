@@ -229,13 +229,13 @@ export async function clearTestData(
 ): Promise<void> {
   if (tenantIds.length === 0) return;
 
-  // Use parameterized query with array binding
+  // Delete in FK-safe order: child tables before parent tables
   const tables = [
-    'transactions',
-    'points_ledger',
-    'campaign_logs',
-    'trigger_logs',
+    'points_ledger',        // references transactions
+    'campaign_logs',        // references campaigns + customers
+    'trigger_logs',         // references customers
     'wallet_transactions',
+    'transactions',         // references customers
     'customers',
     'campaigns',
     'product_categories',
