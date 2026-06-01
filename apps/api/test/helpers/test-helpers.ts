@@ -5,7 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
+import { encrypt } from '@pingloyal/utils';
+import type Redis from 'ioredis';
 import {
+  CampaignStatus,
   CustomerSource,
   IntegrationConnectionType,
   IntegrationSyncStatus,
@@ -23,7 +26,6 @@ import { ProductCategory } from '../../src/modules/tenants/entities/product-cate
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 import { Integration } from '../../src/modules/integrations/entities/integration.entity';
-import { CampaignStatus } from '@pingloyal/types';
 
 // Fewer bcrypt rounds in tests for speed (production uses 12)
 const TEST_BCRYPT_ROUNDS = 4;
@@ -227,13 +229,13 @@ export async function clearTestData(
 ): Promise<void> {
   if (tenantIds.length === 0) return;
 
-  // Use parameterized query with array binding
+  // Delete in FK-safe order: child tables before parent tables
   const tables = [
-    'transactions',
-    'points_ledger',
-    'campaign_logs',
-    'trigger_logs',
+    'points_ledger',        // references transactions
+    'campaign_logs',        // references campaigns + customers
+    'trigger_logs',         // references customers
     'wallet_transactions',
+    'transactions',         // references customers
     'customers',
     'campaigns',
     'product_categories',
@@ -346,11 +348,18 @@ export async function setWalletBalance(
   ctx: Pick<TestHelperCtx, 'dataSource'>,
   tenantId: string,
   amount: number,
+  redis?: Redis,
 ): Promise<void> {
   await ctx.dataSource.query(
     'UPDATE tenants SET marketing_wallet_balance = $1 WHERE id = $2',
     [amount, tenantId],
   );
+  // Always clear tenant cache so services re-read the new balance from DB
+  if (redis) {
+    await redis.del(`tenant:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:full:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:sub:${tenantId}`).catch(() => null);
+  }
 }
 
 /**
@@ -397,4 +406,194 @@ export async function bootstrapTestApp(
   );
   await app.init();
   return app;
+}
+
+// ── Additional helpers for integration/E2E tests ──────────────────────────────
+
+/**
+ * Sets the tenant's WA verification status to VERIFIED with test credentials.
+ */
+export async function setWaVerified(
+  dataSource: DataSource,
+  tenantId: string,
+  redis?: Redis,
+): Promise<void> {
+  const tenantRepo = dataSource.getRepository(Tenant);
+  await tenantRepo.update(tenantId, {
+    waVerificationStatus: WaVerificationStatus.VERIFIED,
+    waVerifiedAt: new Date(),
+    gupshupAppId: 'test-gupshup-app',
+    gupshupApiKey: encrypt('test-api-key'),
+    waPhoneNumber: '+2348099999999',
+    waDisplayName: 'Test Store',
+  });
+  if (redis) {
+    await redis.del(`tenant:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:full:${tenantId}`).catch(() => null);
+  }
+}
+
+/**
+ * Suspends a tenant's subscription.
+ */
+export async function suspendTenant(
+  dataSource: DataSource,
+  tenantId: string,
+  redis?: Redis,
+): Promise<void> {
+  const tenantRepo = dataSource.getRepository(Tenant);
+  const subscriptionRepo = dataSource.getRepository(Subscription);
+  await subscriptionRepo.update(
+    { tenantId },
+    { status: SubscriptionStatus.SUSPENDED },
+  );
+  await tenantRepo.update(tenantId, {
+    subscriptionStatus: SubscriptionStatus.SUSPENDED,
+  });
+  if (redis) {
+    await redis.del(`sub:status:${tenantId}`).catch(() => null);
+  }
+}
+
+/**
+ * Reactivates a suspended tenant.
+ */
+export async function reactivateTenant(
+  dataSource: DataSource,
+  tenantId: string,
+  redis?: Redis,
+): Promise<void> {
+  const tenantRepo = dataSource.getRepository(Tenant);
+  const subscriptionRepo = dataSource.getRepository(Subscription);
+  await subscriptionRepo.update(
+    { tenantId },
+    { status: SubscriptionStatus.ACTIVE },
+  );
+  await tenantRepo.update(tenantId, {
+    subscriptionStatus: SubscriptionStatus.ACTIVE,
+  });
+  if (redis) {
+    await redis.del(`sub:status:${tenantId}`).catch(() => null);
+    await redis.del(`tenant:${tenantId}`).catch(() => null);
+  }
+}
+
+/**
+ * Invalidates the subscription cache entry in Redis.
+ */
+export async function invalidateSubscriptionCache(
+  redis: Redis,
+  tenantId: string,
+): Promise<void> {
+  await redis.del(`sub:status:${tenantId}`).catch(() => null);
+}
+
+/**
+ * Generates a test CSV string with N rows of customer data.
+ */
+export function generateTestCsv(rows: number): string {
+  const header = 'full_name,phone,date_of_birth,consent\n';
+  const lines: string[] = [];
+  for (let i = 0; i < rows; i++) {
+    const phone = `0801${String(i).padStart(7, '0')}`;
+    lines.push(`Test Customer ${i},${phone},1990-01-01,true`);
+  }
+  return header + lines.join('\n');
+}
+
+/**
+ * Gets the current marketing wallet balance for a tenant.
+ */
+export async function getWalletBalance(
+  dataSource: DataSource,
+  tenantId: string,
+): Promise<number> {
+  const rows = await dataSource.query<
+    Array<{ marketing_wallet_balance: string }>
+  >('SELECT marketing_wallet_balance FROM tenants WHERE id = $1', [tenantId]);
+  return Number(rows[0]?.marketing_wallet_balance ?? 0);
+}
+
+/**
+ * Gets a customer's points ledger entries.
+ */
+export async function getLedgerEntries(
+  dataSource: DataSource,
+  customerId: string,
+): Promise<Array<{ delta: number; reason: string; balance_after: number }>> {
+  return dataSource.query(
+    `SELECT delta, reason, balance_after FROM points_ledger
+     WHERE customer_id = $1 ORDER BY created_at ASC`,
+    [customerId],
+  );
+}
+
+/**
+ * Gets trigger_logs for a specific tenant+customer.
+ */
+export async function getTriggerLogs(
+  dataSource: DataSource,
+  tenantId: string,
+  customerId: string,
+): Promise<Array<{ trigger_type: string; status: string }>> {
+  return dataSource.query(
+    `SELECT trigger_type, status FROM trigger_logs
+     WHERE tenant_id = $1 AND customer_id = $2 ORDER BY created_at ASC`,
+    [tenantId, customerId],
+  );
+}
+
+/**
+ * Counts transactions for a customer.
+ */
+export async function countTransactions(
+  dataSource: DataSource,
+  customerId: string,
+  tenantId: string,
+): Promise<number> {
+  const rows = await dataSource.query<[{ count: string }]>(
+    'SELECT COUNT(*) AS count FROM transactions WHERE customer_id = $1 AND tenant_id = $2',
+    [customerId, tenantId],
+  );
+  return parseInt(rows[0].count, 10);
+}
+
+/**
+ * Gets a customer by phone number within a tenant.
+ */
+export async function getCustomerByPhone(
+  dataSource: DataSource,
+  phoneE164: string,
+  tenantId: string,
+): Promise<Customer | null> {
+  const repo = dataSource.getRepository(Customer);
+  return repo.findOne({ where: { phoneE164, tenantId } });
+}
+
+/**
+ * Counts customers matching a phone within a tenant.
+ */
+export async function countCustomersByPhone(
+  dataSource: DataSource,
+  phoneE164: string,
+  tenantId: string,
+): Promise<number> {
+  const rows = await dataSource.query<[{ count: string }]>(
+    'SELECT COUNT(*) AS count FROM customers WHERE phone_e164 = $1 AND tenant_id = $2',
+    [phoneE164, tenantId],
+  );
+  return parseInt(rows[0].count, 10);
+}
+
+/**
+ * Gets a campaign's logs.
+ */
+export async function getCampaignLogs(
+  dataSource: DataSource,
+  campaignId: string,
+): Promise<Array<{ status: string }>> {
+  return dataSource.query(
+    'SELECT status FROM campaign_logs WHERE campaign_id = $1',
+    [campaignId],
+  );
 }

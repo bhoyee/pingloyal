@@ -17,7 +17,7 @@
     "test": "jest",
     "test:unit": "jest --config jest.unit.config.ts --coverage",
     "test:integration": "jest --config jest.integration.config.ts --runInBand --forceExit",
-    "test:e2e": "jest --config jest.e2e.config.ts --runInBand",
+    "test:e2e": "jest --config jest.e2e.config.ts --runInBand --forceExit",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
