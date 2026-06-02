@@ -401,9 +401,7 @@ export class BillingService {
         // ── Subscription payment ──
         if (meta?.type !== 'subscription' || !meta.tenantId || !meta.planId)
           return;
-        const cached = await this.redis.get(
-          `billing:paystack:pending:${ref}`,
-        );
+        const cached = await this.redis.get(`billing:paystack:pending:${ref}`);
         if (!cached) {
           this.logger.warn(
             `Paystack charge.success: no pending reference for ${ref}`,

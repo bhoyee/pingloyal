@@ -172,7 +172,10 @@ describe('BillingService', () => {
         { provide: getQueueToken('wa-messages'), useValue: mockWaQueue },
         {
           provide: WalletService,
-          useValue: { topupWallet: jest.fn().mockResolvedValue(10000), getBalance: jest.fn().mockResolvedValue(10000) },
+          useValue: {
+            topupWallet: jest.fn().mockResolvedValue(10000),
+            getBalance: jest.fn().mockResolvedValue(10000),
+          },
         },
       ],
     }).compile();
