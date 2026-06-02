@@ -21,7 +21,6 @@ import { WaMessageProcessor } from './processors/wa-message.processor';
 import { TriggerCheckProcessor } from './processors/trigger-check.processor';
 import { CampaignSendProcessor } from './processors/campaign-send.processor';
 import { IntegrationSyncProcessor } from './processors/integration-sync.processor';
-import { WalletService } from '../modules/billing/wallet.service';
 import { MessageBuilderService } from './message-builder.service';
 
 export const QUEUE_NAMES = {
@@ -114,9 +113,8 @@ export const QUEUE_NAMES = {
     TriggerCheckProcessor,
     CampaignSendProcessor,
     IntegrationSyncProcessor,
-    WalletService,
     MessageBuilderService,
   ],
-  exports: [BullModule, WalletService, MessageBuilderService],
+  exports: [BullModule, MessageBuilderService],
 })
 export class QueueModule {}
