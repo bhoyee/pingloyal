@@ -395,7 +395,7 @@ describe('WalletService — new methods', () => {
       await service.getMonthlySpend(TENANT_ID);
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'wt.createdAt >= :startOfMonth',
-        expect.objectContaining({ startOfMonth: expect.any(Date) }),
+        expect.objectContaining({ startOfMonth: expect.any(Date) as unknown }),
       );
     });
 
@@ -411,21 +411,39 @@ describe('WalletService — new methods', () => {
 
   describe('checkLowBalanceAlert() (via deductMarketing)', () => {
     it('T24 — does NOT alert when balance > 3000', async () => {
-      mockEm.findOne.mockResolvedValue({ id: TENANT_ID, marketingWalletBalance: 5000 });
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 100, 'test', null);
+      mockEm.findOne.mockResolvedValue({
+        id: TENANT_ID,
+        marketingWalletBalance: 5000,
+      });
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        100,
+        'test',
+        null,
+      );
       // balance after = 4900, above threshold → no alert
       expect(mockWaQueue.add).not.toHaveBeenCalled();
     });
 
     it('T25 — queues wallet_low_balance alert when balance drops to <= 3000', async () => {
-      mockEm.findOne.mockResolvedValue({ id: TENANT_ID, marketingWalletBalance: 3050 });
+      mockEm.findOne.mockResolvedValue({
+        id: TENANT_ID,
+        marketingWalletBalance: 3050,
+      });
       // DB query returns tenant with no recent alert
       mockDataSource.query
         .mockResolvedValueOnce([{ wallet_low_alert_sent_at: null }]) // checkLowBalanceAlert SELECT
         .mockResolvedValueOnce([]) // UPDATE wallet_low_alert_sent_at
         .mockResolvedValueOnce([{ marketing_wallet_balance: '2950' }]); // getBalance (not used)
 
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 100, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        100,
+        'test',
+        null,
+      );
 
       expect(mockWaQueue.add).toHaveBeenCalledWith(
         'send-message',
@@ -435,12 +453,21 @@ describe('WalletService — new methods', () => {
     });
 
     it('T26 — queues wallet_zero alert when balance drops to <= 0', async () => {
-      mockEm.findOne.mockResolvedValue({ id: TENANT_ID, marketingWalletBalance: 100 });
+      mockEm.findOne.mockResolvedValue({
+        id: TENANT_ID,
+        marketingWalletBalance: 100,
+      });
       mockDataSource.query
         .mockResolvedValueOnce([{ wallet_low_alert_sent_at: null }])
         .mockResolvedValueOnce([]);
 
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 100, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        100,
+        'test',
+        null,
+      );
 
       expect(mockWaQueue.add).toHaveBeenCalledWith(
         'send-message',
@@ -450,25 +477,43 @@ describe('WalletService — new methods', () => {
     });
 
     it('T27 — does not send duplicate alert within 24 hours', async () => {
-      mockEm.findOne.mockResolvedValue({ id: TENANT_ID, marketingWalletBalance: 3050 });
+      mockEm.findOne.mockResolvedValue({
+        id: TENANT_ID,
+        marketingWalletBalance: 3050,
+      });
       const recentAlert = new Date(Date.now() - 3600 * 1000).toISOString(); // 1 hour ago
       mockDataSource.query.mockResolvedValueOnce([
         { wallet_low_alert_sent_at: recentAlert },
       ]);
 
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 100, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        100,
+        'test',
+        null,
+      );
 
       expect(mockWaQueue.add).not.toHaveBeenCalled();
     });
 
     it('T28 — sends new alert after 24h cooldown expires', async () => {
-      mockEm.findOne.mockResolvedValue({ id: TENANT_ID, marketingWalletBalance: 3050 });
+      mockEm.findOne.mockResolvedValue({
+        id: TENANT_ID,
+        marketingWalletBalance: 3050,
+      });
       const oldAlert = new Date(Date.now() - 25 * 3600 * 1000).toISOString(); // 25h ago
       mockDataSource.query
         .mockResolvedValueOnce([{ wallet_low_alert_sent_at: oldAlert }])
         .mockResolvedValueOnce([]);
 
-      await service.deductMarketing(TENANT_ID, TriggerType.BIRTHDAY, 100, 'test', null);
+      await service.deductMarketing(
+        TENANT_ID,
+        TriggerType.BIRTHDAY,
+        100,
+        'test',
+        null,
+      );
 
       expect(mockWaQueue.add).toHaveBeenCalled();
     });
@@ -478,8 +523,11 @@ describe('WalletService — new methods', () => {
 
   describe('resolveTransactionType() (private)', () => {
     const resolve = (desc: string): WalletTransactionType =>
-      (service as unknown as { resolveTransactionType: (d: string) => WalletTransactionType })
-        .resolveTransactionType(desc);
+      (
+        service as unknown as {
+          resolveTransactionType: (d: string) => WalletTransactionType;
+        }
+      ).resolveTransactionType(desc);
 
     it('T29 — birthday description → DEBIT_BIRTHDAY', () => {
       expect(resolve('Birthday message for Amaka')).toBe(

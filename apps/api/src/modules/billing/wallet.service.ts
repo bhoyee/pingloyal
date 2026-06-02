@@ -62,6 +62,7 @@ export class WalletService {
     });
 
     if (result.success) {
+      void this.redis.del(`wallet:balance:${tenantId}`).catch(() => null);
       await this.checkLowBalanceAlert(tenantId, result.newBalance).catch(
         (err) => this.logger.error('Low balance alert failed', err),
       );
@@ -107,10 +108,67 @@ export class WalletService {
 
     void this.redis
       .del(
+        `wallet:balance:${tenantId}`,
         `dashboard:summary:${tenantId}`,
         `dashboard:top-spenders:${tenantId}`,
       )
       .catch(() => null);
+  }
+
+  async topupWallet(
+    tenantId: string,
+    amount: number,
+    paystackRef: string,
+  ): Promise<number> {
+    await this.dataSource.transaction(async (em) => {
+      await em.increment(
+        Tenant,
+        { id: tenantId },
+        'marketingWalletBalance',
+        amount,
+      );
+
+      const row = await em.findOne(Tenant, {
+        where: { id: tenantId },
+        select: ['marketingWalletBalance'],
+      });
+      const newBal = parseFloat(
+        Number(row?.marketingWalletBalance ?? 0).toFixed(2),
+      );
+
+      await em.save(
+        em.create(WalletTransaction, {
+          tenantId,
+          type: WalletTransactionType.TOPUP,
+          amount,
+          balanceAfter: newBal,
+          description: 'Wallet top-up via Paystack',
+          paystackRef,
+          refId: null,
+        }),
+      );
+
+      await em.update(
+        Tenant,
+        { id: tenantId },
+        {
+          walletLowAlertSentAt: null,
+          walletLastToppedUpAt: new Date(),
+        },
+      );
+    });
+
+    const newBalance = await this.getBalance(tenantId);
+
+    void this.redis
+      .del(
+        `wallet:balance:${tenantId}`,
+        `dashboard:summary:${tenantId}`,
+        `dashboard:top-spenders:${tenantId}`,
+      )
+      .catch(() => null);
+
+    return newBalance;
   }
 
   async getBalance(tenantId: string): Promise<number> {
@@ -152,10 +210,7 @@ export class WalletService {
 
     const rows = await this.dataSource.query<
       [{ wallet_low_alert_sent_at: string | null }]
-    >(
-      'SELECT wallet_low_alert_sent_at FROM tenants WHERE id = $1',
-      [tenantId],
-    );
+    >('SELECT wallet_low_alert_sent_at FROM tenants WHERE id = $1', [tenantId]);
 
     if (!rows?.[0]) return;
 
