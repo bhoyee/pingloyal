@@ -5,6 +5,7 @@ import { getQueueToken } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { BillingService } from '../../src/modules/billing/billing.service';
+import { WalletService } from '../../src/modules/billing/wallet.service';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { User } from '../../src/modules/auth/entities/user.entity';
@@ -169,6 +170,10 @@ describe('BillingService', () => {
         { provide: ConfigService, useValue: mockConfig },
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: getQueueToken('wa-messages'), useValue: mockWaQueue },
+        {
+          provide: WalletService,
+          useValue: { topupWallet: jest.fn().mockResolvedValue(10000), getBalance: jest.fn().mockResolvedValue(10000) },
+        },
       ],
     }).compile();
 
