@@ -231,11 +231,11 @@ export async function clearTestData(
 
   // Delete in FK-safe order: child tables before parent tables
   const tables = [
-    'points_ledger',        // references transactions
-    'campaign_logs',        // references campaigns + customers
-    'trigger_logs',         // references customers
+    'points_ledger', // references transactions
+    'campaign_logs', // references campaigns + customers
+    'trigger_logs', // references customers
     'wallet_transactions',
-    'transactions',         // references customers
+    'transactions', // references customers
     'customers',
     'campaigns',
     'product_categories',

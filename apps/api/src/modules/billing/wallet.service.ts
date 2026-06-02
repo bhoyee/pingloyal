@@ -121,7 +121,12 @@ export class WalletService {
     paystackRef: string,
   ): Promise<number> {
     await this.dataSource.transaction(async (em) => {
-      await em.increment(Tenant, { id: tenantId }, 'marketingWalletBalance', amount);
+      await em.increment(
+        Tenant,
+        { id: tenantId },
+        'marketingWalletBalance',
+        amount,
+      );
 
       const row = await em.findOne(Tenant, {
         where: { id: tenantId },
@@ -143,10 +148,14 @@ export class WalletService {
         }),
       );
 
-      await em.update(Tenant, { id: tenantId }, {
-        walletLowAlertSentAt: null as unknown as Date,
-        walletLastToppedUpAt: new Date(),
-      });
+      await em.update(
+        Tenant,
+        { id: tenantId },
+        {
+          walletLowAlertSentAt: null,
+          walletLastToppedUpAt: new Date(),
+        },
+      );
     });
 
     const newBalance = await this.getBalance(tenantId);
@@ -201,10 +210,7 @@ export class WalletService {
 
     const rows = await this.dataSource.query<
       [{ wallet_low_alert_sent_at: string | null }]
-    >(
-      'SELECT wallet_low_alert_sent_at FROM tenants WHERE id = $1',
-      [tenantId],
-    );
+    >('SELECT wallet_low_alert_sent_at FROM tenants WHERE id = $1', [tenantId]);
 
     if (!rows?.[0]) return;
 

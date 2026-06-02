@@ -105,7 +105,12 @@ export class WalletController {
       .limit(safeLimit)
       .offset(offset);
 
-    if (type && Object.values(WalletTransactionType).includes(type as WalletTransactionType)) {
+    if (
+      type &&
+      Object.values(WalletTransactionType).includes(
+        type as WalletTransactionType,
+      )
+    ) {
       qb.andWhere('wt.type = :type', { type });
     }
 
