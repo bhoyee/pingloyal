@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as Sentry from '@sentry/node';
 import {
   BadRequestException,
   Inject,
@@ -18,6 +19,7 @@ import { Subscription } from './entities/subscription.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { User } from '../auth/entities/user.entity';
 import { PLANS, type PlanId } from './plans.config';
+import { WalletService } from './wallet.service';
 
 // ── Minimal Stripe interface (avoids nodenext type resolution issues) ─────────
 interface StripeCustomer {
@@ -73,9 +75,16 @@ interface PaystackEvent {
   data: {
     reference?: string;
     status?: string;
+    amount?: number;
     subscription_code?: string;
     customer?: { metadata?: { tenantId?: string } };
-    metadata?: { type?: string; tenantId?: string; planId?: string };
+    metadata?: {
+      type?: string;
+      tenantId?: string;
+      planId?: string;
+      amount?: number;
+      initiatedBy?: string;
+    };
   };
 }
 
@@ -95,6 +104,7 @@ export class BillingService {
     private readonly config: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
+    private readonly walletService: WalletService,
   ) {
     const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.stripe = stripeKey ? createStripeClient(stripeKey) : null;
@@ -342,14 +352,61 @@ export class BillingService {
     switch (event.event) {
       case 'charge.success': {
         const meta = event.data.metadata;
+        const ref = event.data.reference ?? '';
+
+        // ── Wallet top-up ──
+        if (meta?.type === 'wallet_topup') {
+          const pendingKey = `billing:wallet:pending:${ref}`;
+          const pending = await this.redis.get(pendingKey);
+
+          if (!pending) {
+            this.logger.warn(
+              `Wallet topup webhook: no pending record for ref ${ref}`,
+            );
+            return;
+          }
+
+          const pendingData = JSON.parse(pending) as {
+            tenantId: string;
+            amount: number;
+          };
+
+          const paystackNaira = (event.data.amount ?? 0) / 100;
+          if (Math.abs(paystackNaira - pendingData.amount) > 1) {
+            this.logger.error(
+              `Wallet topup amount mismatch: expected ₦${pendingData.amount}, ` +
+                `got ₦${paystackNaira} for ref ${ref}`,
+            );
+            Sentry.captureMessage('Wallet topup amount mismatch', {
+              extra: { reference: ref, pendingData, paystackNaira },
+            });
+            return;
+          }
+
+          const newBalance = await this.walletService.topupWallet(
+            pendingData.tenantId,
+            pendingData.amount,
+            ref,
+          );
+
+          await this.redis.del(pendingKey);
+
+          this.logger.log(
+            `Wallet topped up: tenant=${pendingData.tenantId} ` +
+              `amount=₦${pendingData.amount} newBalance=₦${newBalance} ref=${ref}`,
+          );
+          return;
+        }
+
+        // ── Subscription payment ──
         if (meta?.type !== 'subscription' || !meta.tenantId || !meta.planId)
           return;
         const cached = await this.redis.get(
-          `billing:paystack:pending:${event.data.reference ?? ''}`,
+          `billing:paystack:pending:${ref}`,
         );
         if (!cached) {
           this.logger.warn(
-            `Paystack charge.success: no pending reference for ${event.data.reference ?? ''}`,
+            `Paystack charge.success: no pending reference for ${ref}`,
           );
           return;
         }
@@ -358,9 +415,7 @@ export class BillingService {
           planId: PlanId;
         };
         await this.activateSubscription(tenantId, planId);
-        await this.redis.del(
-          `billing:paystack:pending:${event.data.reference ?? ''}`,
-        );
+        await this.redis.del(`billing:paystack:pending:${ref}`);
         break;
       }
 
