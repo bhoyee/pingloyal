@@ -8,15 +8,23 @@ import { Subscription } from '../../src/modules/billing/entities/subscription.en
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { WalletTransaction } from '../../src/modules/billing/entities/wallet-transaction.entity';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
-import { WalletTransactionType } from '@pingloyal/types';
+import { PlanTier, UserRole, WalletTransactionType } from '@pingloyal/types';
+import type { RequestUser } from '@pingloyal/types';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const TENANT_ID = 'tenant-uuid';
 const USER_ID = 'user-uuid';
 
-function makeReq(extra: object = {}): { user: { tenantId: string; userId: string; role: string } } {
-  return { user: { tenantId: TENANT_ID, userId: USER_ID, role: 'owner', ...extra } };
+function makeReq(): { user: RequestUser } {
+  return {
+    user: {
+      tenantId: TENANT_ID,
+      userId: USER_ID,
+      role: UserRole.OWNER,
+      planTier: PlanTier.STARTER,
+    },
+  };
 }
 
 // ── Suite ──────────────────────────────────────────────────────────────────────
@@ -52,7 +60,9 @@ describe('WalletController', () => {
 
     mockWalletService = {
       getBalance: jest.fn().mockResolvedValue(5000),
-      getMonthlySpend: jest.fn().mockResolvedValue({ totalSpend: 1150, messageCount: 10 }),
+      getMonthlySpend: jest
+        .fn()
+        .mockResolvedValue({ totalSpend: 1150, messageCount: 10 }),
       topupWallet: jest.fn().mockResolvedValue(15000),
     };
 
@@ -70,7 +80,9 @@ describe('WalletController', () => {
     };
 
     mockDataSource = {
-      getRepository: jest.fn().mockReturnValue({ createQueryBuilder: jest.fn().mockReturnValue(mockQb) }),
+      getRepository: jest.fn().mockReturnValue({
+        createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+      }),
     };
 
     mockRedis = {
@@ -92,7 +104,7 @@ describe('WalletController', () => {
           reference: 'ref_abc123',
         },
       }),
-    }) as unknown as typeof fetch;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WalletController],
@@ -117,7 +129,12 @@ describe('WalletController', () => {
 
   describe('getBalance()', () => {
     it('T1 — returns cached response on second call without hitting DB', async () => {
-      const cached = JSON.stringify({ balance: 9999, ratePerMessage: 115, isLow: false, isEmpty: false });
+      const cached = JSON.stringify({
+        balance: 9999,
+        ratePerMessage: 115,
+        isLow: false,
+        isEmpty: false,
+      });
       mockRedis.get.mockResolvedValueOnce(cached);
 
       const result = await controller.getBalance(makeReq());
@@ -130,7 +147,9 @@ describe('WalletController', () => {
       mockWalletService.getBalance.mockResolvedValue(5000);
       mockSubRepo.findOne.mockResolvedValue({ marketingRate: 115 });
 
-      const result = await controller.getBalance(makeReq()) as { estimatedMessagesLeft: number };
+      const result = (await controller.getBalance(makeReq())) as {
+        estimatedMessagesLeft: number;
+      };
 
       expect(result.estimatedMessagesLeft).toBe(43); // Math.floor(5000 / 115)
     });
@@ -138,7 +157,9 @@ describe('WalletController', () => {
     it('T3 — isLow=true when balance < 3000', async () => {
       mockWalletService.getBalance.mockResolvedValue(2500);
 
-      const result = await controller.getBalance(makeReq()) as { isLow: boolean };
+      const result = (await controller.getBalance(makeReq())) as {
+        isLow: boolean;
+      };
 
       expect(result.isLow).toBe(true);
     });
@@ -146,7 +167,9 @@ describe('WalletController', () => {
     it('T4 — isEmpty=true when balance <= 0', async () => {
       mockWalletService.getBalance.mockResolvedValue(0);
 
-      const result = await controller.getBalance(makeReq()) as { isEmpty: boolean };
+      const result = (await controller.getBalance(makeReq())) as {
+        isEmpty: boolean;
+      };
 
       expect(result.isEmpty).toBe(true);
     });
@@ -154,7 +177,9 @@ describe('WalletController', () => {
     it('T5 — isEmpty=false when balance > 0', async () => {
       mockWalletService.getBalance.mockResolvedValue(500);
 
-      const result = await controller.getBalance(makeReq()) as { isEmpty: boolean };
+      const result = (await controller.getBalance(makeReq())) as {
+        isEmpty: boolean;
+      };
 
       expect(result.isEmpty).toBe(false);
     });
@@ -176,16 +201,15 @@ describe('WalletController', () => {
   describe('getTransactions()', () => {
     it('T7 — returns paginated results with total, page, limit', async () => {
       const mockTxns: Partial<WalletTransaction>[] = [
-        { id: 'txn-1', type: WalletTransactionType.TOPUP, amount: 10000 } as WalletTransaction,
+        {
+          id: 'txn-1',
+          type: WalletTransactionType.TOPUP,
+          amount: 10000,
+        },
       ];
       mockQb.getManyAndCount.mockResolvedValue([mockTxns, 1]);
 
-      const result = await controller.getTransactions(makeReq(), 1, 50) as {
-        transactions: WalletTransaction[];
-        total: number;
-        page: number;
-        limit: number;
-      };
+      const result = await controller.getTransactions(makeReq(), 1, 50);
 
       expect(result.transactions).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -194,7 +218,12 @@ describe('WalletController', () => {
     });
 
     it('T8 — filters by type when valid type provided', async () => {
-      await controller.getTransactions(makeReq(), 1, 50, WalletTransactionType.TOPUP);
+      await controller.getTransactions(
+        makeReq(),
+        1,
+        50,
+        WalletTransactionType.TOPUP,
+      );
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         'wt.type = :type',
@@ -220,14 +249,13 @@ describe('WalletController', () => {
 
   describe('initiateTopup()', () => {
     it('T11 — valid amount returns authorizationUrl and reference', async () => {
-      const result = await controller.initiateTopup(makeReq(), { amount: 15000 }) as {
-        authorizationUrl: string;
-        reference: string;
-        amount: number;
-        amountDisplay: string;
-      };
+      const result = await controller.initiateTopup(makeReq(), {
+        amount: 15000,
+      });
 
-      expect(result.authorizationUrl).toBe('https://checkout.paystack.com/test123');
+      expect(result.authorizationUrl).toBe(
+        'https://checkout.paystack.com/test123',
+      );
       expect(result.reference).toBe('ref_abc123');
       expect(result.amount).toBe(15000);
       expect(result.amountDisplay).toBe('₦15,000');
@@ -253,8 +281,10 @@ describe('WalletController', () => {
     it('T14 — sends amount in kobo to Paystack (amount × 100)', async () => {
       await controller.initiateTopup(makeReq(), { amount: 10000 });
 
-      const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(fetchCall[1].body as string) as { amount: number };
+      const calls = (global.fetch as jest.Mock).mock.calls as Array<
+        [string, { body: string }]
+      >;
+      const body = JSON.parse(calls[0][1].body) as { amount: number };
       expect(body.amount).toBe(1_000_000); // 10000 * 100
     });
 
@@ -293,7 +323,9 @@ describe('WalletController', () => {
     });
 
     it('T18 — amountDisplay correctly formats naira with locale separator', async () => {
-      const result = await controller.initiateTopup(makeReq(), { amount: 1000000 }) as {
+      const result = (await controller.initiateTopup(makeReq(), {
+        amount: 1000000,
+      })) as {
         amountDisplay: string;
       };
 
