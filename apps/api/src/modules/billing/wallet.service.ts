@@ -115,6 +115,54 @@ export class WalletService {
       .catch(() => null);
   }
 
+  async deductOverage(
+    tenantId: string,
+    amount: number,
+    description: string,
+  ): Promise<{ success: boolean; newBalance: number }> {
+    const result = await this.dataSource.transaction(async (em) => {
+      const tenant = await em.findOne(Tenant, {
+        where: { id: tenantId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!tenant) return { success: false, newBalance: 0 };
+
+      const current = Number(tenant.marketingWalletBalance);
+      if (current < amount) return { success: false, newBalance: current };
+
+      const newBalance = parseFloat((current - amount).toFixed(2));
+      await em.update(
+        Tenant,
+        { id: tenantId },
+        { marketingWalletBalance: newBalance },
+      );
+
+      await em.save(
+        em.create(WalletTransaction, {
+          tenantId,
+          type: WalletTransactionType.DEBIT_UTILITY_OVERAGE,
+          amount: -amount,
+          balanceAfter: newBalance,
+          description,
+          refId: null,
+          paystackRef: null,
+        }),
+      );
+
+      return { success: true, newBalance };
+    });
+
+    if (result.success) {
+      void this.redis.del(`wallet:balance:${tenantId}`).catch(() => null);
+      await this.checkLowBalanceAlert(tenantId, result.newBalance).catch(
+        (err) => this.logger.error('Low balance alert failed', err),
+      );
+    }
+
+    return result;
+  }
+
   async topupWallet(
     tenantId: string,
     amount: number,

@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException } from '@nestjs/common';
 import { BillingService } from '../../src/modules/billing/billing.service';
 import { WalletService } from '../../src/modules/billing/wallet.service';
+import { UtilityTrackingService } from '../../src/modules/billing/utility-tracking.service';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { User } from '../../src/modules/auth/entities/user.entity';
@@ -175,6 +176,12 @@ describe('BillingService', () => {
           useValue: {
             topupWallet: jest.fn().mockResolvedValue(10000),
             getBalance: jest.fn().mockResolvedValue(10000),
+          },
+        },
+        {
+          provide: UtilityTrackingService,
+          useValue: {
+            resetUsageForNewPeriod: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

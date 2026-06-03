@@ -17,6 +17,7 @@ import { Integration } from '../modules/integrations/entities/integration.entity
 import { ProductCategory } from '../modules/tenants/entities/product-category.entity';
 import { CampaignsModule } from '../modules/campaigns/campaigns.module';
 import { TransactionsModule } from '../modules/transactions/transactions.module';
+import { BillingModule } from '../modules/billing/billing.module';
 import { WaMessageProcessor } from './processors/wa-message.processor';
 import { TriggerCheckProcessor } from './processors/trigger-check.processor';
 import { CampaignSendProcessor } from './processors/campaign-send.processor';
@@ -107,6 +108,7 @@ export const QUEUE_NAMES = {
     WhatsappModule,
     TransactionsModule,
     forwardRef(() => CampaignsModule),
+    forwardRef(() => BillingModule),
   ],
   providers: [
     WaMessageProcessor,

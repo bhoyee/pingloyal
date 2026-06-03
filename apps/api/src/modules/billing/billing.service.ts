@@ -20,6 +20,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { User } from '../auth/entities/user.entity';
 import { PLANS, type PlanId } from './plans.config';
 import { WalletService } from './wallet.service';
+import { UtilityTrackingService } from './utility-tracking.service';
 
 // ── Minimal Stripe interface (avoids nodenext type resolution issues) ─────────
 interface StripeCustomer {
@@ -105,6 +106,7 @@ export class BillingService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
     private readonly walletService: WalletService,
+    private readonly utilityTrackingService: UtilityTrackingService,
   ) {
     const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.stripe = stripeKey ? createStripeClient(stripeKey) : null;
@@ -566,6 +568,7 @@ export class BillingService {
       subscriptionStatus: SubscriptionStatus.ACTIVE,
     });
 
+    await this.utilityTrackingService.resetUsageForNewPeriod(tenantId);
     await this.invalidateTenantCache(tenantId);
     this.logger.log(
       `Subscription activated: tenantId=${tenantId} plan=${planId}`,
