@@ -9,6 +9,7 @@ import { TenantsService } from '../../src/modules/tenants/tenants.service';
 import { BspService } from '../../src/modules/whatsapp/bsp.service';
 import { WalletService } from '../../src/modules/billing/wallet.service';
 import { UtilityTrackingService } from '../../src/modules/billing/utility-tracking.service';
+import { User } from '../../src/modules/auth/entities/user.entity';
 import { MessageBuilderService } from '../../src/queue/message-builder.service';
 import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../src/modules/triggers/entities/trigger-log.entity';
@@ -109,6 +110,10 @@ describe('WaMessageProcessor', () => {
         {
           provide: getRepositoryToken(CampaignLog),
           useValue: { update: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
         },
       ],
     }).compile();

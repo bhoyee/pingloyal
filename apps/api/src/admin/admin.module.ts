@@ -9,6 +9,7 @@ import {
   AdminSimulateController,
   AdminIntegrationController,
   AdminBillingController,
+  AdminWalletAlertController,
 } from './admin.controller';
 
 @Module({
@@ -24,6 +25,7 @@ import {
     AdminSimulateController,
     AdminIntegrationController,
     AdminBillingController,
+    AdminWalletAlertController,
   ],
 })
 export class AdminModule {}

@@ -9,8 +9,10 @@ import {
   SkipReason,
   TriggerStatus,
   TriggerType,
+  UserRole,
   WaVerificationStatus,
 } from '@pingloyal/types';
+import { User } from '../../modules/auth/entities/user.entity';
 import { TenantsService } from '../../modules/tenants/tenants.service';
 import { BspService } from '../../modules/whatsapp/bsp.service';
 import { WalletService } from '../../modules/billing/wallet.service';
@@ -41,6 +43,9 @@ const UTILITY_TYPES = new Set<TriggerType>([
   TriggerType.PURCHASE_CONFIRMATION,
   TriggerType.THRESHOLD_NUDGE,
   TriggerType.REWARD_UNLOCKED,
+  TriggerType.BALANCE_BOT_REPLY,
+  TriggerType.WALLET_LOW_BALANCE,
+  TriggerType.WALLET_ZERO,
 ]);
 
 const OWNER_ALERT_TYPES = new Set<TriggerType>([
@@ -69,6 +74,8 @@ export class WaMessageProcessor extends WorkerHost {
     private readonly campaignRepo: Repository<Campaign>,
     @InjectRepository(CampaignLog)
     private readonly campaignLogRepo: Repository<CampaignLog>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {
     super();
   }
@@ -90,10 +97,23 @@ export class WaMessageProcessor extends WorkerHost {
 
     // Step 2 — Determine recipient
     if (OWNER_ALERT_TYPES.has(type)) {
-      // TODO: Owner phone not stored on users table yet — wallet alerts deferred
-      // until owner profile is extended with a phone field.
-      this.logger.warn(
-        `Owner phone not available — wallet alert skipped: type=${type} tenantId=${tenantId}`,
+      // Load the business owner to check for a phone number
+      await this.userRepo.findOne({
+        where: { tenantId, role: UserRole.OWNER, isActive: true },
+        select: ['id', 'fullName', 'email'],
+      });
+      // Owner phone is not stored on the users table yet — skip for MVP
+      // TODO: add phone column to users table and owner profile UI
+      this.logger.log(
+        `Wallet alert skipped for tenant ${tenantId} — ` +
+          `owner phone not stored. Consider adding phone to user profile.`,
+      );
+      await this.logTrigger(
+        tenantId,
+        null,
+        type,
+        TriggerStatus.SKIPPED,
+        'owner_no_phone',
       );
       return;
     }

@@ -10,6 +10,7 @@ import { WhatsappModule } from '../modules/whatsapp/whatsapp.module';
 import { Customer } from '../modules/customers/entities/customer.entity';
 import { TriggerLog } from '../modules/triggers/entities/trigger-log.entity';
 import { WalletTransaction } from '../modules/billing/entities/wallet-transaction.entity';
+import { User } from '../modules/auth/entities/user.entity';
 import { Campaign } from '../modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../modules/campaigns/entities/campaign-log.entity';
 import { TierConfig } from '../modules/tenants/entities/tier-config.entity';
@@ -103,6 +104,7 @@ export const QUEUE_NAMES = {
       TierConfig,
       Integration,
       ProductCategory,
+      User,
     ]),
     TenantsModule,
     WhatsappModule,

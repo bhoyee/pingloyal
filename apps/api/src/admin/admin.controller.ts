@@ -7,6 +7,7 @@ import { WaBotService } from '../modules/whatsapp/wa-bot.service';
 import { TenantsService } from '../modules/tenants/tenants.service';
 import { IntegrationSchedulerService } from '../modules/integrations/integration-scheduler.service';
 import { BillingService } from '../modules/billing/billing.service';
+import { WalletAlertCronService } from '../modules/billing/wallet-alert.cron';
 
 @Public()
 @Controller('admin/crons')
@@ -87,6 +88,27 @@ export class AdminIntegrationController {
     }
     await this.scheduler.triggerOnce(body.integrationId, body.tenantId);
     return { message: 'Integration sync job queued' };
+  }
+}
+
+@Public()
+@Controller('admin/crons')
+export class AdminWalletAlertController {
+  constructor(
+    private readonly walletAlertCronService: WalletAlertCronService,
+  ) {}
+
+  @Post('wallet-alert/trigger')
+  async triggerWalletAlert(): Promise<{ message: string; duration: number }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    const start = Date.now();
+    await this.walletAlertCronService.checkLowWalletBalances();
+    return {
+      message: 'Wallet alert cron triggered',
+      duration: Date.now() - start,
+    };
   }
 }
 
