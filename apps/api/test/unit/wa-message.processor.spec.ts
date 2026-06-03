@@ -18,6 +18,7 @@ import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../src/modules/triggers/entities/trigger-log.entity';
 import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../../src/modules/campaigns/entities/campaign-log.entity';
+import { User } from '../../src/modules/auth/entities/user.entity';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -133,6 +134,10 @@ describe('WaMessageProcessor', () => {
         {
           provide: getRepositoryToken(CampaignLog),
           useValue: mockCampaignLogRepo,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
         },
       ],
     }).compile();
