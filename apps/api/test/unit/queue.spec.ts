@@ -8,6 +8,7 @@ import { QUEUE_NAMES } from '../../src/queue/queue.module';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 import { BspService } from '../../src/modules/whatsapp/bsp.service';
 import { WalletService } from '../../src/modules/billing/wallet.service';
+import { UtilityTrackingService } from '../../src/modules/billing/utility-tracking.service';
 import { MessageBuilderService } from '../../src/queue/message-builder.service';
 import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../src/modules/triggers/entities/trigger-log.entity';
@@ -85,6 +86,12 @@ describe('WaMessageProcessor', () => {
         {
           provide: WalletService,
           useValue: { deductMarketing: jest.fn(), creditWallet: jest.fn() },
+        },
+        {
+          provide: UtilityTrackingService,
+          useValue: {
+            trackUtilityMessage: jest.fn().mockResolvedValue(undefined),
+          },
         },
         { provide: MessageBuilderService, useValue: { build: jest.fn() } },
         {

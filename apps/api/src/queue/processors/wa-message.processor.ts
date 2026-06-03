@@ -14,6 +14,7 @@ import {
 import { TenantsService } from '../../modules/tenants/tenants.service';
 import { BspService } from '../../modules/whatsapp/bsp.service';
 import { WalletService } from '../../modules/billing/wallet.service';
+import { UtilityTrackingService } from '../../modules/billing/utility-tracking.service';
 import { MessageBuilderService } from '../message-builder.service';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../modules/triggers/entities/trigger-log.entity';
@@ -35,6 +36,13 @@ const MARKETING_TYPES = new Set<TriggerType>([
   TriggerType.CAMPAIGN_MESSAGE,
 ]);
 
+const UTILITY_TYPES = new Set<TriggerType>([
+  TriggerType.WELCOME,
+  TriggerType.PURCHASE_CONFIRMATION,
+  TriggerType.THRESHOLD_NUDGE,
+  TriggerType.REWARD_UNLOCKED,
+]);
+
 const OWNER_ALERT_TYPES = new Set<TriggerType>([
   TriggerType.WALLET_LOW_BALANCE,
   TriggerType.WALLET_ZERO,
@@ -51,6 +59,7 @@ export class WaMessageProcessor extends WorkerHost {
     private readonly tenantService: TenantsService,
     private readonly bspService: BspService,
     private readonly walletService: WalletService,
+    private readonly utilityTrackingService: UtilityTrackingService,
     private readonly messageBuilder: MessageBuilderService,
     @InjectRepository(Customer)
     private readonly customerRepo: Repository<Customer>,
@@ -253,6 +262,18 @@ export class WaMessageProcessor extends WorkerHost {
         sentAt: new Date(),
       });
       await this.campaignRepo.increment({ id: campaignId }, 'sentCount', 1);
+    }
+
+    // Track utility usage — fire-and-forget; never fails the job
+    if (UTILITY_TYPES.has(type)) {
+      this.utilityTrackingService
+        .trackUtilityMessage(tenantId)
+        .catch((err) =>
+          this.logger.error(
+            `Utility tracking failed for tenant ${tenantId}`,
+            err,
+          ),
+        );
     }
   }
 

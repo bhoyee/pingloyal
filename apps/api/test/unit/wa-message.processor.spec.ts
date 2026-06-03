@@ -13,6 +13,7 @@ import { MessageBuilderService } from '../../src/queue/message-builder.service';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 import { BspService } from '../../src/modules/whatsapp/bsp.service';
 import { WalletService } from '../../src/modules/billing/wallet.service';
+import { UtilityTrackingService } from '../../src/modules/billing/utility-tracking.service';
 import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../src/modules/triggers/entities/trigger-log.entity';
 import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
@@ -116,6 +117,12 @@ describe('WaMessageProcessor', () => {
         { provide: TenantsService, useValue: mockTenantService },
         { provide: BspService, useValue: mockBspService },
         { provide: WalletService, useValue: mockWalletService },
+        {
+          provide: UtilityTrackingService,
+          useValue: {
+            trackUtilityMessage: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: MessageBuilderService, useValue: mockMessageBuilder },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
         {
