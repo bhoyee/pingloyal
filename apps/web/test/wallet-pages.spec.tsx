@@ -271,8 +271,11 @@ it('T11 — clicking Pay calls POST /billing/wallet/topup', async () => {
   });
 
   // Mock window.location.href assignment
-  delete (window as { location?: unknown }).location;
-  window.location = { href: '' } as unknown as Location;
+  Object.defineProperty(window, 'location', {
+    value: { href: '' },
+    writable: true,
+    configurable: true,
+  });
 
   render(<TopupPage />, { wrapper });
 
@@ -301,8 +304,11 @@ it('T12 — successful topup response sets window.location to authorizationUrl',
     amountDisplay: '₦15,000',
   });
 
-  delete (window as { location?: unknown }).location;
-  window.location = { href: '' } as unknown as Location;
+  Object.defineProperty(window, 'location', {
+    value: { href: '' },
+    writable: true,
+    configurable: true,
+  });
 
   render(<TopupPage />, { wrapper });
 
