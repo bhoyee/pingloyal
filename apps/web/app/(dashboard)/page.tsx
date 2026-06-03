@@ -347,6 +347,37 @@ export default function DashboardPage() {
                 sub="Across all campaigns"
                 ring={summary.avgDeliveryRate}
               />
+              <div
+                className={`rounded-xl border p-5 shadow-sm ${
+                  summary.walletIsEmpty
+                    ? 'border-red-200 bg-red-50'
+                    : summary.walletIsLow
+                      ? 'border-amber-200 bg-amber-50'
+                      : 'border-slate-200 bg-white'
+                }`}
+                data-testid="wallet-metric-card"
+              >
+                <p className="mb-1 text-2xl">👛</p>
+                <p
+                  className={`text-2xl font-bold ${
+                    summary.walletIsEmpty
+                      ? 'text-red-600'
+                      : summary.walletIsLow
+                        ? 'text-amber-600'
+                        : 'text-green-600'
+                  }`}
+                  data-testid="wallet-metric-balance"
+                >
+                  ₦{summary.walletBalance.toLocaleString()}
+                </p>
+                <p className="text-sm text-slate-500">Marketing Wallet</p>
+                <a
+                  href="/billing/wallet/topup"
+                  className="mt-2 inline-block text-xs font-semibold text-[#0F1E35] hover:underline"
+                >
+                  + Top Up →
+                </a>
+              </div>
             </>
           ) : null}
         </div>
