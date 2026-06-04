@@ -29,6 +29,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
 import { AdminModule } from './admin/admin.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -81,6 +82,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     BillingModule,
     WalletModule,
     DashboardModule,
+    ReportsModule,
     IntegrationsModule,
     TriggersModule,
     AdminModule,
