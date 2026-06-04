@@ -14,6 +14,9 @@ import { TierConfig } from '../tenants/entities/tier-config.entity';
 import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
 import { ReportsService } from './reports.service';
+import { ReportsCronService } from './reports.cron';
+import { ReportsController } from './reports.controller';
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
@@ -33,7 +36,8 @@ import { ReportsService } from './reports.service';
       Subscription,
     ]),
   ],
-  providers: [ReportsService],
-  exports: [ReportsService],
+  controllers: [ReportsController],
+  providers: [ReportsService, ReportsCronService, EmailService],
+  exports: [ReportsService, ReportsCronService],
 })
 export class ReportsModule {}
