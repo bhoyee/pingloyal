@@ -33,10 +33,11 @@ const config: Config = {
     'src/modules/**/*.service.ts',
     'src/modules/**/*.processor.ts',
     'src/queue/processors/**/*.ts',
-    // Complex infra services — covered by integration tests
+    // Complex infra/data services — covered by integration tests
     '!src/modules/auth/auth.service.ts',
     '!src/modules/tenants/tenants.service.ts',
     '!src/modules/storage/r2.service.ts',
+    '!src/modules/reports/reports.service.ts',  // raw SQL data service — integration tested
     '!src/**/*.spec.ts',
     '!src/**/*.module.ts',
     '!src/**/index.ts',

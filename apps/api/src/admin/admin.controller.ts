@@ -8,6 +8,7 @@ import { TenantsService } from '../modules/tenants/tenants.service';
 import { IntegrationSchedulerService } from '../modules/integrations/integration-scheduler.service';
 import { BillingService } from '../modules/billing/billing.service';
 import { WalletAlertCronService } from '../modules/billing/wallet-alert.cron';
+import { ReportsCronService } from '../modules/reports/reports.cron';
 
 @Public()
 @Controller('admin/crons')
@@ -107,6 +108,37 @@ export class AdminWalletAlertController {
     await this.walletAlertCronService.checkLowWalletBalances();
     return {
       message: 'Wallet alert cron triggered',
+      duration: Date.now() - start,
+    };
+  }
+}
+
+@Public()
+@Controller('admin/crons')
+export class AdminReportsCronController {
+  constructor(private readonly reportsCronService: ReportsCronService) {}
+
+  @Post('reports-nightly/trigger')
+  async triggerNightlyReports(): Promise<{
+    message: string;
+    duration: number;
+  }> {
+    if (process.env.NODE_ENV === 'production') throw new NotFoundException();
+    const start = Date.now();
+    await this.reportsCronService.preComputeAllReports();
+    return {
+      message: 'Nightly reports cron triggered',
+      duration: Date.now() - start,
+    };
+  }
+
+  @Post('reports-email/trigger')
+  async triggerEmailReports(): Promise<{ message: string; duration: number }> {
+    if (process.env.NODE_ENV === 'production') throw new NotFoundException();
+    const start = Date.now();
+    await this.reportsCronService.sendScheduledEmailReports();
+    return {
+      message: 'Scheduled email reports cron triggered',
       duration: Date.now() - start,
     };
   }
