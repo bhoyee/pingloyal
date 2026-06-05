@@ -278,8 +278,14 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
           <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
+          <a
+            href="/reports"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-[#0F1E35] hover:text-[#0F1E35]"
+          >
+            📈 Reports
+          </a>
         </div>
       </div>
 
