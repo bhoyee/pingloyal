@@ -2,7 +2,9 @@ import type { NextConfig } from 'next';
 // @ts-expect-error — next-pwa has no bundled types
 import withPWA from 'next-pwa';
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  turbopack: {},
+};
 
 export default withPWA({
   dest: 'public',
