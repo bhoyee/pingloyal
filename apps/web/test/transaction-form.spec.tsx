@@ -18,7 +18,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => mockRouter,
 }));
 
-jest.mock('../app/(cashier)/context/cashier-context', () => ({
+jest.mock('../app/cashier/context/cashier-context', () => ({
   useCashier: jest.fn(),
   CashierProvider: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -27,8 +27,8 @@ jest.mock('../app/(cashier)/context/cashier-context', () => ({
 
 import { cashierApi, ApiError } from '../lib/api';
 import { addToQueue } from '../lib/offline-queue';
-import { useCashier } from '../app/(cashier)/context/cashier-context';
-import TransactionPage from '../app/(cashier)/transaction/page';
+import { useCashier } from '../app/cashier/context/cashier-context';
+import TransactionPage from '../app/cashier/transaction/page';
 import type { CustomerLookupResult, TransactionResult } from '../lib/api';
 
 const mockCashierApi = cashierApi as jest.Mocked<typeof cashierApi>;

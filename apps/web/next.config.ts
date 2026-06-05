@@ -4,6 +4,7 @@ import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
   turbopack: {},
+  allowedDevOrigins: ['192.168.1.125', 'localhost'],
 };
 
 export default withPWA({
