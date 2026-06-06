@@ -1,6 +1,13 @@
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -15,12 +22,15 @@ import {
 } from '@pingloyal/types';
 import type { JwtPayload } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
+import { MailerService } from '../../common/mailer/mailer.service';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { User } from '../auth/entities/user.entity';
 import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
 import { RegisterDto, Country } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Food & Groceries', slug: 'food' },
@@ -34,6 +44,7 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const BCRYPT_ROUNDS = 12;
+const VERIFICATION_EXPIRY_HOURS = 24;
 
 export interface AuthTokens {
   accessToken: string;
@@ -50,11 +61,21 @@ export interface AuthResponse extends AuthTokens {
   };
 }
 
+export interface RegisterResponse {
+  requiresVerification: true;
+  email: string;
+  /** Only present when Resend is not configured (dev/test environments) */
+  devCode?: string;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailer: MailerService,
     @InjectDataSource() private readonly dataSource: DataSource,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
@@ -63,94 +84,115 @@ export class AuthService {
 
   // ── Registration ──────────────────────────────────────────────────────────
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
+  async register(dto: RegisterDto): Promise<RegisterResponse> {
     const isNG = dto.country === Country.NG;
     const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    return this.dataSource.transaction(async (manager) => {
-      // Step 1 — Tenant
-      const slug = await this.buildUniqueSlug(dto.businessName, manager);
-      const tenant = manager.create(Tenant, {
-        businessName: dto.businessName,
-        slug,
-        currency: isNG ? 'NGN' : 'GBP',
-        timezone: isNG ? 'Africa/Lagos' : 'Europe/London',
-        mode: TenantMode.NATIVE,
-        planTier: PlanTier.STARTER,
-        subscriptionStatus: SubscriptionStatus.TRIALING,
-        trialEndsAt: trialEnd,
-        waVerificationStatus: WaVerificationStatus.PENDING,
-        marketingWalletBalance: 0,
-      });
-      const savedTenant = await manager.save(Tenant, tenant);
+    const { savedUser, savedTenant } = await this.dataSource.transaction(
+      async (manager) => {
+        // Step 1 — Tenant
+        const slug = await this.buildUniqueSlug(dto.businessName, manager);
+        const tenant = manager.create(Tenant, {
+          businessName: dto.businessName,
+          slug,
+          currency: isNG ? 'NGN' : 'GBP',
+          timezone: isNG ? 'Africa/Lagos' : 'Europe/London',
+          mode: TenantMode.NATIVE,
+          planTier: PlanTier.STARTER,
+          subscriptionStatus: SubscriptionStatus.TRIALING,
+          trialEndsAt: trialEnd,
+          waVerificationStatus: WaVerificationStatus.PENDING,
+          marketingWalletBalance: 0,
+        });
+        const savedTenant = await manager.save(Tenant, tenant);
 
-      // Step 2 — User
-      const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-      const user = manager.create(User, {
-        tenantId: savedTenant.id,
-        email: dto.email,
-        fullName: dto.fullName,
-        hashedPassword,
-        role: UserRole.OWNER,
-        isActive: true,
-      });
-      const savedUser = await manager.save(User, user);
+        // Step 2 — User (unverified)
+        const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+        const { code, hashedCode } = this.generateVerificationCode();
+        const expiry = new Date(
+          Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
+        );
 
-      // Step 3 — Default product categories
-      const categories = DEFAULT_CATEGORIES.map((cat) =>
-        manager.create(ProductCategory, {
+        const user = manager.create(User, {
           tenantId: savedTenant.id,
-          name: cat.name,
-          slug: cat.slug,
+          email: dto.email,
+          fullName: dto.fullName,
+          hashedPassword,
+          role: UserRole.OWNER,
           isActive: true,
-        }),
-      );
-      await manager.save(ProductCategory, categories);
+          emailVerifiedAt: null,
+          emailVerificationToken: hashedCode,
+          emailVerificationExpiry: expiry,
+        });
+        const savedUser = await manager.save(User, user);
 
-      // Step 4 — Starter subscription (rates stored in DB — never hardcoded)
-      const subscription = manager.create(Subscription, {
-        tenantId: savedTenant.id,
-        planTier: PlanTier.STARTER,
-        billingCycle: 'monthly',
-        currency: savedTenant.currency,
-        amount: isNG ? 8000 : 4900,
-        utilityIncluded: 300,
-        utilityUsedThisPeriod: 0,
-        utilityOverageRate: 20.0,
-        marketingRate: 130.0,
-        status: SubscriptionStatus.TRIALING,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: trialEnd,
-        cancelAtPeriodEnd: false,
+        // Step 3 — Default product categories
+        const categories = DEFAULT_CATEGORIES.map((cat) =>
+          manager.create(ProductCategory, {
+            tenantId: savedTenant.id,
+            name: cat.name,
+            slug: cat.slug,
+            isActive: true,
+          }),
+        );
+        await manager.save(ProductCategory, categories);
+
+        // Step 4 — Starter subscription
+        const subscription = manager.create(Subscription, {
+          tenantId: savedTenant.id,
+          planTier: PlanTier.STARTER,
+          billingCycle: 'monthly',
+          currency: savedTenant.currency,
+          amount: isNG ? 8000 : 4900,
+          utilityIncluded: 300,
+          utilityUsedThisPeriod: 0,
+          utilityOverageRate: 20.0,
+          marketingRate: 130.0,
+          status: SubscriptionStatus.TRIALING,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: trialEnd,
+          cancelAtPeriodEnd: false,
+        });
+        await manager.save(Subscription, subscription);
+
+        // Return the code so we can send email AFTER the transaction commits
+        (savedUser as User & { _plainCode?: string })._plainCode = code;
+
+        return { savedUser, savedTenant };
+      },
+    );
+
+    // Step 5 — Send welcome email (outside transaction so DB row is committed first)
+    const plainCode = (savedUser as User & { _plainCode?: string })._plainCode!;
+    let devCode: string | undefined;
+
+    const resendConfigured =
+      this.configService.get<string>('RESEND_API_KEY', '').length > 20 &&
+      !this.configService.get<string>('RESEND_API_KEY', '').includes('placeholder');
+
+    try {
+      await this.mailer.sendWelcomeVerification({
+        to: savedUser.email,
+        name: savedUser.fullName,
+        businessName: savedTenant.businessName,
+        code: plainCode,
       });
-      await manager.save(Subscription, subscription);
+    } catch (err) {
+      this.logger.error(
+        `Failed to send welcome email to ${savedUser.email}: ${String(err)}`,
+      );
+    }
 
-      // Step 5 — Issue tokens
-      const tokens = await this.issueTokens(savedUser, savedTenant);
+    if (!resendConfigured) {
+      devCode = plainCode;
+    }
 
-      return {
-        ...tokens,
-        user: {
-          id: savedUser.id,
-          email: savedUser.email,
-          fullName: savedUser.fullName,
-          role: savedUser.role,
-        },
-        tenant: {
-          id: savedTenant.id,
-          businessName: savedTenant.businessName,
-          slug: savedTenant.slug,
-          planTier: savedTenant.planTier,
-        },
-      };
-    });
+    return { requiresVerification: true, email: savedUser.email, ...(devCode ? { devCode } : {}) };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
 
   async login(dto: LoginDto): Promise<AuthResponse> {
-    // Always use the same message for wrong email or wrong password
-    // to prevent account-enumeration attacks
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
       relations: ['tenant'],
@@ -172,7 +214,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Update last_login_at
+    if (!user.emailVerifiedAt) {
+      throw new ForbiddenException(
+        'Please verify your email before logging in',
+      );
+    }
+
     await this.userRepo.update(user.id, { lastLoginAt: new Date() });
 
     const tokens = await this.issueTokens(user, user.tenant);
@@ -192,6 +239,102 @@ export class AuthService {
         planTier: user.tenant.planTier,
       },
     };
+  }
+
+  // ── Email verification ────────────────────────────────────────────────────
+
+  async verifyEmail(dto: VerifyEmailDto): Promise<AuthResponse> {
+    const user = await this.userRepo.findOne({
+      where: { email: dto.email },
+      relations: ['tenant'],
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid verification request');
+    }
+
+    if (user.emailVerifiedAt) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    if (
+      !user.emailVerificationToken ||
+      !user.emailVerificationExpiry ||
+      user.emailVerificationExpiry < new Date()
+    ) {
+      throw new BadRequestException(
+        'Verification code has expired — please request a new one',
+      );
+    }
+
+    const incomingHash = crypto
+      .createHash('sha256')
+      .update(dto.code)
+      .digest('hex');
+
+    if (incomingHash !== user.emailVerificationToken) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    await this.userRepo.update(user.id, {
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+      emailVerificationExpiry: null,
+      lastLoginAt: new Date(),
+    });
+
+    const tokens = await this.issueTokens(user, user.tenant);
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+      },
+      tenant: {
+        id: user.tenant.id,
+        businessName: user.tenant.businessName,
+        slug: user.tenant.slug,
+        planTier: user.tenant.planTier,
+      },
+    };
+  }
+
+  // ── Resend verification code ──────────────────────────────────────────────
+
+  async resendVerification(
+    dto: ResendVerificationDto,
+  ): Promise<{ message: string }> {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+
+    // Return generic response to prevent email enumeration
+    if (!user || user.emailVerifiedAt) {
+      return { message: 'If the email exists and is unverified, a new code has been sent' };
+    }
+
+    const { code, hashedCode } = this.generateVerificationCode();
+    const expiry = new Date(
+      Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+
+    await this.userRepo.update(user.id, {
+      emailVerificationToken: hashedCode,
+      emailVerificationExpiry: expiry,
+    });
+
+    try {
+      await this.mailer.sendVerificationCode({
+        to: user.email,
+        name: user.fullName,
+        code,
+      });
+    } catch (err) {
+      this.logger.error(`Failed to resend verification to ${user.email}: ${String(err)}`);
+    }
+
+    return { message: 'If the email exists and is unverified, a new code has been sent' };
   }
 
   // ── Refresh ───────────────────────────────────────────────────────────────
@@ -224,12 +367,10 @@ export class AuthService {
       .digest('hex');
 
     if (incomingHash !== storedHash) {
-      // Possible token reuse — revoke and force re-login
       await this.redis.del(`refresh:${userId}`);
       throw new UnauthorizedException('Session expired');
     }
 
-    // Rotation: delete old key, issue new pair
     await this.redis.del(`refresh:${userId}`);
 
     const user = await this.userRepo.findOne({
@@ -251,6 +392,12 @@ export class AuthService {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private generateVerificationCode(): { code: string; hashedCode: string } {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+    return { code, hashedCode };
+  }
 
   private async issueTokens(user: User, tenant: Tenant): Promise<AuthTokens> {
     const accessPayload = {
@@ -320,7 +467,7 @@ export class AuthService {
       w: 604800,
     };
     const match = duration.match(/^(\d+)([smhdw])$/);
-    if (!match) return 30 * 86400; // default 30 days
+    if (!match) return 30 * 86400;
     return parseInt(match[1]) * units[match[2]];
   }
 }

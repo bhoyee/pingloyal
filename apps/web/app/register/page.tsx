@@ -2,11 +2,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { publicPost } from '@/lib/api';
 
 interface RegisterResponse {
-  accessToken: string;
-  refreshToken?: string;
+  requiresVerification: true;
+  email: string;
+  devCode?: string;
 }
 
 interface FieldErrors {
@@ -49,18 +50,17 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await api.post<RegisterResponse>('/api/v1/auth/register', {
+      const res = await publicPost<RegisterResponse>('/api/v1/auth/register', {
         businessName: businessName.trim(),
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
         country,
       });
-      localStorage.setItem('access_token', res.accessToken);
-      if (res.refreshToken) {
-        localStorage.setItem('refresh_token', res.refreshToken);
-      }
-      router.replace('/onboarding');
+
+      const params = new URLSearchParams({ email: res.email });
+      if (res.devCode) params.set('devCode', res.devCode);
+      router.replace(`/verify-email?${params.toString()}`);
     } catch (err) {
       setServerError(
         err instanceof Error ? err.message : 'Registration failed. Please try again.',
@@ -236,8 +236,8 @@ export default function RegisterPage() {
                 onChange={(e) => setCountry(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-[#0A1628] focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
               >
-                <option value="NG">🇳🇬 Nigeria</option>
-                <option value="UK">🇬🇧 United Kingdom</option>
+                <option value="NG">Nigeria</option>
+                <option value="UK">United Kingdom</option>
               </select>
             </div>
 

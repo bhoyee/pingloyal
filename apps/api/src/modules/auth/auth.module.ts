@@ -10,6 +10,7 @@ import { Subscription } from '../billing/entities/subscription.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { MailerService } from '../../common/mailer/mailer.service';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { AuthService } from './auth.service';
     TypeOrmModule.forFeature([User, Tenant, ProductCategory, Subscription]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, MailerService],
   exports: [JwtModule, PassportModule],
 })
 export class FullAuthModule {}

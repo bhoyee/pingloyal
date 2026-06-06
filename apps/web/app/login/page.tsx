@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { publicPost, ApiError } from '@/lib/api';
 
 interface LoginResponse {
   accessToken: string;
@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post<LoginResponse>('/api/v1/auth/login', {
+      const res = await publicPost<LoginResponse>('/api/v1/auth/login', {
         email,
         password,
       });
@@ -30,6 +30,10 @@ export default function LoginPage() {
       }
       router.replace('/dashboard');
     } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        router.replace(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {
       setLoading(false);
