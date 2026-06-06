@@ -5,6 +5,9 @@ import withPWA from 'next-pwa';
 const nextConfig: NextConfig = {
   turbopack: {},
   allowedDevOrigins: ['192.168.1.125', 'localhost'],
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333',
+  },
   images: {
     remotePatterns: [
       {
