@@ -5,6 +5,14 @@ import withPWA from 'next-pwa';
 const nextConfig: NextConfig = {
   turbopack: {},
   allowedDevOrigins: ['192.168.1.125', 'localhost'],
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
 };
 
 export default withPWA({
