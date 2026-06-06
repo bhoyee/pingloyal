@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CashierProvider, useCashier } from './context/cashier-context';
-import { cashierApi } from '../../lib/api';
-import { getPendingCount } from '../../lib/offline-queue';
-import { offlineSyncService } from '../../lib/offline-sync';
+import { CashierProvider, useCashier } from '../context/cashier-context';
+import { cashierApi } from '@/lib/api';
+import { getPendingCount } from '@/lib/offline-queue';
+import { offlineSyncService } from '@/lib/offline-sync';
 
 type SyncStatus = 'idle' | 'syncing' | 'complete' | 'partial';
 
@@ -98,7 +98,7 @@ function CashierGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function CashierLayout({
+export default function CashierAppLayout({
   children,
 }: {
   children: React.ReactNode;

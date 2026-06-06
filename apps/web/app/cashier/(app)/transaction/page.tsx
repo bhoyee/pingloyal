@@ -8,9 +8,9 @@ import {
   type CustomerLookupResult,
   type Category,
   type TransactionResult,
-} from '../../../lib/api';
-import { useCashier } from '../context/cashier-context';
-import { addToQueue } from '../../../lib/offline-queue';
+} from '@/lib/api';
+import { useCashier } from '../../context/cashier-context';
+import { addToQueue } from '@/lib/offline-queue';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
