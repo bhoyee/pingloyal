@@ -25,7 +25,7 @@ jest.mock('../app/cashier/context/cashier-context', () => ({
 
 import { cashierApi, ApiError } from '../lib/api';
 import { useCashier } from '../app/cashier/context/cashier-context';
-import CashierPage from '../app/cashier/page';
+import CashierPage from '../app/cashier/(app)/page';
 import CashierLoginPage from '../app/cashier/login/page';
 import type { CustomerLookupResult } from '../lib/api';
 

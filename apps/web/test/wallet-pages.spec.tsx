@@ -34,7 +34,7 @@ const mockApi = api as jest.Mocked<typeof api>;
 import WalletPage from '../app/(dashboard)/billing/wallet/page';
 import TopupPage from '../app/(dashboard)/billing/wallet/topup/page';
 import WalletEmptyPage from '../app/(dashboard)/billing/wallet/empty/page';
-import DashboardPage from '../app/(dashboard)/page';
+import DashboardPage from '../app/(dashboard)/dashboard/page';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

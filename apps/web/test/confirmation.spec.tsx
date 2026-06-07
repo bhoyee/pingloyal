@@ -7,8 +7,8 @@ jest.mock('next/navigation', () => ({
 
 const mockRouter = { replace: jest.fn() };
 
-import ConfirmationScreen from '../app/cashier/transaction/ConfirmationScreen';
-import type { ConfirmationData } from '../app/cashier/transaction/ConfirmationScreen';
+import ConfirmationScreen from '../app/cashier/(app)/transaction/ConfirmationScreen';
+import type { ConfirmationData } from '../app/cashier/(app)/transaction/ConfirmationScreen';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

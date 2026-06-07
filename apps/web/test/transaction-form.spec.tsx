@@ -28,7 +28,7 @@ jest.mock('../app/cashier/context/cashier-context', () => ({
 import { cashierApi, ApiError } from '../lib/api';
 import { addToQueue } from '../lib/offline-queue';
 import { useCashier } from '../app/cashier/context/cashier-context';
-import TransactionPage from '../app/cashier/transaction/page';
+import TransactionPage from '../app/cashier/(app)/transaction/page';
 import type { CustomerLookupResult, TransactionResult } from '../lib/api';
 
 const mockCashierApi = cashierApi as jest.Mocked<typeof cashierApi>;
