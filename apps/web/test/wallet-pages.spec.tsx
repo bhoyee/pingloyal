@@ -349,10 +349,10 @@ it('T14 — dashboard wallet card shows red colour when walletIsEmpty=true', asy
 
   render(<DashboardPage />, { wrapper });
 
-  await waitFor(() =>
-    expect(screen.getByTestId('wallet-metric-card')).toBeInTheDocument(),
-  );
-  expect(screen.getByTestId('wallet-metric-balance').className).toContain('text-red');
+  await waitFor(() => {
+    expect(screen.getByTestId('wallet-metric-card')).toBeInTheDocument();
+    expect(screen.getByTestId('wallet-metric-balance').className).toContain('text-red');
+  });
 });
 
 // T15: dashboard red banner shown when walletIsEmpty ──────────────────────────
