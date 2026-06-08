@@ -161,6 +161,7 @@ export function OnboardingWizard() {
               writeShowVerification(true);
             }}
             onBack={() => goToStep(3)}
+            onSkip={() => goToStep(5)}
           />
         )}
 
