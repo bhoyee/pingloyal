@@ -6,12 +6,16 @@ import { Resend } from 'resend';
 export class MailerService {
   private readonly logger = new Logger(MailerService.name);
   private readonly resend: Resend | null;
-  private readonly fromAddress = 'PingLoyal <noreply@pingloyal.com>';
+  private readonly fromAddress: string;
 
   constructor(private readonly config: ConfigService) {
     const key = this.config.get<string>('RESEND_API_KEY', '');
-    const isPlaceholder = !key || key.includes('placeholder') || key.includes('_test_');
+    const isPlaceholder =
+      !key || key.includes('placeholder') || key.includes('_test_');
     this.resend = isPlaceholder ? null : new Resend(key);
+    this.fromAddress =
+      this.config.get<string>('MAIL_FROM') ??
+      'PingLoyal <noreply@pingloyal.com>';
   }
 
   async sendWelcomeVerification(params: {

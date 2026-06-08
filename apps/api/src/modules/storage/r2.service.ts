@@ -35,6 +35,12 @@ export class R2Service {
   }
 
   async uploadFile(params: UploadFileParams): Promise<string> {
+    // Dev fallback — when R2 credentials are placeholders, skip the upload and
+    // return an inline data URI so the rest of the app still works.
+    if (this.accountId.includes('placeholder')) {
+      return `data:${params.contentType};base64,${params.buffer.toString('base64')}`;
+    }
+
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
