@@ -134,17 +134,17 @@ export default function WalletPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-4xl">
           <h1 className="text-xl font-bold text-slate-900">Marketing Wallet</h1>
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-6 py-6">
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
 
         {/* ── Balance Hero ─────────────────────────────────────────────────── */}
-        <div className="rounded-2xl bg-[#0F1E35] p-6 text-white shadow-lg">
-          <div className="flex items-start justify-between">
+        <div className="rounded-2xl bg-[#0F1E35] p-5 text-white shadow-lg sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                 Marketing Wallet Balance
@@ -153,7 +153,7 @@ export default function WalletPage() {
                 <div className="mt-2 h-10 w-40 animate-pulse rounded bg-slate-700" />
               ) : (
                 <p
-                  className={`mt-1 text-5xl font-bold ${balanceColour}`}
+                  className={`mt-1 text-4xl font-bold sm:text-5xl ${balanceColour}`}
                   data-testid="wallet-balance"
                 >
                   ₦{(wallet?.balance ?? 0).toLocaleString()}
@@ -168,7 +168,7 @@ export default function WalletPage() {
             </div>
             <button
               onClick={() => router.push('/billing/wallet/topup')}
-              className="shrink-0 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600"
+              className="self-start shrink-0 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-600 sm:self-auto"
               data-testid="topup-btn"
             >
               + Top Up
@@ -179,7 +179,7 @@ export default function WalletPage() {
         {/* ── Low balance warning ──────────────────────────────────────────── */}
         {wallet?.isLow && !wallet.isEmpty && (
           <div
-            className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+            className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
             data-testid="low-balance-warning"
           >
             <p className="text-sm font-medium text-amber-800">
@@ -188,7 +188,7 @@ export default function WalletPage() {
             </p>
             <button
               onClick={() => router.push('/billing/wallet/topup')}
-              className="ml-4 shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+              className="self-start shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 sm:ml-4 sm:self-auto"
             >
               Top Up Now →
             </button>
@@ -268,11 +268,11 @@ export default function WalletPage() {
 
         {/* ── Transaction history ───────────────────────────────────────────── */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">Transaction History</h2>
             <button
               onClick={handleExportCsv}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800"
+              className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-800"
               data-testid="export-csv"
             >
               ⬇ Export CSV
@@ -280,7 +280,7 @@ export default function WalletPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="tx-table">
+            <table className="w-full min-w-[560px] text-sm" data-testid="tx-table">
               <thead>
                 <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500">
                   <th className="px-4 py-3">Date</th>
@@ -333,7 +333,7 @@ export default function WalletPage() {
 
           {/* Pagination */}
           {txResult && totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+            <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">
                 {txResult.total} transactions
               </p>

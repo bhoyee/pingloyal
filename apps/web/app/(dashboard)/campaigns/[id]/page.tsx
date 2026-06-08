@@ -134,9 +134,9 @@ export default function CampaignDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <button
                 onClick={() => router.push('/campaigns')}
@@ -145,7 +145,7 @@ export default function CampaignDetailPage() {
                 ← Campaigns
               </button>
               <h1 className="text-xl font-bold text-slate-900">{campaign.name}</h1>
-              <div className="mt-1 flex items-center gap-3">
+              <div className="mt-1 flex flex-wrap items-center gap-3">
                 <StatusBadge status={campaign.status} />
                 <span className="text-xs text-slate-400">
                   {formatDistanceToNow(new Date(campaign.createdAt), { addSuffix: true })}
@@ -171,7 +171,7 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         {/* Stats */}
         <CampaignStats
           totalRecipients={stats.totalRecipients}
@@ -195,7 +195,8 @@ export default function CampaignDetailPage() {
             </div>
           ) : (
             <>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Customer</th>
@@ -227,8 +228,9 @@ export default function CampaignDetailPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
               {/* Pagination */}
-              <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
+              <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-slate-400">
                   Page {logsPage} · {logsTotal} total
                 </p>

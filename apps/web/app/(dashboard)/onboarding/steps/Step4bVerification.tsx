@@ -83,8 +83,8 @@ export function Step4bVerification({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">
+      <div className="px-4 pt-5 pb-4 border-b border-slate-100 sm:px-6 sm:pt-6">
+        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
           Check your WhatsApp
         </h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -94,7 +94,7 @@ export function Step4bVerification({
         </p>
       </div>
 
-      <div className="p-6 flex flex-col items-center gap-6">
+      <div className="p-4 flex flex-col items-center gap-6 sm:p-6">
         {/* WhatsApp icon with pulsing glow */}
         <div className="relative">
           <div className="absolute inset-0 rounded-full bg-green-400/30 animate-ping" />

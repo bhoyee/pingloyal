@@ -76,7 +76,7 @@ function SyncStatusWidget({ config, onRetry }: {
 
   return (
     <div
-      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4"
+      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
       data-testid="sync-status-widget"
     >
       <div className="flex items-center gap-3">
@@ -257,7 +257,7 @@ export default function IntegrationsSettingsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-3xl">
           <h1 className="text-xl font-bold text-slate-900">Integration Settings</h1>
           <p className="text-sm text-slate-500">
@@ -266,10 +266,10 @@ export default function IntegrationsSettingsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         {/* Mode badge */}
         {tenant && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-2">
               {tenant.mode === 'connected' ? (
                 <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700">
@@ -297,7 +297,7 @@ export default function IntegrationsSettingsPage() {
         {/* Configuration form */}
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+          className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
         >
           {/* Connection type selector */}
           <div className="space-y-3">
@@ -363,12 +363,12 @@ export default function IntegrationsSettingsPage() {
               <h2 className="font-bold text-slate-900">Webhook Configuration</h2>
               <div>
                 <Label>Your Webhook URL</Label>
-                <div className="mt-1 flex gap-2">
+                <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                   <input
                     readOnly
                     value={webhookUrl}
                     data-testid="webhook-url"
-                    className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600"
                   />
                   <Button
                     type="button"
@@ -460,8 +460,8 @@ export default function IntegrationsSettingsPage() {
               Map your system's field names to ours. Use dot notation for nested fields (e.g.{' '}
               <code>customer.phone</code>).
             </p>
-            <div className="overflow-hidden rounded-lg border border-slate-200">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full min-w-[480px] text-sm">
                 <thead>
                   <tr className="bg-slate-50">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">

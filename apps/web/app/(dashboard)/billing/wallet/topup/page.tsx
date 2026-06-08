@@ -96,7 +96,7 @@ export default function TopupPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-xl">
           <button
             onClick={() => router.push('/billing/wallet')}
@@ -108,7 +108,7 @@ export default function TopupPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-xl space-y-6 px-6 py-6">
+      <div className="mx-auto max-w-xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         {/* Success message */}
         {successMsg && (
           <div

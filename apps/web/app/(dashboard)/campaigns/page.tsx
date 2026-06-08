@@ -74,16 +74,16 @@ export default function CampaignsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-slate-900">Campaigns</h1>
-          <Button onClick={() => router.push('/campaigns/new')}>
+          <Button className="self-start sm:self-auto" onClick={() => router.push('/campaigns/new')}>
             + New Campaign
           </Button>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-6 py-6">
+      <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
         {/* Status filter tabs */}
         <div
           className="mb-6 flex gap-1 overflow-x-auto"
@@ -151,8 +151,8 @@ export default function CampaignsPage() {
 
         {/* Table */}
         {!loading && filtered.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Name</th>
