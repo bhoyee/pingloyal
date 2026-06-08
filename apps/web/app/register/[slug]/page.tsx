@@ -12,7 +12,7 @@ export default async function RegisterPage({ params }: Props) {
 
   let tenantInfo: TenantInfo;
   try {
-    tenantInfo = await publicGet<TenantInfo>(`/register/${slug}/tenant-info`);
+    tenantInfo = await publicGet<TenantInfo>(`/api/v1/register/${slug}/tenant-info`);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
       notFound();

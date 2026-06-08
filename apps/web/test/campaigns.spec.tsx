@@ -181,14 +181,18 @@ describe('Audience builder', () => {
       (c[0] as string).includes('audience-preview'),
     ).length;
 
-    // Advance less than 1 second — should NOT fire another call
+    // Change a real audience filter — this is what should schedule a debounced refetch
+    const activeRadio = screen.getByLabelText('Active only — purchased recently');
+    await act(async () => { fireEvent.click(activeRadio); });
+
+    // Advance less than 1 second — should NOT fire another call yet
     act(() => { jest.advanceTimersByTime(500); });
     const midCallCount = mockApi.get.mock.calls.filter((c) =>
       (c[0] as string).includes('audience-preview'),
     ).length;
     expect(midCallCount).toBe(initialCallCount);
 
-    // Advance past 1 second — should fire
+    // Advance past 1 second — the debounced refetch should now fire
     act(() => { jest.advanceTimersByTime(600); });
     await act(async () => { await Promise.resolve(); });
     const afterCallCount = mockApi.get.mock.calls.filter((c) =>
@@ -238,7 +242,7 @@ function MessageBuilderWrapper({ initialBody = '' }: { initialBody?: string }) {
   const methods = useForm({ defaultValues: { messageBody: initialBody } });
   return (
     <FormProvider {...methods}>
-      <MessageBuilder templates={[{ id: 'tpl-1', name: 'Test Tpl', body: 'Hello {{firstName}}!' }]} tenant={null} />
+      <MessageBuilder templates={[{ id: 'tpl-1', name: 'Test Tpl', body: 'Hello {{firstName}}!' }]} templatesLoading={false} tenant={null} />
     </FormProvider>
   );
 }

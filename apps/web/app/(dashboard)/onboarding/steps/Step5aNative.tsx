@@ -76,8 +76,8 @@ export function Step5aNative({ businessName }: Step5aNativeProps) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-        <h2 className="text-2xl font-semibold text-slate-900">
+      <div className="px-4 pt-5 pb-4 border-b border-slate-100 sm:px-6 sm:pt-6">
+        <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
           You&apos;re ready to go! 🎉
         </h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -86,7 +86,7 @@ export function Step5aNative({ businessName }: Step5aNativeProps) {
         </p>
       </div>
 
-      <div className="p-6 flex flex-col items-center gap-6">
+      <div className="p-4 flex flex-col items-center gap-6 sm:p-6">
         {loading && (
           <div className="flex flex-col items-center gap-3 py-12">
             <Spinner className="h-8 w-8" />

@@ -84,8 +84,8 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-        <h2 className="text-xl font-semibold text-slate-900">
+      <div className="px-4 pt-5 pb-4 border-b border-slate-100 sm:px-6 sm:pt-6">
+        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
           Connect your existing system
         </h2>
         <p className="mt-1 text-sm text-slate-500">
@@ -93,7 +93,7 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
         </p>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 space-y-6 sm:p-6">
         {/* Connection type cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {([
@@ -231,8 +231,8 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
             <p className="text-xs text-slate-500">
               Map our field names to your system&apos;s field names.
             </p>
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="rounded-xl border border-slate-200 overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
                     <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase">

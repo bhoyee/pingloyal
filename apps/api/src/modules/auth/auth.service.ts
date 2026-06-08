@@ -165,10 +165,7 @@ export class AuthService {
     // Step 5 — Send welcome email (outside transaction so DB row is committed first)
     const plainCode = (savedUser as User & { _plainCode?: string })._plainCode!;
     let devCode: string | undefined;
-
-    const resendConfigured =
-      this.configService.get<string>('RESEND_API_KEY', '').length > 20 &&
-      !this.configService.get<string>('RESEND_API_KEY', '').includes('placeholder');
+    let emailSent = false;
 
     try {
       await this.mailer.sendWelcomeVerification({
@@ -177,17 +174,26 @@ export class AuthService {
         businessName: savedTenant.businessName,
         code: plainCode,
       });
+      emailSent = true;
     } catch (err) {
       this.logger.error(
         `Failed to send welcome email to ${savedUser.email}: ${String(err)}`,
       );
     }
 
-    if (!resendConfigured) {
+    // In development, surface the code in the response whenever email didn't
+    // actually send (no API key, wrong sender domain, etc.) so the dev can
+    // still complete the flow without a working email setup.
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    if (isDev && !emailSent) {
       devCode = plainCode;
     }
 
-    return { requiresVerification: true, email: savedUser.email, ...(devCode ? { devCode } : {}) };
+    return {
+      requiresVerification: true,
+      email: savedUser.email,
+      ...(devCode ? { devCode } : {}),
+    };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -311,7 +317,10 @@ export class AuthService {
 
     // Return generic response to prevent email enumeration
     if (!user || user.emailVerifiedAt) {
-      return { message: 'If the email exists and is unverified, a new code has been sent' };
+      return {
+        message:
+          'If the email exists and is unverified, a new code has been sent',
+      };
     }
 
     const { code, hashedCode } = this.generateVerificationCode();
@@ -324,17 +333,28 @@ export class AuthService {
       emailVerificationExpiry: expiry,
     });
 
+    let emailSent = false;
     try {
       await this.mailer.sendVerificationCode({
         to: user.email,
         name: user.fullName,
         code,
       });
+      emailSent = true;
     } catch (err) {
-      this.logger.error(`Failed to resend verification to ${user.email}: ${String(err)}`);
+      this.logger.error(
+        `Failed to resend verification to ${user.email}: ${String(err)}`,
+      );
     }
 
-    return { message: 'If the email exists and is unverified, a new code has been sent' };
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    const devCode = isDev && !emailSent ? code : undefined;
+
+    return {
+      message:
+        'If the email exists and is unverified, a new code has been sent',
+      ...(devCode ? { devCode } : {}),
+    };
   }
 
   // ── Refresh ───────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { TenantsService } from '../tenants/tenants.service';
 
-const SUMMARY_TTL_S = 300;
+const SUMMARY_TTL_S = 60;
 const TOP_SPENDERS_TTL_S = 900;
 const WALLET_LOW_THRESHOLD = 3000;
 
@@ -56,29 +56,25 @@ export class DashboardService {
     const rows = await this.dataSource.query<Record<string, string>[]>(
       `WITH customer_stats AS (
         SELECT
-          COUNT(*) FILTER (WHERE wa_opted_in = true)
+          COUNT(*)
             AS total_customers,
           COUNT(*) FILTER (
-            WHERE wa_opted_in = true
-            AND last_purchase_at > NOW() - (
+            WHERE last_purchase_at > NOW() - (
               SELECT lapsed_days FROM tenants WHERE id = $1
             ) * INTERVAL '1 day'
           ) AS active_customers,
           COUNT(*) FILTER (
-            WHERE wa_opted_in = true
-            AND (
-              last_purchase_at <= NOW() - (
+            WHERE last_purchase_at <= NOW() - (
                 SELECT lapsed_days FROM tenants WHERE id = $1
               ) * INTERVAL '1 day'
               OR last_purchase_at IS NULL
-            )
           ) AS inactive_customers,
           COUNT(*) FILTER (
-            WHERE wa_opted_in = true
-            AND created_at >= date_trunc('month', NOW())
+            WHERE created_at >= date_trunc('month', NOW())
           ) AS new_customers_this_month
         FROM customers
         WHERE tenant_id = $1
+          AND is_active = true
       ),
       points_stats AS (
         SELECT
@@ -86,10 +82,10 @@ export class DashboardService {
             WHERE delta > 0
             AND created_at >= date_trunc('month', NOW())
           ), 0) AS issued_this_month,
-          COALESCE(ABS(SUM(delta)) FILTER (
+          COALESCE(ABS(SUM(delta) FILTER (
             WHERE delta < 0
             AND created_at >= date_trunc('month', NOW())
-          ), 0) AS redeemed_this_month
+          )), 0) AS redeemed_this_month
         FROM points_ledger
         WHERE tenant_id = $1
       ),
@@ -124,10 +120,10 @@ export class DashboardService {
       ),
       wallet_stats AS (
         SELECT
-          COALESCE(ABS(SUM(amount)) FILTER (
+          COALESCE(ABS(SUM(amount) FILTER (
             WHERE amount < 0
             AND created_at >= date_trunc('month', NOW())
-          ), 0) AS wallet_spent_this_month,
+          )), 0) AS wallet_spent_this_month,
           COALESCE(COUNT(*) FILTER (
             WHERE amount < 0
             AND created_at >= date_trunc('month', NOW())
@@ -200,7 +196,7 @@ export class DashboardService {
       FROM customers c
       LEFT JOIN tier_configs tc ON c.tier_id = tc.id
       WHERE c.tenant_id = $1
-        AND c.wa_opted_in = true
+        AND c.is_active = true
       ORDER BY c.total_spend DESC
       LIMIT 10`,
       [tenantId],

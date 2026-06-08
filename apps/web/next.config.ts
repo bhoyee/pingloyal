@@ -2,11 +2,18 @@ import type { NextConfig } from 'next';
 // @ts-expect-error — next-pwa has no bundled types
 import withPWA from 'next-pwa';
 
+const INTERNAL_API = process.env.INTERNAL_API_URL ?? 'http://localhost:3333';
+
 const nextConfig: NextConfig = {
   turbopack: {},
   allowedDevOrigins: ['192.168.1.125', 'localhost'],
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333',
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${INTERNAL_API}/api/v1/:path*`,
+      },
+    ];
   },
   images: {
     remotePatterns: [

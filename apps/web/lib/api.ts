@@ -1,5 +1,10 @@
+// Server components run in Node.js where relative URLs are not supported,
+// so they call the API directly. Browser code uses '' (relative) which goes
+// through the Next.js rewrite proxy → avoids CORS entirely.
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
+  typeof window === 'undefined'
+    ? (process.env.INTERNAL_API_URL ?? 'http://localhost:3333')
+    : '';
 
 const API_URL = API_BASE_URL;
 
@@ -19,9 +24,10 @@ export class ApiError extends Error {
 }
 
 export async function publicGet<T>(path: string): Promise<T> {
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await fetch(`${API_BASE_URL}${normalizedPath}`, {
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
     });
@@ -35,9 +41,10 @@ export async function publicGet<T>(path: string): Promise<T> {
 }
 
 export async function publicPost<T>(path: string, body: unknown): Promise<T> {
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+    res = await fetch(`${API_BASE_URL}${normalizedPath}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -62,9 +69,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError('No auth token', 401);
   }
 
+  // Normalize: short paths like "/tenants/me" → "/api/v1/tenants/me"
+  // Full paths already carrying "/api/v1/" are left untouched.
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
+
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${API_URL}${normalizedPath}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -279,9 +290,13 @@ async function cashierRequest<T>(
     throw new ApiError('No auth token', 401);
   }
 
+  // Cashier paths like "/tenants/me" need the global prefix the regular
+  // api client paths already carry. Add it if absent.
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
+
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${API_URL}${normalizedPath}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

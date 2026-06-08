@@ -189,11 +189,11 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <h1 className="text-xl font-bold text-slate-900">Reports</h1>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* Period selector */}
             <select
               value={period}
@@ -209,21 +209,21 @@ export default function ReportsPage() {
             </select>
 
             {period === 'custom' && (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <input type="date" max={today} value={customStart} onChange={(e) => setCustomStart(e.target.value)}
                   className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
                 <span className="text-sm text-slate-400">→</span>
                 <input type="date" max={today} value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
                   className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm" />
-              </>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl space-y-8 px-6 py-6">
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6">
         {/* Last updated + refresh */}
-        <div className="flex items-center gap-3 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
           {report && (
             <span>Last updated {formatDistanceToNow(new Date(report.generatedAt), { addSuffix: true })}</span>
           )}
@@ -240,7 +240,7 @@ export default function ReportsPage() {
         {/* ── SECTION 1: Loyalty ──────────────────────────────────────────── */}
         <section data-testid="loyalty-section">
           <SectionTitle>Loyalty Performance</SectionTitle>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : report ? (
@@ -271,7 +271,7 @@ export default function ReportsPage() {
         {/* ── SECTION 2: Points ───────────────────────────────────────────── */}
         <section data-testid="points-section">
           <SectionTitle>Points & Rewards</SectionTitle>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : report ? (
@@ -301,7 +301,7 @@ export default function ReportsPage() {
         {/* ── SECTION 3: WhatsApp ─────────────────────────────────────────── */}
         <section data-testid="whatsapp-section">
           <SectionTitle>WhatsApp Performance</SectionTitle>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : report ? (
@@ -348,7 +348,7 @@ export default function ReportsPage() {
         {/* ── SECTION 4: Wallet ───────────────────────────────────────────── */}
         <section data-testid="wallet-section">
           <SectionTitle>Wallet & Spend</SectionTitle>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {isLoading ? (
               Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
             ) : report ? (
@@ -365,7 +365,7 @@ export default function ReportsPage() {
             ) : null}
           </div>
           {report && Object.keys(report.wallet.spendByType).length > 0 && (
-            <div className="mt-4 flex gap-4">
+            <div className="mt-4 flex flex-col gap-4 sm:flex-row">
               <div className="flex-1 rounded-xl border border-slate-200 bg-white p-4">
                 <p className="mb-2 text-xs font-semibold text-slate-500">Spend by Type</p>
                 <ResponsiveContainer width="100%" height={200}>
@@ -381,7 +381,7 @@ export default function ReportsPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex w-52 flex-col justify-center rounded-xl border border-slate-200 bg-white p-5 text-center">
+              <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-white p-5 text-center sm:w-52">
                 <p className={`text-4xl font-bold ${report.wallet.estimatedRoi > 3 ? 'text-green-600' : report.wallet.estimatedRoi >= 1 ? 'text-amber-600' : 'text-red-600'}`}>
                   {report.wallet.estimatedRoi}x
                 </p>
@@ -449,7 +449,8 @@ export default function ReportsPage() {
                     <div className="border-b border-slate-100 px-4 py-3">
                       <p className="text-xs font-semibold text-slate-500">Top Customers</p>
                     </div>
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[420px] text-sm">
                       <thead>
                         <tr className="text-left text-xs text-slate-400">
                           <th className="px-4 py-2">Rank</th>
@@ -475,6 +476,7 @@ export default function ReportsPage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
 

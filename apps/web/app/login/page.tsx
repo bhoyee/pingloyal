@@ -28,7 +28,8 @@ export default function LoginPage() {
       if (res.refreshToken) {
         localStorage.setItem('refresh_token', res.refreshToken);
       }
-      router.replace('/dashboard');
+      // Onboarding wizard handles the dashboard redirect once setup is complete
+      router.replace('/onboarding');
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         router.replace(`/verify-email?email=${encodeURIComponent(email)}`);

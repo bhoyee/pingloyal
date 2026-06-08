@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -8,8 +9,13 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { TenantMode } from '@pingloyal/types';
 
 export class UpdateSettingsDto {
+  @IsOptional()
+  @IsEnum(TenantMode)
+  mode?: TenantMode;
+
   @IsOptional()
   @IsNumber()
   @Min(0.1)

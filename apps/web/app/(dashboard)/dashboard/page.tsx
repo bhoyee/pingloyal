@@ -129,14 +129,14 @@ function MetricCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${onClick ? 'cursor-pointer hover:border-[#0F1E35]' : ''}`}
+      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${onClick ? 'cursor-pointer hover:border-[#0F1E35]' : ''}`}
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-2xl">{icon}</span>
+        <span className="text-xl sm:text-2xl">{icon}</span>
         {ring !== undefined && <RingChart pct={ring} />}
       </div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      <p className="text-sm text-slate-500">{label}</p>
+      <p className="text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
+      <p className="text-xs text-slate-500 sm:text-sm">{label}</p>
       {sub && <p className="mt-1 text-xs text-slate-400">{sub}</p>}
     </div>
   );
@@ -161,7 +161,7 @@ function AlertBanner({
 }) {
   return (
     <div
-      className={`flex items-center justify-between rounded-xl border ${border} ${bg} px-4 py-3`}
+      className={`flex flex-col gap-3 rounded-xl border ${border} ${bg} px-4 py-3 sm:flex-row sm:items-center sm:justify-between`}
       data-testid="alert-banner"
     >
       <p className="text-sm font-medium text-slate-800">
@@ -169,7 +169,7 @@ function AlertBanner({
       </p>
       <a
         href={href}
-        className="ml-4 shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+        className="self-start shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 sm:ml-4 sm:self-auto"
       >
         {buttonLabel}
       </a>
@@ -181,57 +181,68 @@ function AlertBanner({
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Get tenantId from auth token on mount
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!localStorage.getItem('access_token')) {
       router.replace('/login');
-      return;
-    }
-    // Decode JWT to get tenantId (payload is base64url)
-    try {
-      const payload = JSON.parse(
-        atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')),
-      ) as { tenantId?: string };
-      setTenantId(payload.tenantId ?? null);
-    } catch {
-      router.replace('/login');
+    } else {
+      setMounted(true);
     }
   }, [router]);
 
-  const {
-    data: summary,
-    isLoading: summaryLoading,
-  } = useQuery<DashboardSummary>({
-    queryKey: ['dashboard-summary', tenantId],
-    queryFn: () => api.get<DashboardSummary>('/api/v1/dashboard/summary'),
-    enabled: !!tenantId,
-    refetchInterval: 300_000,
-    staleTime: 60_000,
-  });
+  const { data: summary, isLoading: summaryLoading } =
+    useQuery<DashboardSummary>({
+      queryKey: ['dashboard-summary'],
+      queryFn: () => api.get<DashboardSummary>('/api/v1/dashboard/summary'),
+      enabled: mounted,
+      refetchInterval: 60_000,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    });
 
   const { data: topSpenders, isLoading: spendersLoading } = useQuery<
     TopSpender[]
   >({
-    queryKey: ['dashboard-top-spenders', tenantId],
+    queryKey: ['dashboard-top-spenders'],
     queryFn: () => api.get<TopSpender[]>('/api/v1/dashboard/top-spenders'),
-    enabled: !!tenantId,
-    refetchInterval: 300_000,
+    enabled: mounted,
+    refetchInterval: 60_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const { data: triggerLogs } = useQuery<TriggerLogEntry[]>({
-    queryKey: ['trigger-logs', tenantId],
+    queryKey: ['trigger-logs'],
     queryFn: () => api.get<TriggerLogEntry[]>('/api/v1/trigger-logs'),
-    enabled: !!tenantId,
+    enabled: mounted,
     refetchInterval: 60_000,
   });
+
+  // Default summary so metric cards always render (show 0s for fresh accounts)
+  const s: DashboardSummary = summary ?? {
+    totalCustomers: 0,
+    activeCustomers: 0,
+    inactiveCustomers: 0,
+    newCustomersThisMonth: 0,
+    pointsIssuedThisMonth: 0,
+    pointsRedeemedThisMonth: 0,
+    campaignsSentThisMonth: 0,
+    avgDeliveryRate: 0,
+    messagesSentThisMonth: 0,
+    walletBalance: 0,
+    walletSpentThisMonth: 0,
+    marketingMessagesThisMonth: 0,
+    walletIsLow: false,
+    walletIsEmpty: false,
+    waIsConnected: false,
+    waVerificationStatus: 'unverified',
+  };
 
   // ── Alert banner selection ───────────────────────────────────────────────
 
   let banner: React.ReactNode = null;
-  if (summary?.walletIsEmpty) {
+  if (!summaryLoading && s.walletIsEmpty) {
     banner = (
       <AlertBanner
         icon="🔴"
@@ -240,179 +251,137 @@ export default function DashboardPage() {
         href="/billing/wallet/topup"
         bg="bg-red-50"
         border="border-red-200"
-        data-testid="wallet-empty-banner"
       />
     );
-  } else if (summary?.walletIsLow) {
+  } else if (!summaryLoading && s.walletIsLow) {
     banner = (
       <AlertBanner
         icon="⚠️"
-        text={`Marketing Wallet is running low (₦${summary.walletBalance.toLocaleString()}). Top up to keep automations running.`}
+        text={`Marketing Wallet is running low (₦${s.walletBalance.toLocaleString()}). Top up to keep automations running.`}
         buttonLabel="Top Up →"
         href="/billing/wallet/topup"
         bg="bg-amber-50"
         border="border-amber-200"
-        data-testid="wallet-low-banner"
       />
     );
-  } else if (summary && !summary.waIsConnected) {
+  } else if (!summaryLoading && !s.waIsConnected) {
     banner = (
       <AlertBanner
         icon="💬"
-        text="WhatsApp is not connected. Connect to start sending automated messages to your customers."
+        text="WhatsApp not connected. Connect your number to start sending automated loyalty messages."
         buttonLabel="Connect WhatsApp →"
-        href="/onboarding"
+        href="/settings/integrations"
         bg="bg-blue-50"
         border="border-blue-200"
-        data-testid="wa-banner"
       />
     );
   }
 
   const activePercent =
-    summary && summary.totalCustomers > 0
-      ? Math.round((summary.activeCustomers / summary.totalCustomers) * 100)
+    s.totalCustomers > 0
+      ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
       : 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
+      {/* Page header */}
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Overview of your loyalty programme</p>
+          </div>
           <a
-            href="/reports"
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-[#0F1E35] hover:text-[#0F1E35]"
+            href="/campaigns/new"
+            className="self-start rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050] sm:self-auto"
           >
-            📈 Reports
+            + New Campaign
           </a>
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
+      <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         {/* Alert banner */}
         {banner}
 
         {/* Metric cards grid */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {summaryLoading ? (
             Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-          ) : summary ? (
+          ) : (
             <>
               <MetricCard
                 icon="👥"
-                value={summary.totalCustomers}
+                value={s.totalCustomers}
                 label="Total Customers"
-                sub={
-                  summary.newCustomersThisMonth > 0
-                    ? `+${summary.newCustomersThisMonth} this month`
-                    : 'This month'
-                }
+                sub={s.newCustomersThisMonth > 0 ? `+${s.newCustomersThisMonth} this month` : 'No new customers yet'}
               />
               <MetricCard
-                icon="🟢"
-                value={summary.activeCustomers}
+                icon="✅"
+                value={s.activeCustomers}
                 label="Active Customers"
-                sub={`${activePercent}% of total`}
+                sub={s.totalCustomers > 0 ? `${activePercent}% of total` : 'Register your first customer'}
               />
               <MetricCard
-                icon="⚫"
-                value={summary.inactiveCustomers}
+                icon="😴"
+                value={s.inactiveCustomers}
                 label="Lapsed Customers"
-                sub="Click to view →"
-                onClick={() => router.push('/customers?status=inactive')}
+                sub={s.inactiveCustomers > 0 ? 'Click to view →' : 'None lapsed yet'}
+                onClick={s.inactiveCustomers > 0 ? () => router.push('/customers?status=inactive') : undefined}
               />
               <MetricCard
                 icon="⭐"
-                value={summary.pointsIssuedThisMonth.toLocaleString()}
+                value={s.pointsIssuedThisMonth.toLocaleString()}
                 label="Points Issued"
                 sub="This month"
               />
               <MetricCard
                 icon="🎁"
-                value={summary.pointsRedeemedThisMonth.toLocaleString()}
+                value={s.pointsRedeemedThisMonth.toLocaleString()}
                 label="Points Redeemed"
                 sub="This month"
               />
               <MetricCard
                 icon="💬"
-                value={summary.messagesSentThisMonth.toLocaleString()}
+                value={s.messagesSentThisMonth.toLocaleString()}
                 label="WA Messages Sent"
                 sub="This month"
               />
               <MetricCard
                 icon="📣"
-                value={summary.campaignsSentThisMonth}
+                value={s.campaignsSentThisMonth}
                 label="Campaigns Sent"
                 sub="This month"
               />
               <MetricCard
-                icon=""
-                value={`${summary.avgDeliveryRate}%`}
+                icon="📈"
+                value={s.avgDeliveryRate > 0 ? `${s.avgDeliveryRate}%` : '—'}
                 label="Avg Delivery Rate"
                 sub="Across all campaigns"
-                ring={summary.avgDeliveryRate}
+                ring={s.avgDeliveryRate > 0 ? s.avgDeliveryRate : undefined}
               />
-              <div
-                className={`rounded-xl border p-5 shadow-sm ${
-                  summary.walletIsEmpty
-                    ? 'border-red-200 bg-red-50'
-                    : summary.walletIsLow
-                      ? 'border-amber-200 bg-amber-50'
-                      : 'border-slate-200 bg-white'
-                }`}
-                data-testid="wallet-metric-card"
-              >
-                <p className="mb-1 text-2xl">👛</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    summary.walletIsEmpty
-                      ? 'text-red-600'
-                      : summary.walletIsLow
-                        ? 'text-amber-600'
-                        : 'text-green-600'
-                  }`}
-                  data-testid="wallet-metric-balance"
-                >
-                  ₦{summary.walletBalance.toLocaleString()}
-                </p>
-                <p className="text-sm text-slate-500">Marketing Wallet</p>
-                <a
-                  href="/billing/wallet/topup"
-                  className="mt-2 inline-block text-xs font-semibold text-[#0F1E35] hover:underline"
-                >
-                  + Top Up →
-                </a>
-              </div>
             </>
-          ) : null}
+          )}
         </div>
 
         {/* Wallet summary */}
-        {summary && (
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div>
-              <p className="text-sm font-semibold text-slate-500">
-                Marketing Wallet
-              </p>
-              <p
-                className={`text-3xl font-bold ${summary.walletIsEmpty ? 'text-red-600' : 'text-green-600'}`}
-              >
-                ₦{summary.walletBalance.toLocaleString()}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                {summary.marketingMessagesThisMonth} marketing messages this month
-                · ₦{summary.walletSpentThisMonth.toLocaleString()} spent
-              </p>
-            </div>
-            <a
-              href="/billing/wallet/topup"
-              className="rounded-lg bg-[#0F1E35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050]"
-            >
-              + Top Up
-            </a>
+        <div data-testid="wallet-metric-card" className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Marketing Wallet</p>
+            <p data-testid="wallet-metric-balance" className={`text-2xl font-bold sm:text-3xl ${s.walletIsEmpty ? 'text-red-600' : s.walletIsLow ? 'text-amber-600' : 'text-green-600'}`}>
+              ₦{s.walletBalance.toLocaleString()}
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              {s.marketingMessagesThisMonth} marketing messages · ₦{s.walletSpentThisMonth.toLocaleString()} spent this month
+            </p>
           </div>
-        )}
+          <a
+            href="/billing/wallet/topup"
+            className="self-start rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050] sm:self-auto"
+          >
+            + Top Up
+          </a>
+        </div>
 
         {/* Top spenders */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -436,6 +405,7 @@ export default function DashboardPage() {
               No transactions recorded yet
             </p>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm" data-testid="top-spenders-table">
               <thead>
                 <tr className="bg-slate-50">
@@ -449,35 +419,35 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {topSpenders.map((s, i) => (
-                  <tr key={s.id}>
+                {topSpenders.map((spender, i) => (
+                  <tr key={spender.id}>
                     <td className="px-5 py-3 text-slate-500">
                       {i === 0 ? '👑' : `#${i + 1}`}
                     </td>
                     <td className="px-5 py-3 font-medium text-slate-900">
-                      {s.fullName}
+                      {spender.fullName}
                     </td>
                     <td className="px-5 py-3 text-slate-600">
-                      ⭐ {s.pointsBalance.toLocaleString()}
+                      ⭐ {spender.pointsBalance.toLocaleString()}
                     </td>
                     <td className="px-5 py-3">
-                      {s.tierLabel ? (
+                      {spender.tierLabel ? (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          {s.tierLabel}
+                          {spender.tierLabel}
                         </span>
                       ) : (
                         '—'
                       )}
                     </td>
                     <td className="px-5 py-3 text-slate-700">
-                      ₦{s.totalSpend.toLocaleString()}
+                      ₦{spender.totalSpend.toLocaleString()}
                     </td>
                     <td className="px-5 py-3 text-slate-600">
-                      {s.purchaseCount}
+                      {spender.purchaseCount}
                     </td>
                     <td className="px-5 py-3 text-xs text-slate-400">
-                      {s.lastPurchaseAt
-                        ? formatDistanceToNow(new Date(s.lastPurchaseAt), {
+                      {spender.lastPurchaseAt
+                        ? formatDistanceToNow(new Date(spender.lastPurchaseAt), {
                             addSuffix: true,
                           })
                         : '—'}
@@ -486,6 +456,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 
@@ -499,12 +470,12 @@ export default function DashboardPage() {
             </div>
             <ul className="divide-y divide-slate-100">
               {triggerLogs.map((log) => (
-                <li key={log.id} className="flex items-center gap-3 px-5 py-3">
+                <li key={log.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 sm:flex-nowrap">
                   <span className="text-xl">
                     {TRIGGER_ICONS[log.triggerType] ?? '📩'}
                   </span>
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-700">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-slate-700">
                       {log.customerName ?? 'Unknown customer'}
                     </p>
                     <p className="text-xs text-slate-400">
@@ -516,7 +487,7 @@ export default function DashboardPage() {
                   >
                     {log.status}
                   </span>
-                  <span className="text-xs text-slate-400">
+                  <span className="ml-auto text-xs text-slate-400 sm:ml-0">
                     {formatDistanceToNow(new Date(log.createdAt), {
                       addSuffix: true,
                     })}

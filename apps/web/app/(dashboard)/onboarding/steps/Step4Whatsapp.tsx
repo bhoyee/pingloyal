@@ -61,12 +61,14 @@ interface Step4WhatsappProps {
   businessName?: string;
   onComplete: (phoneNumber: string) => void;
   onBack: () => void;
+  onSkip: () => void;
 }
 
 export function Step4Whatsapp({
   businessName = '',
   onComplete,
   onBack,
+  onSkip,
 }: Step4WhatsappProps) {
   const [apiError, setApiError] = useState('');
 
@@ -274,6 +276,17 @@ export function Step4Whatsapp({
           continueLabel="Connect WhatsApp →"
           loading={isSubmitting}
         />
+
+        <p className="text-center text-xs text-slate-400 pt-1">
+          BSP approval still pending?{' '}
+          <button
+            type="button"
+            onClick={onSkip}
+            className="text-slate-500 underline hover:text-slate-700"
+          >
+            Skip WhatsApp for now — set up later in Settings
+          </button>
+        </p>
       </form>
     </StepCard>
   );
