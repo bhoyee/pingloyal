@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addMinutes, isAfter } from 'date-fns';
+import { ArrowLeft } from 'lucide-react';
 import { api, type TenantMe, type CampaignTemplate, type AudiencePreview } from '@/lib/api';
 import { AudienceBuilder } from '@/components/campaigns/AudienceBuilder';
 import { MessageBuilder } from '@/components/campaigns/MessageBuilder';
@@ -43,6 +44,7 @@ export default function NewCampaignPage() {
   const router = useRouter();
   const [tenant, setTenant] = useState<TenantMe | null>(null);
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   const [audiencePreview, setAudiencePreview] = useState<AudiencePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -78,12 +80,25 @@ export default function NewCampaignPage() {
     activityStatus: rules.activityStatus ?? 'all',
   };
 
-  const debouncedRules = useDebounce(effectiveSegmentRules, 1000);
+  // Debounce on a stringified key so the timer only resets when the rules
+  // actually change — using the object directly resets it on every render
+  // (a fresh object is built each time), which kept the audience preview
+  // reloading and its loading-skeleton swap was shifting the layout below it.
+  const rulesKey = JSON.stringify(effectiveSegmentRules);
+  const debouncedRulesKey = useDebounce(rulesKey, 1000);
+  const debouncedRules = useMemo(
+    () => JSON.parse(debouncedRulesKey) as typeof effectiveSegmentRules,
+    [debouncedRulesKey],
+  );
 
   // Load tenant + templates on mount
   useEffect(() => {
     void api.get<TenantMe>('/api/v1/tenants/me').then(setTenant).catch(() => null);
-    void api.get<CampaignTemplate[]>('/api/v1/templates').then(setTemplates).catch(() => null);
+    void api
+      .get<CampaignTemplate[]>('/api/v1/templates')
+      .then(setTemplates)
+      .catch(() => null)
+      .finally(() => setTemplatesLoading(false));
   }, []);
 
   // Refresh audience preview when segment rules change (debounced)
@@ -187,21 +202,25 @@ export default function NewCampaignPage() {
     <FormProvider {...methods}>
       <div className="min-h-screen bg-slate-50">
         {/* Header */}
-        <div className="border-b border-slate-200 bg-white px-6 py-4">
-          <div className="mx-auto flex max-w-3xl items-center justify-between">
+        <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-6xl items-center justify-between">
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={() => router.push('/campaigns')}
-                className="text-slate-500 hover:text-slate-700"
+                aria-label="Back to campaigns"
+                title="Back to campaigns"
+                className="-ml-1.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
-                ←
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back</span>
               </button>
               <h1 className="text-xl font-bold text-slate-900">New Campaign</h1>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto max-w-3xl space-y-8 px-6 py-8">
+        <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8">
           {/* Campaign name */}
           <div className="space-y-1">
             <Label htmlFor="name">Campaign Name *</Label>
@@ -217,7 +236,7 @@ export default function NewCampaignPage() {
           </div>
 
           {/* Section 1: Audience */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 text-base font-bold text-slate-900">1. Audience</h2>
             <AudienceBuilder
               tenant={tenant}
@@ -228,13 +247,13 @@ export default function NewCampaignPage() {
           </section>
 
           {/* Section 2: Message */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 text-base font-bold text-slate-900">2. Message</h2>
-            <MessageBuilder templates={templates} tenant={tenant} />
+            <MessageBuilder templates={templates} templatesLoading={templatesLoading} tenant={tenant} />
           </section>
 
           {/* Section 3: Schedule & Send */}
-          <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <h2 className="mb-6 text-base font-bold text-slate-900">3. Schedule & Send</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Send Now */}
@@ -268,7 +287,7 @@ export default function NewCampaignPage() {
                   min={minDateTime}
                   {...register('scheduledAt')}
                   data-testid="schedule-datetime-input"
-                  className="mb-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F1E35]"
+                  className="mb-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0F1E35]"
                 />
                 {errors.scheduledAt && (
                   <p className="mb-2 text-xs text-red-500">
