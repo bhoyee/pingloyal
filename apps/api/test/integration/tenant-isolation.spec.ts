@@ -33,6 +33,7 @@ import {
   createTestTransaction,
 } from '../helpers/test-helpers';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
+import { User } from '../../src/modules/auth/entities/user.entity';
 
 // ─── Test-only controller for triggering 500 errors ──────────────────────────
 // This controller is ONLY loaded in the test module, not in production.
@@ -129,23 +130,29 @@ describe('Tenant Isolation', () => {
       expect(regA.status).toBe(201);
       expect(regB.status).toBe(201);
 
-      type RegisterBody = {
-        tenant: { id: string };
-        user: { id: string; email: string };
-      };
+      // Registration now requires email verification before returning
+      // tenant/user details, so look the created records up directly.
+      type RegisterBody = { requiresVerification: boolean; email: string };
       const bodyA = regA.body as RegisterBody;
       const bodyB = regB.body as RegisterBody;
+      expect(bodyA.requiresVerification).toBe(true);
+      expect(bodyB.requiresVerification).toBe(true);
+
+      const userRepo = dataSource.getRepository(User);
+      const users = await userRepo.find({ where: { email: sharedEmail } });
+      expect(users).toHaveLength(2);
+      const [userA, userB] = users;
 
       // Different tenants — different tenant IDs
-      expect(bodyA.tenant.id).not.toBe(bodyB.tenant.id);
+      expect(userA.tenantId).not.toBe(userB.tenantId);
       // Different users — different user IDs
-      expect(bodyA.user.id).not.toBe(bodyB.user.id);
+      expect(userA.id).not.toBe(userB.id);
       // Both have the same email but different tenant scopes
-      expect(bodyA.user.email).toBe(sharedEmail);
-      expect(bodyB.user.email).toBe(sharedEmail);
+      expect(userA.email).toBe(sharedEmail);
+      expect(userB.email).toBe(sharedEmail);
 
       // Track for cleanup
-      createdTenantIds.push(bodyA.tenant.id, bodyB.tenant.id);
+      createdTenantIds.push(userA.tenantId, userB.tenantId);
     });
 
     it("Tenant B's JWT tenantId is B's tenant — cannot masquerade as Tenant A", () => {

@@ -50,7 +50,7 @@ Object.defineProperty(window, 'localStorage', {
 import { api } from '../lib/api';
 const mockApi = api as jest.Mocked<typeof api>;
 
-import DashboardPage from '../app/(dashboard)/page';
+import DashboardPage from '../app/(dashboard)/dashboard/page';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

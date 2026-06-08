@@ -32,11 +32,18 @@ export function CashierProvider({ children }: { children: React.ReactNode }) {
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
 
   const loadTenant = useCallback(async () => {
+    // Don't call the API when there's no token — cashierRequest would
+    // trigger window.location.href = '/cashier/login' causing an infinite
+    // reload loop on the login page itself.
+    if (!localStorage.getItem('cashier_token')) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const data = await cashierApi.get<TenantMe>('/tenants/me');
       setTenant(data);
     } catch {
-      // token invalid or network failure — layout will redirect
+      // expired/invalid token — CashierGuard will redirect
     } finally {
       setIsLoading(false);
     }

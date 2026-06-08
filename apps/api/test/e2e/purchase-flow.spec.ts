@@ -85,26 +85,54 @@ describe('Complete Purchase Flow (E2E)', () => {
 
   // ── Step 1: Business registers ────────────────────────────────────────────
 
-  it('Step 1 — business registers and receives JWT + tenant', async () => {
-    const res = await request(
+  it('Step 1 — business registers, verifies email, and receives JWT + tenant', async () => {
+    const email = `e2e-${Date.now()}@freshmart.ng`;
+    const password = 'SecurePass123!';
+
+    const registerRes = await request(
       app.getHttpServer() as Parameters<typeof request>[0],
     )
       .post('/api/v1/auth/register')
       .send({
         businessName: 'FreshMart E2E',
         fullName: 'Adaeze Okonkwo',
-        email: `e2e-${Date.now()}@freshmart.ng`,
-        password: 'SecurePass123!',
+        email,
+        password,
         country: 'NG',
       });
 
-    expect(res.status).toBe(201);
+    expect(registerRes.status).toBe(201);
+    type RegisterBody = { requiresVerification: boolean; email: string };
+    const registerBody = registerRes.body as RegisterBody;
+    expect(registerBody.requiresVerification).toBe(true);
+    expect(registerBody.email).toBe(email);
+
+    // Registration now withholds the tenant/token until the email is
+    // verified. Simulate verification directly via DB — mirrors Step 3's
+    // "WA verification simulated (direct DB)" pattern — then log in to
+    // obtain the JWT + tenant info, exactly like a real verified user would.
+    await dataSource.query(
+      `UPDATE users
+       SET email_verified_at = NOW(),
+           email_verification_token = NULL,
+           email_verification_expiry = NULL
+       WHERE email = $1`,
+      [email],
+    );
+
+    const loginRes = await request(
+      app.getHttpServer() as Parameters<typeof request>[0],
+    )
+      .post('/api/v1/auth/login')
+      .send({ email, password });
+
+    expect(loginRes.status).toBe(200);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ownerToken = res.body.accessToken as string;
+    ownerToken = loginRes.body.accessToken as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    tenantId = (res.body.tenant?.id ?? res.body.tenantId) as string;
+    tenantId = loginRes.body.tenant?.id as string;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    tenantSlug = res.body.tenant?.slug as string;
+    tenantSlug = loginRes.body.tenant?.slug as string;
     createdTenantIds.push(tenantId);
 
     expect(ownerToken).toBeDefined();

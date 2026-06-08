@@ -1,5 +1,5 @@
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333';
 
 const API_URL = API_BASE_URL;
 
@@ -31,6 +31,26 @@ export async function publicGet<T>(path: string): Promise<T> {
   if (!res.ok) {
     throw new ApiError(`HTTP ${res.status}`, res.status);
   }
+  return res.json() as Promise<T>;
+}
+
+export async function publicPost<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError('Network error — check your connection', 0);
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const msg = typeof data.message === 'string' ? data.message : `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status);
+  }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 

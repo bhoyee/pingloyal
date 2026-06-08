@@ -2,7 +2,21 @@ import type { NextConfig } from 'next';
 // @ts-expect-error — next-pwa has no bundled types
 import withPWA from 'next-pwa';
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+  turbopack: {},
+  allowedDevOrigins: ['192.168.1.125', 'localhost'],
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333',
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+  },
+};
 
 export default withPWA({
   dest: 'public',

@@ -3,8 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { cashierApi, ApiError, type CustomerLookupResult } from '../../lib/api';
-import { useCashier } from './context/cashier-context';
+import { cashierApi, ApiError, type CustomerLookupResult } from '@/lib/api';
+import { useCashier } from '../context/cashier-context';
 
 type LookupState =
   | { status: 'empty' }

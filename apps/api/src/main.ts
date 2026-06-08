@@ -92,9 +92,13 @@ async function bootstrap(): Promise<void> {
   // Gzip compression
   app.use(compression());
 
-  // CORS
+  // CORS — FRONTEND_URL supports comma-separated origins for LAN dev access
+  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3001')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: [process.env.FRONTEND_URL ?? 'http://localhost:3001'],
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -135,4 +139,7 @@ async function bootstrap(): Promise<void> {
   );
 }
 
-void bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error('❌ Bootstrap failed:', err);
+  process.exit(1);
+});
