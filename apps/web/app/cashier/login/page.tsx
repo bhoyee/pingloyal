@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_BASE_URL, ApiError } from '../../../lib/api';
+import { ApiError } from '../../../lib/api';
 
 interface LoginResponse {
   access_token: string;
@@ -21,7 +21,7 @@ export default function CashierLoginPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

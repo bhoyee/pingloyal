@@ -39,11 +39,12 @@ export const envValidationSchema = Joi.object({
 
   // ── Email ─────────────────────────────────────────────────────────────────
   RESEND_API_KEY: Joi.string().required(),
+  MAIL_FROM: Joi.string().optional(),
 
   // ── App ───────────────────────────────────────────────────────────────────
   NODE_ENV: Joi.string().valid('development', 'production', 'test').required(),
   PORT: Joi.number().default(3000),
-  FRONTEND_URL: Joi.string().uri().required(),
+  FRONTEND_URL: Joi.string().required(),
 
   // ── Queue dashboard ───────────────────────────────────────────────────────
   ADMIN_QUEUE_USER: Joi.string().required(),

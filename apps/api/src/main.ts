@@ -132,7 +132,7 @@ async function bootstrap(): Promise<void> {
   }
 
   const port = parseInt(process.env.PORT ?? '3000', 10);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   console.log(
     `PingLoyal API running on port ${port} in ${nodeEnv} environment`,

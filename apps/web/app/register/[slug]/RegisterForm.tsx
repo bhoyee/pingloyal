@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { API_BASE_URL } from '@/lib/api';
 import type { TenantInfo } from '@/lib/api';
 import SuccessScreen from './SuccessScreen';
 
@@ -70,7 +69,7 @@ export default function RegisterForm({ slug, tenantInfo }: Props) {
 
     let res: Response;
     try {
-      res = await postWithRetry(`${API_BASE_URL}/register`, {
+      res = await postWithRetry(`/api/v1/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +166,7 @@ export default function RegisterForm({ slug, tenantInfo }: Props) {
           </label>
           <select
             id="country"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             {...register('country')}
           >
             <option value="">Select country</option>
@@ -187,7 +186,7 @@ export default function RegisterForm({ slug, tenantInfo }: Props) {
             id="dateOfBirth"
             type="date"
             max={maxDob}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             {...register('dateOfBirth')}
           />
           {errors.dateOfBirth && (
