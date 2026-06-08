@@ -13,10 +13,11 @@ import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { getQueueToken } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { Queue, QueueEvents } from 'bullmq';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { QUEUE_NAMES } from '../../src/queue/queue.module';
+import { redisConfig } from '../../src/queue/redis.config';
 import {
   TriggerType,
   CampaignLogStatus,
@@ -41,16 +42,20 @@ import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-async function drainQueue(queue: Queue, timeoutMs = 8000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const [active, waiting] = await Promise.all([
-      queue.getActiveCount(),
-      queue.getWaitingCount(),
-    ]);
-    if (active === 0 && waiting === 0) return;
-    await new Promise((r) => setTimeout(r, 300));
-  }
+// Polling queue.getActiveCount()/getWaitingCount() races with BullMQ's
+// Redis→worker pickup latency: a job can be invisible to those counts both
+// just after it's added (not yet claimed) and just after its handler
+// resolves (not yet flushed from the active set), so "0 and 0" doesn't
+// reliably mean "this job ran to completion". Awaiting the Job itself via
+// QueueEvents waits on the actual `completed`/`failed` event instead.
+async function runJob(
+  queue: Queue,
+  queueEvents: QueueEvents,
+  payload: Record<string, unknown>,
+  timeoutMs = 15_000,
+): Promise<void> {
+  const job = await queue.add('send-message', payload);
+  await job.waitUntilFinished(queueEvents, timeoutMs);
 }
 
 async function getWalletTransactions(
@@ -127,6 +132,7 @@ describe('Wallet Integration Tests', () => {
   let tenantResult: CreateTenantResult;
   let redis: Redis;
   let waMessagesQueue: Queue;
+  let queueEvents: QueueEvents;
   let walletService: WalletService;
   let mockBspService: { sendMessage: jest.Mock };
   const createdTenantIds: string[] = [];
@@ -167,6 +173,11 @@ describe('Wallet Integration Tests', () => {
     waMessagesQueue = app.get<Queue>(getQueueToken(QUEUE_NAMES.WA_MESSAGES));
     walletService = app.get<WalletService>(WalletService);
 
+    queueEvents = new QueueEvents(QUEUE_NAMES.WA_MESSAGES, {
+      connection: redisConfig.connection,
+    });
+    await queueEvents.waitUntilReady();
+
     await dataSource.runMigrations();
 
     tenantResult = await createTestTenant(ctx, {
@@ -177,6 +188,7 @@ describe('Wallet Integration Tests', () => {
   }, 90_000);
 
   afterAll(async () => {
+    await queueEvents.close();
     await clearTestData(ctx.dataSource, createdTenantIds);
     await app.close();
   }, 30_000);
@@ -223,13 +235,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.BIRTHDAY,
         tenantId: tenantId(),
         customerId: customer.id,
         data: {},
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).toHaveBeenCalledTimes(1);
       const newBalance = await walletService.getBalance(tenantId());
@@ -246,13 +257,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.BIRTHDAY,
         tenantId: tenantId(),
         customerId: customer.id,
         data: {},
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).not.toHaveBeenCalled();
       const log = await getLastTriggerLog(
@@ -275,13 +285,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.LAPSED_WINBACK,
         tenantId: tenantId(),
         customerId: customer.id,
         data: { daysSinceVisit: '65' },
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).not.toHaveBeenCalled();
       const log = await getLastTriggerLog(
@@ -321,7 +330,7 @@ describe('Wallet Integration Tests', () => {
         customer.id,
       );
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.CAMPAIGN_MESSAGE,
         tenantId: tenantId(),
         customerId: customer.id,
@@ -329,7 +338,6 @@ describe('Wallet Integration Tests', () => {
         campaignId: campaign.id,
         data: {},
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).not.toHaveBeenCalled();
       const updatedLog = await getCampaignLog(ctx.dataSource, campaignLog.id);
@@ -344,13 +352,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.PURCHASE_CONFIRMATION,
         tenantId: tenantId(),
         customerId: customer.id,
         data: { pointsEarned: '50', newBalance: '550' },
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).toHaveBeenCalledTimes(1);
       // Wallet unchanged — utility messages never deduct
@@ -365,13 +372,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.WELCOME,
         tenantId: tenantId(),
         customerId: customer.id,
         data: {},
       });
-      await drainQueue(waMessagesQueue);
 
       expect(mockBspService.sendMessage).toHaveBeenCalledTimes(1);
     }, 30_000);
@@ -383,13 +389,12 @@ describe('Wallet Integration Tests', () => {
         waOptedIn: true,
       });
 
-      await waMessagesQueue.add('send-message', {
+      await runJob(waMessagesQueue, queueEvents, {
         type: TriggerType.BALANCE_BOT_REPLY,
         tenantId: tenantId(),
         customerId: customer.id,
         data: { message: 'Your balance is 500 points' },
       });
-      await drainQueue(waMessagesQueue);
 
       // Raw message type — BSP deferred (templateName=null), but no wallet deduction
       const balance = await walletService.getBalance(tenantId());
