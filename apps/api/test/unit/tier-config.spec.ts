@@ -35,14 +35,37 @@ const mockTierService = {
 const TENANT_ID = 'tenant-1';
 
 const VALID_TIERS = [
-  { tierName: 'vip', tierLabel: 'VIP Member', minQuarterlySpend: 400000, maxQuarterlySpend: null, displayOrder: 0 },
-  { tierName: 'mid', tierLabel: 'Regular Customer', minQuarterlySpend: 100000, maxQuarterlySpend: 399999, displayOrder: 1 },
-  { tierName: 'standard', tierLabel: 'Standard', minQuarterlySpend: 0, maxQuarterlySpend: 99999, displayOrder: 2 },
+  {
+    tierName: 'vip',
+    tierLabel: 'VIP Member',
+    minQuarterlySpend: 400000,
+    maxQuarterlySpend: null,
+    displayOrder: 0,
+  },
+  {
+    tierName: 'mid',
+    tierLabel: 'Regular Customer',
+    minQuarterlySpend: 100000,
+    maxQuarterlySpend: 399999,
+    displayOrder: 1,
+  },
+  {
+    tierName: 'standard',
+    tierLabel: 'Standard',
+    minQuarterlySpend: 0,
+    maxQuarterlySpend: 99999,
+    displayOrder: 2,
+  },
 ];
 
 describe('TenantsService – upsertTierConfig', () => {
   let service: TenantsService;
-  let mockManager: { query: jest.Mock; delete: jest.Mock; create: jest.Mock; save: jest.Mock };
+  let mockManager: {
+    query: jest.Mock;
+    delete: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+  };
   let mockDataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
@@ -53,14 +76,19 @@ describe('TenantsService – upsertTierConfig', () => {
       save: jest.fn((_entity, rows: unknown) => Promise.resolve(rows)),
     };
     mockDataSource = {
-      transaction: jest.fn(async (cb: (manager: typeof mockManager) => unknown) => cb(mockManager)),
+      transaction: jest.fn((cb: (manager: typeof mockManager) => unknown) =>
+        Promise.resolve(cb(mockManager)),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TenantsService,
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
-        { provide: getRepositoryToken(ProductCategory), useValue: mockCategoryRepo },
+        {
+          provide: getRepositoryToken(ProductCategory),
+          useValue: mockCategoryRepo,
+        },
         { provide: getRepositoryToken(TierConfig), useValue: mockTierRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: DataSource, useValue: mockDataSource },
@@ -76,9 +104,12 @@ describe('TenantsService – upsertTierConfig', () => {
     mockManager.query.mockResolvedValue(undefined);
     mockManager.delete.mockResolvedValue(undefined);
     mockManager.create.mockImplementation((_entity, row: unknown) => row);
-    mockManager.save.mockImplementation((_entity, rows: unknown) => Promise.resolve(rows));
+    mockManager.save.mockImplementation((_entity, rows: unknown) =>
+      Promise.resolve(rows),
+    );
     mockDataSource.transaction.mockImplementation(
-      async (cb: (manager: typeof mockManager) => unknown) => cb(mockManager),
+      (cb: (manager: typeof mockManager) => unknown) =>
+        Promise.resolve(cb(mockManager)),
     );
     mockRedis.del.mockResolvedValue(1);
     mockTierService.recalculateAll.mockResolvedValue({ updated: 0 });
@@ -104,7 +135,9 @@ describe('TenantsService – upsertTierConfig', () => {
   });
 
   it('invalidates the tiers cache and returns the saved tiers', async () => {
-    const result = await service.upsertTierConfig(TENANT_ID, { tiers: VALID_TIERS });
+    const result = await service.upsertTierConfig(TENANT_ID, {
+      tiers: VALID_TIERS,
+    });
 
     expect(mockRedis.del).toHaveBeenCalledWith(`tiers:${TENANT_ID}`);
     expect(result).toHaveLength(3);
