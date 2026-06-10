@@ -442,10 +442,13 @@ export default function DashboardPage() {
         {/* Top spenders + Recent trigger activity */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Top Spenders
             </h2>
+            <a href="/customers" className="text-xs font-semibold text-[#0DC56A] hover:underline">
+              View all →
+            </a>
           </div>
           {spendersLoading ? (
             <div className="space-y-3 p-4">
@@ -473,7 +476,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {topSpenders.map((spender) => {
+                {topSpenders.slice(0, 5).map((spender) => {
                   const tier = spender.tierLabel ? tierBadge(spender.tierLabel) : null;
                   return (
                     <tr key={spender.id}>
@@ -509,10 +512,13 @@ export default function DashboardPage() {
 
         {/* Trigger activity feed */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Recent Trigger Activity
             </h2>
+            <a href="/triggers" className="text-xs font-semibold text-[#0DC56A] hover:underline">
+              View all →
+            </a>
           </div>
           {!triggerLogs?.length ? (
             <p className="py-10 text-center text-sm text-slate-400">
@@ -520,7 +526,7 @@ export default function DashboardPage() {
             </p>
           ) : (
             <ul className="divide-y divide-slate-100 p-2">
-              {triggerLogs.map((log) => (
+              {triggerLogs.slice(0, 5).map((log) => (
                 <li
                   key={log.id}
                   className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 sm:flex-nowrap ${ROW_COLOURS[log.status] ?? 'bg-slate-50'}`}
