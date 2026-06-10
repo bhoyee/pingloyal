@@ -10,6 +10,12 @@ const SUMMARY_TTL_S = 60;
 const TOP_SPENDERS_TTL_S = 900;
 const WALLET_LOW_THRESHOLD = 3000;
 
+// Mask a +234... phone number to "+234 801 ****78" for display
+function maskPhone(phone: string | null): string | null {
+  if (!phone || phone.length < 8) return phone;
+  return `${phone.slice(0, 4)} ${phone.slice(4, 7)} ****${phone.slice(-2)}`;
+}
+
 export interface DashboardSummary {
   totalCustomers: number;
   activeCustomers: number;
@@ -33,6 +39,7 @@ export interface DashboardSummary {
 export interface TopSpender {
   id: string;
   fullName: string;
+  phone: string | null;
   pointsBalance: number;
   totalSpend: number;
   lastPurchaseAt: string | null;
@@ -182,6 +189,7 @@ export class DashboardService {
       Array<{
         id: string;
         full_name: string;
+        phone_e164: string | null;
         points_balance: string;
         total_spend: string;
         last_purchase_at: string | null;
@@ -190,7 +198,7 @@ export class DashboardService {
       }>
     >(
       `SELECT
-        c.id, c.full_name, c.points_balance, c.total_spend,
+        c.id, c.full_name, c.phone_e164, c.points_balance, c.total_spend,
         c.last_purchase_at, c.purchase_count,
         tc.tier_label
       FROM customers c
@@ -205,6 +213,7 @@ export class DashboardService {
     const result: TopSpender[] = rows.map((r) => ({
       id: r.id,
       fullName: r.full_name,
+      phone: maskPhone(r.phone_e164),
       pointsBalance: Number(r.points_balance),
       totalSpend: Number(r.total_spend),
       lastPurchaseAt: r.last_purchase_at,

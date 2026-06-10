@@ -36,11 +36,19 @@ interface DashboardSummary {
 interface TopSpender {
   id: string;
   fullName: string;
+  phone: string | null;
   pointsBalance: number;
   totalSpend: number;
   lastPurchaseAt: string | null;
   purchaseCount: number;
   tierLabel: string | null;
+}
+
+function tierBadge(tierLabel: string): { icon: string; classes: string } {
+  if (tierLabel.toLowerCase().includes('vip')) {
+    return { icon: '👑', classes: 'bg-amber-100 text-amber-700' };
+  }
+  return { icon: '⭐', classes: 'bg-emerald-100 text-emerald-700' };
 }
 
 interface TriggerLogEntry {
@@ -436,7 +444,7 @@ export default function DashboardPage() {
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
-              Top Customers by Spend
+              Top Spenders
             </h2>
           </div>
           {spendersLoading ? (
@@ -458,51 +466,41 @@ export default function DashboardPage() {
             <table className="w-full text-sm" data-testid="top-spenders-table">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Rank</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Name</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Points</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Customer</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Tier</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Spend</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Visits</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Last Visit</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Points</th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500">Total Spend</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {topSpenders.map((spender, i) => (
-                  <tr key={spender.id}>
-                    <td className="px-5 py-3 text-slate-500">
-                      {i === 0 ? '👑' : `#${i + 1}`}
-                    </td>
-                    <td className="px-5 py-3 font-medium text-slate-900">
-                      {spender.fullName}
-                    </td>
-                    <td className="px-5 py-3 text-slate-600">
-                      ⭐ {spender.pointsBalance.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3">
-                      {spender.tierLabel ? (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          {spender.tierLabel}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-slate-700">
-                      ₦{spender.totalSpend.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3 text-slate-600">
-                      {spender.purchaseCount}
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-400">
-                      {spender.lastPurchaseAt
-                        ? formatDistanceToNow(new Date(spender.lastPurchaseAt), {
-                            addSuffix: true,
-                          })
-                        : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {topSpenders.map((spender) => {
+                  const tier = spender.tierLabel ? tierBadge(spender.tierLabel) : null;
+                  return (
+                    <tr key={spender.id}>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-slate-900">{spender.fullName}</p>
+                        {spender.phone && (
+                          <p className="text-xs text-slate-400">{spender.phone}</p>
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        {tier ? (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tier.classes}`}>
+                            {tier.icon} {spender.tierLabel}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-5 py-3 font-semibold text-emerald-600">
+                        {spender.pointsBalance.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3 font-semibold text-slate-900">
+                        ₦{spender.totalSpend.toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             </div>

@@ -81,6 +81,7 @@ function makeTopSpenders() {
     {
       id: 'c1',
       fullName: 'Amara Okafor',
+      phone: '+234 801 ****67',
       pointsBalance: 850,
       totalSpend: 150000,
       lastPurchaseAt: new Date().toISOString(),
@@ -223,17 +224,16 @@ it('T16 — clicking inactive customers card navigates to /customers?status=inac
   expect(mockPush).toHaveBeenCalledWith('/customers?status=inactive');
 });
 
-// T17: top spenders table has no phone numbers ────────────────────────────────
+// T17: top spenders table only shows masked phone numbers ─────────────────────
 
-it('T17 — top spenders table does not show any phone numbers', async () => {
-  // Add a spender with a phoneE164 that should NOT appear
+it('T17 — top spenders table shows masked phone numbers, not the raw number', async () => {
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('summary')) return Promise.resolve(makeSummary());
     if (path.includes('top-spenders'))
       return Promise.resolve([
         {
           ...makeTopSpenders()[0],
-          // phoneE164 should never be in the response, but verify UI doesn't show it
+          phone: '+234 801 ****67',
         },
       ]);
     return Promise.resolve([]);
@@ -245,10 +245,10 @@ it('T17 — top spenders table does not show any phone numbers', async () => {
     expect(screen.getByTestId('top-spenders-table')).toBeInTheDocument();
   });
 
-  // No phone number columns in the rendered table
+  // Phone is shown masked, with the middle digits hidden
   const table = screen.getByTestId('top-spenders-table');
-  expect(table).not.toHaveTextContent('+234');
-  expect(table.querySelector('th[data-col="phone"]')).toBeNull();
+  expect(table).toHaveTextContent('+234 801 ****67');
+  expect(table).not.toHaveTextContent('+2348011234567');
 });
 
 // T18: refetchInterval configured ─────────────────────────────────────────────
