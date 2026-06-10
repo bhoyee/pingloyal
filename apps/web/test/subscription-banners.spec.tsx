@@ -11,6 +11,7 @@ jest.mock('../lib/api', () => ({
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({ push: jest.fn(), replace: jest.fn() })),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/dashboard',
 }));
 
 import { api } from '../lib/api';
@@ -43,10 +44,20 @@ function makeBillingStatus(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// The layout also fetches /api/v1/tenants/me to check onboarding status —
+// route each endpoint to its own response so onboarding doesn't redirect away.
+function mockApiResponses(billingStatus: Record<string, unknown>) {
+  mockApi.get.mockImplementation((path: string) => {
+    if (path.includes('billing/status')) return Promise.resolve(billingStatus);
+    if (path.includes('tenants/me')) return Promise.resolve({ qrCodeUrl: 'https://example.com/qr.png' });
+    return Promise.resolve({});
+  });
+}
+
 // T16: trialing 10 days → blue trial banner ───────────────────────────────────
 
 it('T16 — trialing with 10 days remaining shows blue trial banner', async () => {
-  mockApi.get.mockResolvedValue(
+  mockApiResponses(
     makeBillingStatus({ status: 'trialing', trialDaysRemaining: 10 }),
   );
 
@@ -69,7 +80,7 @@ it('T16 — trialing with 10 days remaining shows blue trial banner', async () =
 // T17: trialing 2 days → urgent warning banner ────────────────────────────────
 
 it('T17 — trialing with 2 days remaining shows urgent warning banner', async () => {
-  mockApi.get.mockResolvedValue(
+  mockApiResponses(
     makeBillingStatus({ status: 'trialing', trialDaysRemaining: 2 }),
   );
 
@@ -90,7 +101,7 @@ it('T17 — trialing with 2 days remaining shows urgent warning banner', async (
 // T18: past_due → amber payment banner ────────────────────────────────────────
 
 it('T18 — past_due status shows amber payment failed banner', async () => {
-  mockApi.get.mockResolvedValue(makeBillingStatus({ status: 'past_due' }));
+  mockApiResponses(makeBillingStatus({ status: 'past_due' }));
 
   render(
     <DashboardLayout>
@@ -110,7 +121,7 @@ it('T18 — past_due status shows amber payment failed banner', async () => {
 // T19: suspended → full-page overlay, content hidden ──────────────────────────
 
 it('T19 — suspended status shows full-page overlay and hides dashboard content', async () => {
-  mockApi.get.mockResolvedValue(makeBillingStatus({ status: 'suspended' }));
+  mockApiResponses(makeBillingStatus({ status: 'suspended' }));
 
   render(
     <DashboardLayout>
@@ -130,7 +141,7 @@ it('T19 — suspended status shows full-page overlay and hides dashboard content
 // T20: active → no banner ─────────────────────────────────────────────────────
 
 it('T20 — active subscription shows no status banner', async () => {
-  mockApi.get.mockResolvedValue(makeBillingStatus({ status: 'active' }));
+  mockApiResponses(makeBillingStatus({ status: 'active' }));
 
   render(
     <DashboardLayout>
@@ -151,7 +162,7 @@ it('T20 — active subscription shows no status banner', async () => {
 // T21: suspended overlay has subscribe link to /billing ────────────────────────
 
 it('T21 — suspended overlay shows Subscribe button linking to /billing', async () => {
-  mockApi.get.mockResolvedValue(makeBillingStatus({ status: 'suspended' }));
+  mockApiResponses(makeBillingStatus({ status: 'suspended' }));
 
   render(
     <DashboardLayout>
@@ -169,7 +180,7 @@ it('T21 — suspended overlay shows Subscribe button linking to /billing', async
 // T22: trial banner Subscribe button links to /billing ────────────────────────
 
 it('T22 — trial banner Subscribe Now button links to /billing', async () => {
-  mockApi.get.mockResolvedValue(
+  mockApiResponses(
     makeBillingStatus({ status: 'trialing', trialDaysRemaining: 8 }),
   );
 
