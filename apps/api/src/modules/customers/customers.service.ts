@@ -117,6 +117,18 @@ export class CustomersService {
         source: CustomerSource.QR_REGISTRATION,
       });
       customer = await this.customerRepo.save(draft);
+
+      // Assign the lowest configured tier (₦0 spend qualifies for it)
+      // so new customers don't show a blank tier until their first purchase.
+      await this.customerRepo.manager.query(
+        `UPDATE customers SET tier_id = (
+           SELECT id FROM tier_configs
+            WHERE tenant_id = $1
+            ORDER BY min_quarterly_spend ASC
+            LIMIT 1
+         ) WHERE id = $2`,
+        [tenant.id, customer.id],
+      );
     } else {
       // Update name and opt-in if changed
       let changed = false;

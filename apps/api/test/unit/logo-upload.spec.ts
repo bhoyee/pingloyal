@@ -10,6 +10,7 @@ import { TierConfig } from '../../src/modules/tenants/entities/tier-config.entit
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { R2Service } from '../../src/modules/storage/r2.service';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
+import { TierService } from '../../src/modules/tenants/tier.service';
 
 // jest.mock is hoisted — factory must not reference outer const/let variables
 jest.mock('sharp', () => jest.fn());
@@ -34,6 +35,10 @@ const mockR2 = {
 };
 const mockConfig = {
   getOrThrow: jest.fn().mockReturnValue('https://app.pingloyal.com'),
+};
+const mockTierService = {
+  recalculate: jest.fn().mockResolvedValue(undefined),
+  recalculateAll: jest.fn().mockResolvedValue({ updated: 0 }),
 };
 
 describe('TenantsService – logo upload', () => {
@@ -66,6 +71,7 @@ describe('TenantsService – logo upload', () => {
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: R2Service, useValue: mockR2 },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: TierService, useValue: mockTierService },
       ],
     }).compile();
 

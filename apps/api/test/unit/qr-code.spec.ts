@@ -10,6 +10,7 @@ import { TierConfig } from '../../src/modules/tenants/entities/tier-config.entit
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { R2Service } from '../../src/modules/storage/r2.service';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
+import { TierService } from '../../src/modules/tenants/tier.service';
 
 jest.mock('qrcode', () => ({
   toBuffer: jest.fn().mockResolvedValue(Buffer.from('fake-qr-png')),
@@ -39,6 +40,10 @@ const mockConfig = {
     return '';
   }),
 };
+const mockTierService = {
+  recalculate: jest.fn().mockResolvedValue(undefined),
+  recalculateAll: jest.fn().mockResolvedValue({ updated: 0 }),
+};
 
 describe('TenantsService – QR code', () => {
   let service: TenantsService;
@@ -58,6 +63,7 @@ describe('TenantsService – QR code', () => {
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: R2Service, useValue: mockR2 },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: TierService, useValue: mockTierService },
       ],
     }).compile();
 

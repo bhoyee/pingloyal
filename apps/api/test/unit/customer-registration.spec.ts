@@ -34,6 +34,7 @@ const mockCustomerRepo = {
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
+  manager: { query: jest.fn().mockResolvedValue(undefined) },
 };
 const mockRedis = {
   get: jest.fn(),
@@ -156,6 +157,47 @@ describe('CustomersService – register', () => {
     expect(result.isNew).toBe(true);
     expect(result.phoneE164).toBe(E164);
     expect(mockCustomerRepo.save).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Assigns the lowest tier to a brand-new customer ────────────────────────────
+  it('assigns the lowest configured tier to a newly registered customer', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(TENANT_VERIFIED);
+    mockCustomerRepo.findOne.mockResolvedValue(null);
+    const saved = {
+      id: 'cust-new',
+      tenantId: 'tenant-uuid-1',
+      fullName: BASE_DTO.fullName,
+      phoneE164: E164,
+      waOptedIn: true,
+      pointsBalance: 0,
+    };
+    mockCustomerRepo.create.mockReturnValue(saved);
+    mockCustomerRepo.save.mockResolvedValue(saved);
+
+    await service.register(BASE_DTO, IDEM_KEY);
+
+    expect(mockCustomerRepo.manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE customers SET tier_id'),
+      ['tenant-uuid-1', 'cust-new'],
+    );
+  });
+
+  // ── Does NOT touch tier_id for an existing customer ────────────────────────────
+  it('does not run tier assignment query for an existing (returning) customer', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(TENANT_VERIFIED);
+    const existing = {
+      id: 'cust-existing',
+      tenantId: 'tenant-uuid-1',
+      fullName: BASE_DTO.fullName,
+      phoneE164: E164,
+      waOptedIn: true,
+      pointsBalance: 50,
+    };
+    mockCustomerRepo.findOne.mockResolvedValue(existing);
+
+    await service.register(BASE_DTO, IDEM_KEY);
+
+    expect(mockCustomerRepo.manager.query).not.toHaveBeenCalled();
   });
 
   // ── 36. Returns existing customer (isNew=false) for duplicate phone ───────────
