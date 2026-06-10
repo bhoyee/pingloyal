@@ -84,9 +84,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     queryFn: () => api.get<SidebarSummary>('/api/v1/dashboard/summary'),
   });
 
+  const activeHref = [...OVERVIEW, ...AUTOMATION, ...NATIVE_MODE, ...SETTINGS]
+    .filter((item) => !item.external)
+    .filter((item) =>
+      item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href),
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   function isActive(href: string) {
-    if (href === '/dashboard') return pathname === '/dashboard';
-    return pathname.startsWith(href);
+    return href === activeHref;
   }
 
   function badgeValue(badge: NavItem['badge']): string | undefined {
@@ -203,15 +209,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
           {tenant && (
             <div className="mt-3 flex items-center gap-2">
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                  tenant.mode === 'connected'
-                    ? 'bg-blue-500/15 text-blue-400'
-                    : 'bg-[#0DC56A]/15 text-[#0DC56A]'
-                }`}
-              >
-                {tenant.mode === 'connected' ? 'Connected Mode' : 'Native Mode'}
-              </span>
+              <p className="truncate text-xs font-semibold text-slate-300" title={tenant.businessName}>
+                {tenant.businessName}
+              </p>
             </div>
           )}
 

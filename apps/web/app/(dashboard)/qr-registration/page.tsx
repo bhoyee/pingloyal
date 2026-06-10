@@ -12,21 +12,22 @@ export default function QrRegistrationPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    void api.get<TenantMe>('/api/v1/tenants/me').then(setTenant).catch(() => null);
-    api
-      .get<QrCodeResult>('/api/v1/tenants/qr-code')
-      .then(setQr)
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : 'Failed to load QR code'),
-      )
-      .finally(() => setLoading(false));
+    void Promise.all([
+      api.get<TenantMe>('/api/v1/tenants/me').then(setTenant).catch(() => null),
+      api
+        .get<QrCodeResult>('/api/v1/tenants/qr-code')
+        .then(setQr)
+        .catch((e: unknown) =>
+          setError(e instanceof Error ? e.message : 'Failed to load QR code'),
+        ),
+    ]).finally(() => setLoading(false));
   }, []);
 
   function handleDownload() {
-    if (!qr) return;
+    if (!qr || !tenant) return;
     const a = document.createElement('a');
     a.href = qr.qrCodeUrl;
-    a.download = `${(tenant?.businessName ?? 'pingloyal').replace(/\s+/g, '-').toLowerCase()}-qr.png`;
+    a.download = `${tenant.businessName.replace(/\s+/g, '-').toLowerCase()}-qr.png`;
     a.target = '_blank';
     document.body.appendChild(a);
     a.click();
@@ -34,10 +35,13 @@ export default function QrRegistrationPage() {
   }
 
   function handlePrint() {
-    if (!qr) return;
+    if (!qr || !tenant) return;
     const win = window.open('', '_blank');
     if (!win) return;
-    const businessName = tenant?.businessName ?? 'PingLoyal';
+    const businessName = tenant.businessName;
+    const logo = tenant.logoUrl
+      ? `<img src="${tenant.logoUrl}" alt="${businessName}" class="logo" />`
+      : '';
     win.document.write(`
       <!DOCTYPE html>
       <html>
@@ -46,6 +50,7 @@ export default function QrRegistrationPage() {
           <style>
             body { font-family: Arial, sans-serif; text-align: center; padding: 40px; }
             img { width: 300px; height: 300px; margin: 20px auto; display: block; }
+            .logo { width: auto; height: 60px; margin: 0 auto 12px; }
             h1 { font-size: 24px; color: #0F1E35; margin: 0; }
             p { color: #555; font-size: 14px; }
             .url { font-size: 11px; color: #888; word-break: break-all; }
@@ -53,6 +58,7 @@ export default function QrRegistrationPage() {
           </style>
         </head>
         <body>
+          ${logo}
           <h1>${businessName}</h1>
           <img src="${qr.qrCodeUrl}" alt="QR Code" />
           <p>Scan to join our loyalty programme and earn points!</p>
