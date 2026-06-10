@@ -433,7 +433,7 @@ export default function DashboardPage() {
 
         {/* Top spenders + Recent trigger activity */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${triggerLogs?.length ? '' : 'lg:col-span-2'}`}>
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Top Customers by Spend
@@ -510,13 +510,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Trigger activity feed */}
-        {triggerLogs && triggerLogs.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-5 py-4">
-              <h2 className="text-sm font-bold text-slate-900">
-                Recent Trigger Activity
-              </h2>
-            </div>
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="text-sm font-bold text-slate-900">
+              Recent Trigger Activity
+            </h2>
+          </div>
+          {!triggerLogs?.length ? (
+            <p className="py-10 text-center text-sm text-slate-400">
+              No automation activity yet
+            </p>
+          ) : (
             <ul className="divide-y divide-slate-100 p-2">
               {triggerLogs.map((log) => (
                 <li
@@ -547,8 +551,8 @@ export default function DashboardPage() {
                 </li>
               ))}
             </ul>
-          </div>
-        )}
+          )}
+        </div>
         </div>
       </div>
     </div>
