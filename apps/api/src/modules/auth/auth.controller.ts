@@ -7,8 +7,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { Throttle } from '@nestjs/throttler';
+import {
+  LoginThrottleGuard,
+  ResendVerificationThrottleGuard,
+} from '../../common/throttle/auth-throttle.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
@@ -35,7 +38,7 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(LoginThrottleGuard)
   @Throttle({ login: { ttl: 15 * 60 * 1000, limit: 5 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -53,7 +56,7 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(ResendVerificationThrottleGuard)
   @Throttle({ default: { ttl: 60 * 1000, limit: 3 } })
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)

@@ -35,6 +35,14 @@ export default function LoginPage() {
         router.replace(`/verify-email?email=${encodeURIComponent(email)}`);
         return;
       }
+      if (err instanceof ApiError && err.status === 429) {
+        setError('Too many login attempts. Please wait 15 minutes and try again.');
+        return;
+      }
+      if (err instanceof ApiError && err.status === 401) {
+        setError('Incorrect email or password.');
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {
       setLoading(false);
