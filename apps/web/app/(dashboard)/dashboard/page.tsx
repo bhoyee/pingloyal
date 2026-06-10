@@ -5,6 +5,13 @@ import { formatDistanceToNow } from 'date-fns';
 import { api, type TenantMe } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DashboardSummary {
@@ -65,6 +72,15 @@ const STATUS_COLOURS: Record<string, string> = {
   delivered: 'bg-emerald-100 text-emerald-800',
   skipped: 'bg-slate-100 text-slate-500',
   failed: 'bg-red-100 text-red-600',
+  queued: 'bg-amber-100 text-amber-700',
+};
+
+const ROW_COLOURS: Record<string, string> = {
+  sent: 'bg-green-50',
+  delivered: 'bg-emerald-50',
+  skipped: 'bg-slate-50',
+  failed: 'bg-red-50',
+  queued: 'bg-amber-50',
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -191,6 +207,12 @@ export default function DashboardPage() {
     }
   }, [router]);
 
+  const { data: tenant } = useQuery<TenantMe>({
+    queryKey: ['tenant-me'],
+    queryFn: () => api.get<TenantMe>('/api/v1/tenants/me'),
+    enabled: mounted,
+  });
+
   const { data: summary, isLoading: summaryLoading } =
     useQuery<DashboardSummary>({
       queryKey: ['dashboard-summary'],
@@ -282,6 +304,14 @@ export default function DashboardPage() {
       ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
       : 0;
 
+  const isTrialing = tenant?.subscriptionStatus === 'trialing';
+  const trialDaysLeft = tenant?.trialEndsAt
+    ? Math.max(
+        0,
+        Math.ceil((new Date(tenant.trialEndsAt).getTime() - Date.now()) / 86_400_000),
+      )
+    : null;
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Page header */}
@@ -289,14 +319,32 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Overview of your loyalty programme</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {getGreeting()}
+              {tenant?.ownerName ? `, ${tenant.ownerName}` : ''} 👋
+            </p>
           </div>
-          <a
-            href="/campaigns/new"
-            className="self-start rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050] sm:self-auto"
-          >
-            + New Campaign
-          </a>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {isTrialing && trialDaysLeft !== null && (
+              <span className="rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700">
+                Trial: {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
+              </span>
+            )}
+            {isTrialing && (
+              <a
+                href="/billing"
+                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700"
+              >
+                Subscribe
+              </a>
+            )}
+            <a
+              href="/campaigns/new"
+              className="rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050]"
+            >
+              + New Campaign
+            </a>
+          </div>
         </div>
       </div>
 
@@ -383,8 +431,9 @@ export default function DashboardPage() {
           </a>
         </div>
 
-        {/* Top spenders */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* Top spenders + Recent trigger activity */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${triggerLogs?.length ? '' : 'lg:col-span-2'}`}>
           <div className="border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Top Customers by Spend
@@ -465,38 +514,42 @@ export default function DashboardPage() {
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-5 py-4">
               <h2 className="text-sm font-bold text-slate-900">
-                Recent Automations
+                Recent Trigger Activity
               </h2>
             </div>
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-slate-100 p-2">
               {triggerLogs.map((log) => (
-                <li key={log.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 sm:flex-nowrap">
+                <li
+                  key={log.id}
+                  className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 sm:flex-nowrap ${ROW_COLOURS[log.status] ?? 'bg-slate-50'}`}
+                >
                   <span className="text-xl">
                     {TRIGGER_ICONS[log.triggerType] ?? '📩'}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-slate-700">
+                    <p className="truncate text-sm font-semibold text-slate-700">
                       {log.customerName ?? 'Unknown customer'}
                     </p>
                     <p className="text-xs text-slate-400">
                       {log.triggerType.replace(/_/g, ' ')}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOURS[log.status] ?? 'bg-slate-100 text-slate-500'}`}
-                  >
-                    {log.status}
-                  </span>
-                  <span className="ml-auto text-xs text-slate-400 sm:ml-0">
+                  <span className="text-xs text-slate-400">
                     {formatDistanceToNow(new Date(log.createdAt), {
                       addSuffix: true,
                     })}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_COLOURS[log.status] ?? 'bg-slate-100 text-slate-500'}`}
+                  >
+                    {log.status}
                   </span>
                 </li>
               ))}
             </ul>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

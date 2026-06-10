@@ -21,6 +21,7 @@ interface UploadedFile {
 import { WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { R2Service } from '../storage/r2.service';
+import { User } from '../auth/entities/user.entity';
 import { Tenant } from './entities/tenant.entity';
 import { ProductCategory } from './entities/product-category.entity';
 import { TierConfig } from './entities/tier-config.entity';
@@ -37,6 +38,7 @@ export class TenantsService {
     private readonly categoryRepo: Repository<ProductCategory>,
     @InjectRepository(TierConfig)
     private readonly tierConfigRepo: Repository<TierConfig>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectDataSource() private readonly dataSource: DataSource,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly r2: R2Service,
@@ -92,20 +94,34 @@ export class TenantsService {
 
   // ── GET /tenants/me ───────────────────────────────────────────────────────
 
-  async getTenantFull(tenantId: string): Promise<TenantFullResponse> {
+  async getTenantFull(
+    tenantId: string,
+    userId?: string,
+  ): Promise<TenantFullResponse> {
+    let response: TenantFullResponse;
     const cached = await this.redis.get(`tenant:full:${tenantId}`);
-    if (cached) return JSON.parse(cached) as TenantFullResponse;
+    if (cached) {
+      response = JSON.parse(cached) as TenantFullResponse;
+    } else {
+      const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+      if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
-    if (!tenant) throw new NotFoundException('Tenant not found');
+      response = this.toFullResponse(tenant);
+      await this.redis.setex(
+        `tenant:full:${tenantId}`,
+        60,
+        JSON.stringify(response),
+      );
+    }
 
-    const response = this.toFullResponse(tenant);
-    await this.redis.setex(
-      `tenant:full:${tenantId}`,
-      60,
-      JSON.stringify(response),
-    );
+    response.ownerName = userId ? await this.getOwnerFirstName(userId) : null;
     return response;
+  }
+
+  private async getOwnerFirstName(userId: string): Promise<string | null> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user?.fullName) return null;
+    return user.fullName.trim().split(/\s+/)[0] ?? null;
   }
 
   // ── PATCH /tenants/settings ───────────────────────────────────────────────
@@ -334,6 +350,7 @@ export class TenantsService {
     return {
       id: tenant.id,
       businessName: tenant.businessName,
+      ownerName: null,
       slug: tenant.slug,
       mode: tenant.mode,
       planTier: tenant.planTier,
@@ -376,6 +393,7 @@ export interface LogoResponse {
 export interface TenantFullResponse {
   id: string;
   businessName: string;
+  ownerName: string | null;
   slug: string;
   mode: string;
   planTier: string;

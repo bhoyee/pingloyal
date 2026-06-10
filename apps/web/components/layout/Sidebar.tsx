@@ -209,9 +209,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
           {tenant && (
             <div className="mt-3 flex items-center gap-2">
-              <p className="truncate text-xs font-semibold text-slate-300" title={tenant.businessName}>
+              <span
+                className="max-w-full truncate rounded-full bg-blue-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-400"
+                title={tenant.businessName}
+              >
                 {tenant.businessName}
-              </p>
+              </span>
             </div>
           )}
 

@@ -120,6 +120,7 @@ export const api = {
 export interface TenantMe {
   id: string;
   businessName: string;
+  ownerName: string | null;
   slug: string;
   mode: string;
   planTier: string;
