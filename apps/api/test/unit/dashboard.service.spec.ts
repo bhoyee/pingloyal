@@ -196,4 +196,61 @@ describe('DashboardService', () => {
       `dashboard:top-spenders:${TENANT_ID}`,
     );
   });
+
+  // ── T11: top spenders mask phone numbers ──────────────────────────────────
+
+  it('T11 — getTopSpenders masks customer phone numbers', async () => {
+    mockDataSource.query.mockResolvedValue([
+      {
+        id: 'c1',
+        full_name: 'Amara Okafor',
+        phone_e164: '+2348011234567',
+        points_balance: '850',
+        total_spend: '150000',
+        last_purchase_at: null,
+        purchase_count: '12',
+        tier_label: 'VIP',
+      },
+    ]);
+
+    const result = await service.getTopSpenders(TENANT_ID);
+
+    expect(result[0].phone).toBe('+234 801 ****67');
+    expect(result[0].fullName).toBe('Amara Okafor');
+    expect(result[0].pointsBalance).toBe(850);
+    expect(result[0].totalSpend).toBe(150000);
+  });
+
+  // ── T12: top spenders with no phone ───────────────────────────────────────
+
+  it('T12 — getTopSpenders leaves a missing phone as null', async () => {
+    mockDataSource.query.mockResolvedValue([
+      {
+        id: 'c2',
+        full_name: 'No Phone',
+        phone_e164: null,
+        points_balance: '0',
+        total_spend: '0',
+        last_purchase_at: null,
+        purchase_count: '0',
+        tier_label: null,
+      },
+    ]);
+
+    const result = await service.getTopSpenders(TENANT_ID);
+
+    expect(result[0].phone).toBeNull();
+  });
+
+  // ── T13: top spenders cache hit ───────────────────────────────────────────
+
+  it('T13 — getTopSpenders cache hit returns cached data without running SQL query', async () => {
+    const cached = [{ id: 'c1', fullName: 'Cached', phone: '+234 801 ****67' }];
+    mockRedis.get.mockResolvedValue(JSON.stringify(cached));
+
+    const result = await service.getTopSpenders(TENANT_ID);
+
+    expect(result).toEqual(cached);
+    expect(mockDataSource.query).not.toHaveBeenCalled();
+  });
 });

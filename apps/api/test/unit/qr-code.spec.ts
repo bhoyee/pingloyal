@@ -7,6 +7,7 @@ import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { ProductCategory } from '../../src/modules/tenants/entities/product-category.entity';
 import { TierConfig } from '../../src/modules/tenants/entities/tier-config.entity';
+import { User } from '../../src/modules/auth/entities/user.entity';
 import { R2Service } from '../../src/modules/storage/r2.service';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 
@@ -19,6 +20,7 @@ import * as QRCode from 'qrcode';
 const mockTenantRepo = { findOne: jest.fn(), update: jest.fn() };
 const mockCategoryRepo = { find: jest.fn() };
 const mockTierRepo = { find: jest.fn() };
+const mockUserRepo = { findOne: jest.fn() };
 const mockDataSource = { transaction: jest.fn() };
 const mockRedis = {
   get: jest.fn().mockResolvedValue(null),
@@ -51,6 +53,7 @@ describe('TenantsService – QR code', () => {
           useValue: mockCategoryRepo,
         },
         { provide: getRepositoryToken(TierConfig), useValue: mockTierRepo },
+        { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: DataSource, useValue: mockDataSource },
         { provide: REDIS_CLIENT, useValue: mockRedis },
         { provide: R2Service, useValue: mockR2 },
