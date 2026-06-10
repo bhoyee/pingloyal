@@ -103,6 +103,38 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function upload<T>(path: string, file: File): Promise<T> {
+  const token = getToken();
+
+  if (!token) {
+    window.location.href = '/login';
+    throw new ApiError('No auth token', 401);
+  }
+
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${normalizedPath}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+  } catch {
+    throw new ApiError('Network error — check your connection', 0);
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    const msg = typeof body.message === 'string' ? body.message : `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status);
+  }
+
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   patch: <T>(path: string, body: unknown) =>
@@ -113,6 +145,7 @@ export const api = {
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) =>
     request<T>(path, { method: 'DELETE' }),
+  upload: <T>(path: string, file: File) => upload<T>(path, file),
 };
 
 // ── Typed API helpers ──────────────────────────────────────────────────────────
@@ -271,6 +304,8 @@ export interface TierConfig {
   tierName: string;
   tierLabel: string;
   minQuarterlySpend: number;
+  maxQuarterlySpend: number | null;
+  displayOrder: number;
 }
 
 // ── Cashier API (uses cashier_token, redirects to /cashier/login on 401) ──────
