@@ -195,6 +195,7 @@ describe('T11 — CustomersService.register enqueues welcome job for verified te
       waOptedIn: true,
       pointsBalance: 0,
     }),
+    manager: { query: jest.fn().mockResolvedValue(undefined) },
   };
   const mockRedis = {
     get: jest.fn().mockResolvedValue(null),
@@ -224,6 +225,7 @@ describe('T11 — CustomersService.register enqueues welcome job for verified te
       pointsBalance: 0,
     });
     mockRedis.get.mockResolvedValue(null);
+    mockCustomerRepo.manager.query.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
