@@ -624,10 +624,18 @@ export default function SettingsPage() {
               <p className="text-sm text-slate-500">{tenant.whatsapp.phoneNumber}</p>
             )}
             {!tenant?.whatsapp.isConnected && (
-              <p className="text-sm text-slate-500">
-                WhatsApp is not yet connected. Complete onboarding to connect your
-                WhatsApp Business number.
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500">
+                  WhatsApp is not yet connected. Connect your WhatsApp Business
+                  number to start sending automated loyalty messages.
+                </p>
+                <a
+                  href="/onboarding?step=4"
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50"
+                >
+                  Connect WhatsApp →
+                </a>
+              </div>
             )}
           </CardContent>
         </Card>
