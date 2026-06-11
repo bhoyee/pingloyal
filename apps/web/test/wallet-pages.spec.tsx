@@ -361,6 +361,8 @@ it('T15 — dashboard shows red alert banner when walletIsEmpty=true', async () 
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('summary'))
       return Promise.resolve(makeDashSummary({ walletIsEmpty: true, walletBalance: 0 }));
+    if (path.includes('tenants/me'))
+      return Promise.resolve({ qrCodeUrl: 'https://cdn.example.com/qr.png' });
     return Promise.resolve([]);
   });
 
