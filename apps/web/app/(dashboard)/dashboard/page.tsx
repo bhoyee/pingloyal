@@ -272,7 +272,18 @@ export default function DashboardPage() {
   // ── Alert banner selection ───────────────────────────────────────────────
 
   let banner: React.ReactNode = null;
-  if (!summaryLoading && s.walletIsEmpty) {
+  if (tenant && !tenant.qrCodeUrl) {
+    banner = (
+      <AlertBanner
+        icon="🚧"
+        text="Your account setup isn't complete yet. Finish onboarding to unlock your QR code and loyalty automations."
+        buttonLabel="Finish setup →"
+        href="/onboarding"
+        bg="bg-amber-50"
+        border="border-amber-200"
+      />
+    );
+  } else if (!summaryLoading && s.walletIsEmpty) {
     banner = (
       <AlertBanner
         icon="🔴"
@@ -292,17 +303,6 @@ export default function DashboardPage() {
         href="/billing/wallet/topup"
         bg="bg-amber-50"
         border="border-amber-200"
-      />
-    );
-  } else if (tenant && !tenant.qrCodeUrl) {
-    banner = (
-      <AlertBanner
-        icon="🚧"
-        text="Your account setup isn't complete yet. Finish onboarding to unlock your QR code and loyalty automations."
-        buttonLabel="Finish setup →"
-        href="/onboarding"
-        bg="bg-blue-50"
-        border="border-blue-200"
       />
     );
   } else if (!summaryLoading && !s.waIsConnected) {

@@ -76,6 +76,16 @@ function makeSummary(overrides: Partial<DashboardSummary> = {}): DashboardSummar
   };
 }
 
+function makeTenant(overrides: Partial<{ qrCodeUrl: string | null }> = {}) {
+  return {
+    id: 'tenant-1',
+    businessName: 'Test Store',
+    qrCodeUrl: 'https://cdn.example.com/qr.png',
+    whatsapp: { isConnected: true, verificationStatus: 'verified' },
+    ...overrides,
+  };
+}
+
 function makeTopSpenders() {
   return [
     {
@@ -106,6 +116,7 @@ beforeEach(() => {
     if (path.includes('summary')) return Promise.resolve(makeSummary());
     if (path.includes('top-spenders')) return Promise.resolve(makeTopSpenders());
     if (path.includes('trigger-logs')) return Promise.resolve([]);
+    if (path.includes('tenants/me')) return Promise.resolve(makeTenant());
     return Promise.resolve([]);
   });
 });
@@ -131,6 +142,7 @@ it('T12 — shows wallet empty banner when walletIsEmpty=true', async () => {
       return Promise.resolve(
         makeSummary({ walletIsEmpty: true, walletBalance: 0 }),
       );
+    if (path.includes('tenants/me')) return Promise.resolve(makeTenant());
     return Promise.resolve([]);
   });
 
@@ -151,6 +163,7 @@ it('T13 — shows wallet low banner when walletIsLow=true (not empty)', async ()
       return Promise.resolve(
         makeSummary({ walletIsLow: true, walletBalance: 1500, walletIsEmpty: false }),
       );
+    if (path.includes('tenants/me')) return Promise.resolve(makeTenant());
     return Promise.resolve([]);
   });
 
@@ -175,6 +188,7 @@ it('T14 — does NOT show WA banner when walletIsEmpty=true (wallet takes priori
           waIsConnected: false,
         }),
       );
+    if (path.includes('tenants/me')) return Promise.resolve(makeTenant());
     return Promise.resolve([]);
   });
 
@@ -194,6 +208,7 @@ it('T15 — shows WA not connected banner when waIsConnected=false', async () =>
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('summary'))
       return Promise.resolve(makeSummary({ waIsConnected: false }));
+    if (path.includes('tenants/me')) return Promise.resolve(makeTenant());
     return Promise.resolve([]);
   });
 
@@ -203,6 +218,28 @@ it('T15 — shows WA not connected banner when waIsConnected=false', async () =>
     const banner = screen.getByTestId('alert-banner');
     expect(banner).toHaveClass('bg-blue-50');
     expect(banner).toHaveTextContent('Connect WhatsApp');
+  });
+});
+
+// T15b: onboarding incomplete banner ─────────────────────────────────────────
+
+it('T15b — shows onboarding incomplete banner when tenant has no qrCodeUrl', async () => {
+  mockApi.get.mockImplementation((path: string) => {
+    if (path.includes('summary'))
+      return Promise.resolve(
+        makeSummary({ walletIsEmpty: true, waIsConnected: false }),
+      );
+    if (path.includes('tenants/me'))
+      return Promise.resolve(makeTenant({ qrCodeUrl: null }));
+    return Promise.resolve([]);
+  });
+
+  render(<DashboardPage />, { wrapper });
+
+  await waitFor(() => {
+    const banner = screen.getByTestId('alert-banner');
+    expect(banner).toHaveClass('bg-amber-50');
+    expect(banner).toHaveTextContent('Finish setup');
   });
 });
 
