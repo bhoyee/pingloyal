@@ -238,7 +238,7 @@ it('T15b — shows onboarding incomplete banner when tenant has no qrCodeUrl', a
 
   await waitFor(() => {
     const banner = screen.getByTestId('alert-banner');
-    expect(banner).toHaveClass('bg-blue-50');
+    expect(banner).toHaveClass('bg-amber-50');
     expect(banner).toHaveTextContent('Finish setup');
   });
 });

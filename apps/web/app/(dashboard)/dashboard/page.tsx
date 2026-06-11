@@ -279,8 +279,8 @@ export default function DashboardPage() {
         text="Your account setup isn't complete yet. Finish onboarding to unlock your QR code and loyalty automations."
         buttonLabel="Finish setup →"
         href="/onboarding"
-        bg="bg-blue-50"
-        border="border-blue-200"
+        bg="bg-amber-50"
+        border="border-amber-200"
       />
     );
   } else if (!summaryLoading && s.walletIsEmpty) {
