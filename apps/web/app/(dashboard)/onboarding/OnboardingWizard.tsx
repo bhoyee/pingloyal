@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api, type TenantMe } from '@/lib/api';
 import { WizardProgress } from '@/components/onboarding/WizardProgress';
 import { Spinner } from '@/components/ui/spinner';
@@ -42,6 +42,7 @@ function writeShowVerification(v: boolean) {
 
 export function OnboardingWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<WizardStep>(1);
   const [showVerification, setShowVerification] = useState(false);
   const [verificationPhone, setVerificationPhone] = useState('');
@@ -55,17 +56,29 @@ export function OnboardingWizard() {
       return;
     }
 
+    // A `?step=` param lets users jump back into a specific step (e.g. from
+    // Settings to reconnect WhatsApp) even after onboarding is complete.
+    const stepParam = Number(searchParams.get('step'));
+    const requestedStep =
+      stepParam >= 1 && stepParam <= 5 ? (stepParam as WizardStep) : null;
+
     // Restore local state
-    const savedStep = readStep();
+    const savedStep = requestedStep ?? readStep();
     const savedVerification = readShowVerification();
     setStep(savedStep);
-    setShowVerification(savedVerification);
+    setShowVerification(requestedStep ? false : savedVerification);
+    if (requestedStep) {
+      writeStep(requestedStep);
+      writeShowVerification(false);
+    }
 
     // Check server state
     api
       .get<TenantMe>('/tenants/me')
       .then((t) => {
         setTenant(t);
+
+        if (requestedStep) return;
 
         // Already complete
         if (t.qrCodeUrl) {
@@ -88,7 +101,7 @@ export function OnboardingWizard() {
         // If API fails, continue with local state
       })
       .finally(() => setInitialising(false));
-  }, [router]);
+  }, [router, searchParams]);
 
   function goToStep(s: WizardStep) {
     setStep(s);

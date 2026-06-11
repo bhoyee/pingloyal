@@ -294,13 +294,24 @@ export default function DashboardPage() {
         border="border-amber-200"
       />
     );
+  } else if (tenant && !tenant.qrCodeUrl) {
+    banner = (
+      <AlertBanner
+        icon="🚧"
+        text="Your account setup isn't complete yet. Finish onboarding to unlock your QR code and loyalty automations."
+        buttonLabel="Finish setup →"
+        href="/onboarding"
+        bg="bg-blue-50"
+        border="border-blue-200"
+      />
+    );
   } else if (!summaryLoading && !s.waIsConnected) {
     banner = (
       <AlertBanner
         icon="💬"
         text="WhatsApp not connected. Connect your number to start sending automated loyalty messages."
         buttonLabel="Connect WhatsApp →"
-        href="/settings/integrations"
+        href="/onboarding?step=4"
         bg="bg-blue-50"
         border="border-blue-200"
       />

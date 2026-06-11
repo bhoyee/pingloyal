@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { OnboardingWizard } from './OnboardingWizard';
 
 export const metadata = {
@@ -5,5 +6,9 @@ export const metadata = {
 };
 
 export default function OnboardingPage() {
-  return <OnboardingWizard />;
+  return (
+    <Suspense fallback={null}>
+      <OnboardingWizard />
+    </Suspense>
+  );
 }
