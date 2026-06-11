@@ -176,9 +176,9 @@ it('T13 — shows wallet low banner when walletIsLow=true (not empty)', async ()
   });
 });
 
-// T14: walletIsEmpty → no WA banner ──────────────────────────────────────────
+// T14: walletIsEmpty + WA not connected → both banners shown ────────────────
 
-it('T14 — does NOT show WA banner when walletIsEmpty=true (wallet takes priority)', async () => {
+it('T14 — shows both wallet-empty and WA banners when both apply', async () => {
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('summary'))
       return Promise.resolve(
@@ -195,10 +195,11 @@ it('T14 — does NOT show WA banner when walletIsEmpty=true (wallet takes priori
   render(<DashboardPage />, { wrapper });
 
   await waitFor(() => {
-    const banner = screen.getByTestId('alert-banner');
-    // Should show wallet banner (red), NOT WA banner (blue)
-    expect(banner).toHaveClass('bg-red-50');
-    expect(banner).not.toHaveClass('bg-blue-50');
+    const banners = screen.getAllByTestId('alert-banner');
+    expect(banners).toHaveLength(2);
+    expect(banners.some((b) => b.classList.contains('bg-red-50'))).toBe(true);
+    expect(banners.some((b) => b.classList.contains('bg-amber-50'))).toBe(true);
+    expect(banners.some((b) => b.textContent?.includes('Connect WhatsApp'))).toBe(true);
   });
 });
 
@@ -216,14 +217,14 @@ it('T15 — shows WA not connected banner when waIsConnected=false', async () =>
 
   await waitFor(() => {
     const banner = screen.getByTestId('alert-banner');
-    expect(banner).toHaveClass('bg-blue-50');
+    expect(banner).toHaveClass('bg-amber-50');
     expect(banner).toHaveTextContent('Connect WhatsApp');
   });
 });
 
-// T15b: onboarding incomplete banner ─────────────────────────────────────────
+// T15b: onboarding incomplete + WA not connected + wallet empty → all shown ──
 
-it('T15b — shows onboarding incomplete banner when tenant has no qrCodeUrl', async () => {
+it('T15b — shows onboarding incomplete, WA, and wallet banners together when all apply', async () => {
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('summary'))
       return Promise.resolve(
@@ -237,9 +238,11 @@ it('T15b — shows onboarding incomplete banner when tenant has no qrCodeUrl', a
   render(<DashboardPage />, { wrapper });
 
   await waitFor(() => {
-    const banner = screen.getByTestId('alert-banner');
-    expect(banner).toHaveClass('bg-amber-50');
-    expect(banner).toHaveTextContent('Finish setup');
+    const banners = screen.getAllByTestId('alert-banner');
+    expect(banners).toHaveLength(3);
+    expect(banners.every((b) => b.classList.contains('bg-amber-50') || b.classList.contains('bg-red-50'))).toBe(true);
+    expect(banners.some((b) => b.textContent?.includes('Finish setup'))).toBe(true);
+    expect(banners.some((b) => b.textContent?.includes('Connect WhatsApp'))).toBe(true);
   });
 });
 

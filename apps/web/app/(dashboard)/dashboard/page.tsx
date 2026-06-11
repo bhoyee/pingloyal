@@ -271,50 +271,56 @@ export default function DashboardPage() {
 
   // ── Alert banner selection ───────────────────────────────────────────────
 
-  let banner: React.ReactNode = null;
+  const banners: React.ReactNode[] = [];
   if (tenant && !tenant.qrCodeUrl) {
-    banner = (
+    banners.push(
       <AlertBanner
+        key="onboarding-incomplete"
         icon="🚧"
         text="Your account setup isn't complete yet. Finish onboarding to unlock your QR code and loyalty automations."
         buttonLabel="Finish setup →"
         href="/onboarding"
         bg="bg-amber-50"
         border="border-amber-200"
-      />
+      />,
     );
-  } else if (!summaryLoading && s.walletIsEmpty) {
-    banner = (
+  }
+  if (!summaryLoading && !s.waIsConnected) {
+    banners.push(
       <AlertBanner
+        key="wa-not-connected"
+        icon="💬"
+        text="WhatsApp not connected. Connect your number to start sending automated loyalty messages."
+        buttonLabel="Connect WhatsApp →"
+        href="/onboarding?step=4"
+        bg="bg-amber-50"
+        border="border-amber-200"
+      />,
+    );
+  }
+  if (!summaryLoading && s.walletIsEmpty) {
+    banners.push(
+      <AlertBanner
+        key="wallet-empty"
         icon="🔴"
         text="Marketing Wallet is empty — Birthday messages, win-backs, and campaigns are paused."
         buttonLabel="Top Up Wallet →"
         href="/billing/wallet/topup"
         bg="bg-red-50"
         border="border-red-200"
-      />
+      />,
     );
   } else if (!summaryLoading && s.walletIsLow) {
-    banner = (
+    banners.push(
       <AlertBanner
+        key="wallet-low"
         icon="⚠️"
         text={`Marketing Wallet is running low (₦${s.walletBalance.toLocaleString()}). Top up to keep automations running.`}
         buttonLabel="Top Up →"
         href="/billing/wallet/topup"
         bg="bg-amber-50"
         border="border-amber-200"
-      />
-    );
-  } else if (!summaryLoading && !s.waIsConnected) {
-    banner = (
-      <AlertBanner
-        icon="💬"
-        text="WhatsApp not connected. Connect your number to start sending automated loyalty messages."
-        buttonLabel="Connect WhatsApp →"
-        href="/onboarding?step=4"
-        bg="bg-blue-50"
-        border="border-blue-200"
-      />
+      />,
     );
   }
 
@@ -368,8 +374,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
-        {/* Alert banner */}
-        {banner}
+        {/* Alert banners */}
+        {banners.length > 0 && (
+          <div className="space-y-3">{banners}</div>
+        )}
 
         {/* Metric cards grid */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
