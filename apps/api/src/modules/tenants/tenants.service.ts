@@ -29,6 +29,7 @@ import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpsertTierConfigDto } from './dto/upsert-tier-config.dto';
 import { validateTiers } from './utils/validate-tiers.util';
+import { TierService } from './tier.service';
 
 @Injectable()
 export class TenantsService {
@@ -43,6 +44,7 @@ export class TenantsService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly r2: R2Service,
     private readonly config: ConfigService,
+    private readonly tierService: TierService,
   ) {}
 
   // ── Cache helpers ──────────────────────────────────────────────────────────
@@ -199,6 +201,12 @@ export class TenantsService {
     );
 
     const newTiers = await this.dataSource.transaction(async (manager) => {
+      // Detach customers from the tier configs about to be replaced —
+      // tier_id has a FK to tier_configs and would otherwise block the delete.
+      await manager.query(
+        'UPDATE customers SET tier_id = NULL WHERE tenant_id = $1',
+        [tenantId],
+      );
       await manager.delete(TierConfig, { tenantId });
 
       const rows = dto.tiers.map((t, i) =>
@@ -215,6 +223,10 @@ export class TenantsService {
     });
 
     await this.redis.del(`tiers:${tenantId}`);
+
+    // Re-assign every customer to a tier under the new thresholds.
+    await this.tierService.recalculateAll(tenantId);
+
     return newTiers;
   }
 
