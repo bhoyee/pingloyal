@@ -353,10 +353,6 @@ export default function DashboardPage() {
     );
   }
 
-  const activePercent =
-    s.totalCustomers > 0
-      ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
-      : 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -410,13 +406,15 @@ export default function DashboardPage() {
                 icon="👥"
                 value={s.totalCustomers}
                 label="Total Customers"
-                sub={s.newCustomersThisMonth > 0 ? `+${s.newCustomersThisMonth} this month` : 'No new customers yet'}
+                sub={s.totalCustomers > 0 ? 'Click to view →' : (s.newCustomersThisMonth > 0 ? `+${s.newCustomersThisMonth} this month` : 'No new customers yet')}
+                onClick={s.totalCustomers > 0 ? () => router.push('/customers') : undefined}
               />
               <MetricCard
                 icon="✅"
                 value={s.activeCustomers}
                 label="Active Customers"
-                sub={s.totalCustomers > 0 ? `${activePercent}% of total` : 'Register your first customer'}
+                sub={s.activeCustomers > 0 ? 'Click to view →' : 'Register your first customer'}
+                onClick={s.activeCustomers > 0 ? () => router.push('/customers?status=active') : undefined}
               />
               <MetricCard
                 icon="😴"

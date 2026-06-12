@@ -297,6 +297,42 @@ it('T16 — clicking inactive customers card navigates to /customers?status=inac
   expect(mockPush).toHaveBeenCalledWith('/customers?status=inactive');
 });
 
+// T16b: total customers card click ───────────────────────────────────────────
+
+it('T16b — clicking total customers card navigates to /customers', async () => {
+  const { useRouter } = await import('next/navigation');
+  const mockPush = jest.fn();
+  (useRouter as jest.Mock).mockReturnValue({ push: mockPush, replace: jest.fn() });
+
+  render(<DashboardPage />, { wrapper });
+
+  await waitFor(() => {
+    expect(screen.getByText('Total Customers')).toBeInTheDocument();
+  });
+
+  await userEvent.click(screen.getByText('Total Customers').closest('div')!);
+
+  expect(mockPush).toHaveBeenCalledWith('/customers');
+});
+
+// T16c: active customers card click ──────────────────────────────────────────
+
+it('T16c — clicking active customers card navigates to /customers?status=active', async () => {
+  const { useRouter } = await import('next/navigation');
+  const mockPush = jest.fn();
+  (useRouter as jest.Mock).mockReturnValue({ push: mockPush, replace: jest.fn() });
+
+  render(<DashboardPage />, { wrapper });
+
+  await waitFor(() => {
+    expect(screen.getByText('Active Customers')).toBeInTheDocument();
+  });
+
+  await userEvent.click(screen.getByText('Active Customers').closest('div')!);
+
+  expect(mockPush).toHaveBeenCalledWith('/customers?status=active');
+});
+
 // T17: top spenders table only shows masked phone numbers ─────────────────────
 
 it('T17 — top spenders table shows masked phone numbers, not the raw number', async () => {
