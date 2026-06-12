@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { api, type Campaign, type CampaignStatus } from '@/lib/api';
+import { api, type Campaign, type CampaignStatus, type Category, type TenantMe, type TierConfig } from '@/lib/api';
 import { StatusBadge } from '@/components/campaigns/StatusBadge';
 import { Button } from '@/components/ui/button';
 
@@ -34,6 +34,39 @@ function deliveryRate(c: Campaign): string {
   return `${Math.round((c.deliveredCount / c.sentCount) * 100)}%`;
 }
 
+function describeAudience(
+  campaign: Campaign,
+  tiers: TierConfig[],
+  categories: Category[],
+  lapsedDays: number,
+): string {
+  const r = campaign.segmentRules;
+
+  if (r.tierIds?.length) {
+    const labels = r.tierIds.map((id) => tiers.find((t) => t.id === id)?.tierLabel ?? 'Tier');
+    return `${labels.join(', ')} tier only`;
+  }
+
+  if (r.categoryIds?.length) {
+    const labels = r.categoryIds.map((id) => categories.find((c) => c.id === id)?.name ?? 'category');
+    return `Bought ${labels.join(', ').toLowerCase()} items`;
+  }
+
+  if (r.activityStatus === 'inactive') {
+    return `Inactive ${lapsedDays}+ days`;
+  }
+
+  if (r.minPoints) {
+    return `${r.minPoints}+ points`;
+  }
+
+  if (r.activityStatus === 'active') {
+    return 'All active customers';
+  }
+
+  return 'All customers';
+}
+
 export default function CampaignsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -44,6 +77,9 @@ export default function CampaignsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [tiers, setTiers] = useState<TierConfig[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [lapsedDays, setLapsedDays] = useState(60);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +88,10 @@ export default function CampaignsPage() {
       .then((data) => setCampaigns(data))
       .catch(() => null)
       .finally(() => setLoading(false));
+
+    void api.get<TierConfig[]>('/api/v1/tenants/tier-config').then(setTiers).catch(() => null);
+    void api.get<Category[]>('/api/v1/tenants/categories').then(setCategories).catch(() => null);
+    void api.get<TenantMe>('/api/v1/tenants/me').then((t) => setLapsedDays(t.lapsedDays)).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -89,7 +129,10 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-bold text-slate-900">Campaigns</h1>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-xl font-bold text-slate-900">Campaigns</h1>
+            <span className="text-xs text-slate-400">WhatsApp broadcast engine</span>
+          </div>
           <Button className="self-start sm:self-auto" onClick={() => router.push('/campaigns/new')}>
             + New Campaign
           </Button>
@@ -197,7 +240,7 @@ export default function CampaignsPage() {
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Campaign Name</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Recipients</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Delivery Rate</th>
@@ -209,10 +252,13 @@ export default function CampaignsPage() {
                 {paginated.map((campaign) => (
                   <tr
                     key={campaign.id}
-                    className="cursor-pointer hover:bg-slate-50"
+                    className="cursor-pointer transition-colors hover:bg-emerald-50"
                     onClick={() => router.push(`/campaigns/${campaign.id}`)}
                   >
-                    <td className="px-4 py-3 font-medium text-slate-900">{campaign.name}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-900">{campaign.name}</p>
+                      <p className="text-xs text-slate-400">{describeAudience(campaign, tiers, categories, lapsedDays)}</p>
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={campaign.status} />
                     </td>
@@ -223,7 +269,7 @@ export default function CampaignsPage() {
                       <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         {campaign.status === 'draft' && (
                           <button
-                            className="rounded px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-sm"
                             onClick={() => router.push(`/campaigns/${campaign.id}`)}
                           >
                             Edit
@@ -231,7 +277,7 @@ export default function CampaignsPage() {
                         )}
                         {campaign.status === 'draft' && (
                           <button
-                            className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                            className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 hover:shadow-sm"
                             onClick={(e) => void deleteCampaign(e, campaign.id)}
                           >
                             Delete
