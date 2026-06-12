@@ -33,9 +33,9 @@ function isActiveCustomer(c: Customer): boolean {
   return !!c.lastPurchaseAt && c.purchaseCount > 0;
 }
 
-const TIER_ORDER: Record<string, number> = { vip: 0, mid: 1, standard: 2 };
+const FIXED_TIERS = ['VIP', 'Mid', 'Standard'];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 
 function SkeletonRow() {
   return (
@@ -57,6 +57,7 @@ export default function CustomersPage() {
   const [tierFilter, setTierFilter] = useState('all');
   const [sortBy, setSortBy] = useState<SortField>('totalSpend');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
 
   useEffect(() => {
     if (!localStorage.getItem('access_token')) {
@@ -74,7 +75,7 @@ export default function CustomersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, tierFilter, sortBy]);
+  }, [search, tierFilter, sortBy, pageSize]);
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -100,11 +101,16 @@ export default function CustomersPage() {
       tierCounts.set(c.tier.tierLabel, (tierCounts.get(c.tier.tierLabel) ?? 0) + 1);
     }
   }
-  const sortedTiers = [...tierCounts.entries()].sort((a, b) => {
-    const ao = TIER_ORDER[a[0].toLowerCase()] ?? 99;
-    const bo = TIER_ORDER[b[0].toLowerCase()] ?? 99;
-    return ao - bo;
+  const usedLabels = new Set<string>();
+  const fixedTierPills: Array<[string, number]> = FIXED_TIERS.map((fixedLabel) => {
+    const match = [...tierCounts.entries()].find(
+      ([label]) => label.toLowerCase() === fixedLabel.toLowerCase(),
+    );
+    if (match) usedLabels.add(match[0]);
+    return [match ? match[0] : fixedLabel, match ? match[1] : 0];
   });
+  const extraTierPills = [...tierCounts.entries()].filter(([label]) => !usedLabels.has(label));
+  const sortedTiers = [...fixedTierPills, ...extraTierPills];
 
   const filtered = (customers ?? []).filter((c) => {
     if (search) {
@@ -129,8 +135,8 @@ export default function CustomersPage() {
 
   const pointsThreshold = tenant?.pointsThreshold ?? 0;
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="min-h-screen bg-emerald-50/40">
@@ -210,7 +216,7 @@ export default function CustomersPage() {
             placeholder="Search by name or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-64"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-80"
           />
           <select
             value={sortBy}
@@ -304,27 +310,41 @@ export default function CustomersPage() {
           {!isLoading && sorted.length > 0 && (
             <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length} customers
+                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sorted.length)} of {sorted.length} customers
               </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5">
+                  Rows per page
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    Prev
-                  </button>
-                  <span>Page {page} of {totalPages}</span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </label>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                    >
+                      Prev
+                    </button>
+                    <span>Page {page} of {totalPages}</span>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
