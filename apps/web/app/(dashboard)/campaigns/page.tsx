@@ -15,6 +15,8 @@ const STATUSES: { key: CampaignStatus | 'all'; label: string }[] = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
 function formatDate(campaign: Campaign): string {
   const date =
     campaign.scheduledAt ??
@@ -39,6 +41,9 @@ export default function CampaignsPage() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
 
   useEffect(() => {
     setLoading(true);
@@ -49,10 +54,18 @@ export default function CampaignsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered =
-    statusFilter === 'all'
-      ? campaigns
-      : campaigns.filter((c) => c.status === statusFilter);
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, pageSize]);
+
+  const filtered = campaigns.filter((c) => {
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const countByStatus = (s: CampaignStatus | 'all') =>
     s === 'all' ? campaigns.length : campaigns.filter((c) => c.status === s).length;
@@ -72,10 +85,10 @@ export default function CampaignsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-emerald-50/40">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-slate-900">Campaigns</h1>
           <Button className="self-start sm:self-auto" onClick={() => router.push('/campaigns/new')}>
             + New Campaign
@@ -83,10 +96,10 @@ export default function CampaignsPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-6">
+      <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-6">
         {/* Status filter tabs */}
         <div
-          className="mb-6 flex gap-1 overflow-x-auto"
+          className="flex flex-wrap gap-1 overflow-x-auto"
           data-testid="status-filter-tabs"
         >
           {STATUSES.map(({ key, label }) => (
@@ -114,6 +127,29 @@ export default function CampaignsPage() {
           ))}
         </div>
 
+        {/* Search + rows per page */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            placeholder="Search by campaign name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-80"
+          />
+          <label className="flex items-center gap-1.5 self-start text-sm text-slate-600 sm:self-auto sm:ml-auto">
+            Rows per page
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         {/* Loading */}
         {loading && (
           <div className="space-y-3">
@@ -139,13 +175,19 @@ export default function CampaignsPage() {
                 d="M8 16h48M8 32h32M8 48h20M44 40l8 8m0-8l-8 8"
               />
             </svg>
-            <p className="text-lg font-semibold text-slate-700">No campaigns yet</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Create your first campaign to send a WhatsApp message to your customers
+            <p className="text-lg font-semibold text-slate-700">
+              {search || statusFilter !== 'all' ? 'No campaigns match your filters' : 'No campaigns yet'}
             </p>
-            <Button className="mt-6" onClick={() => router.push('/campaigns/new')}>
-              + Create Campaign
-            </Button>
+            {!search && statusFilter === 'all' && (
+              <>
+                <p className="mt-1 text-sm text-slate-500">
+                  Create your first campaign to send a WhatsApp message to your customers
+                </p>
+                <Button className="mt-6" onClick={() => router.push('/campaigns/new')}>
+                  + Create Campaign
+                </Button>
+              </>
+            )}
           </div>
         )}
 
@@ -164,7 +206,7 @@ export default function CampaignsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((campaign) => (
+                {paginated.map((campaign) => (
                   <tr
                     key={campaign.id}
                     className="cursor-pointer hover:bg-slate-50"
@@ -201,6 +243,30 @@ export default function CampaignsPage() {
                 ))}
               </tbody>
             </table>
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)} of {filtered.length} campaigns
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <span>Page {page} of {totalPages}</span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
