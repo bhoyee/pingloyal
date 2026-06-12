@@ -175,6 +175,7 @@ function AlertBanner({
   href,
   bg,
   border,
+  buttonClassName,
 }: {
   icon: string;
   text: string;
@@ -182,6 +183,7 @@ function AlertBanner({
   href: string;
   bg: string;
   border: string;
+  buttonClassName?: string;
 }) {
   return (
     <div
@@ -193,7 +195,10 @@ function AlertBanner({
       </p>
       <a
         href={href}
-        className="self-start shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 sm:ml-4 sm:self-auto"
+        className={
+          buttonClassName ??
+          'self-start shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 sm:ml-4 sm:self-auto'
+        }
       >
         {buttonLabel}
       </a>
@@ -269,9 +274,31 @@ export default function DashboardPage() {
     waVerificationStatus: 'unverified',
   };
 
+  const isTrialing = tenant?.subscriptionStatus === 'trialing';
+  const trialDaysLeft = tenant?.trialEndsAt
+    ? Math.max(
+        0,
+        Math.ceil((new Date(tenant.trialEndsAt).getTime() - Date.now()) / 86_400_000),
+      )
+    : null;
+
   // ── Alert banner selection ───────────────────────────────────────────────
 
   const banners: React.ReactNode[] = [];
+  if (isTrialing && trialDaysLeft !== null) {
+    banners.push(
+      <AlertBanner
+        key="trial-countdown"
+        icon="⏳"
+        text={`${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} remaining in your free trial. Subscribe now to keep all your automations running after trial ends.`}
+        buttonLabel="Subscribe →"
+        href="/billing"
+        bg="bg-amber-50"
+        border="border-amber-200"
+        buttonClassName="self-start shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 sm:ml-4 sm:self-auto"
+      />,
+    );
+  }
   if (tenant && !tenant.qrCodeUrl) {
     banners.push(
       <AlertBanner
@@ -329,22 +356,14 @@ export default function DashboardPage() {
       ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
       : 0;
 
-  const isTrialing = tenant?.subscriptionStatus === 'trialing';
-  const trialDaysLeft = tenant?.trialEndsAt
-    ? Math.max(
-        0,
-        Math.ceil((new Date(tenant.trialEndsAt).getTime() - Date.now()) / 86_400_000),
-      )
-    : null;
-
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Page header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="flex items-baseline gap-2">
             <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400">
               {getGreeting()}
               {tenant?.ownerName ? `, ${tenant.ownerName}` : ''} 👋
             </p>
