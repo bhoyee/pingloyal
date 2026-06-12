@@ -153,10 +153,12 @@ function MetricCard({
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${onClick ? 'cursor-pointer hover:border-[#0F1E35]' : ''}`}
+      className={`group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${onClick ? 'cursor-pointer hover:border-[#0F1E35]' : 'hover:border-slate-300'}`}
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xl sm:text-2xl">{icon}</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-xl transition-transform duration-200 ease-out group-hover:scale-110 sm:h-10 sm:w-10 sm:text-2xl">
+          {icon}
+        </span>
         {ring !== undefined && <RingChart pct={ring} />}
       </div>
       <p className="text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
@@ -459,7 +461,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Wallet summary */}
-        <div data-testid="wallet-metric-card" className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div data-testid="wallet-metric-card" className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div>
             <p className="text-sm font-semibold text-slate-500">Marketing Wallet</p>
             <p data-testid="wallet-metric-balance" className={`text-2xl font-bold sm:text-3xl ${s.walletIsEmpty ? 'text-red-600' : s.walletIsLow ? 'text-amber-600' : 'text-green-600'}`}>
@@ -471,7 +473,7 @@ export default function DashboardPage() {
           </div>
           <a
             href="/billing/wallet/topup"
-            className="self-start rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3050] sm:self-auto"
+            className="self-start rounded-lg bg-[#0A1628] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1a3050] sm:self-auto"
           >
             + Top Up
           </a>
@@ -479,7 +481,7 @@ export default function DashboardPage() {
 
         {/* Top spenders + Recent trigger activity */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow duration-200 ease-out hover:shadow-lg">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Top Spenders
@@ -517,7 +519,7 @@ export default function DashboardPage() {
                 {topSpenders.slice(0, 5).map((spender) => {
                   const tier = spender.tierLabel ? tierBadge(spender.tierLabel) : null;
                   return (
-                    <tr key={spender.id}>
+                    <tr key={spender.id} className="transition-colors hover:bg-slate-50">
                       <td className="px-5 py-3">
                         <p className="font-medium text-slate-900">{spender.fullName}</p>
                         {spender.phone && (
@@ -549,7 +551,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Trigger activity feed */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm transition-shadow duration-200 ease-out hover:shadow-lg">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
             <h2 className="text-sm font-bold text-slate-900">
               Recent Trigger Activity
@@ -567,7 +569,7 @@ export default function DashboardPage() {
               {triggerLogs.slice(0, 5).map((log) => (
                 <li
                   key={log.id}
-                  className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 sm:flex-nowrap ${ROW_COLOURS[log.status] ?? 'bg-slate-50'}`}
+                  className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 transition-transform duration-150 ease-out hover:scale-[1.01] hover:shadow-sm sm:flex-nowrap ${ROW_COLOURS[log.status] ?? 'bg-slate-50'}`}
                 >
                   <span className="text-xl">
                     {TRIGGER_ICONS[log.triggerType] ?? '📩'}

@@ -76,12 +76,20 @@ function makeSummary(overrides: Partial<DashboardSummary> = {}): DashboardSummar
   };
 }
 
-function makeTenant(overrides: Partial<{ qrCodeUrl: string | null }> = {}) {
+function makeTenant(
+  overrides: Partial<{
+    qrCodeUrl: string | null;
+    subscriptionStatus: string;
+    trialEndsAt: string | null;
+  }> = {},
+) {
   return {
     id: 'tenant-1',
     businessName: 'Test Store',
     qrCodeUrl: 'https://cdn.example.com/qr.png',
     whatsapp: { isConnected: true, verificationStatus: 'verified' },
+    subscriptionStatus: 'active',
+    trialEndsAt: null,
     ...overrides,
   };
 }
@@ -243,6 +251,31 @@ it('T15b — shows onboarding incomplete, WA, and wallet banners together when a
     expect(banners.every((b) => b.classList.contains('bg-amber-50') || b.classList.contains('bg-red-50'))).toBe(true);
     expect(banners.some((b) => b.textContent?.includes('Finish setup'))).toBe(true);
     expect(banners.some((b) => b.textContent?.includes('Connect WhatsApp'))).toBe(true);
+  });
+});
+
+// T15c: trial countdown banner ───────────────────────────────────────────────
+
+it('T15c — shows amber trial countdown banner under the header when trialing', async () => {
+  mockApi.get.mockImplementation((path: string) => {
+    if (path.includes('summary')) return Promise.resolve(makeSummary());
+    if (path.includes('tenants/me'))
+      return Promise.resolve(
+        makeTenant({
+          subscriptionStatus: 'trialing',
+          trialEndsAt: new Date(Date.now() + 9 * 86_400_000).toISOString(),
+        }),
+      );
+    return Promise.resolve([]);
+  });
+
+  render(<DashboardPage />, { wrapper });
+
+  await waitFor(() => {
+    const banner = screen.getByTestId('alert-banner');
+    expect(banner).toHaveClass('bg-amber-50');
+    expect(banner).toHaveTextContent('remaining in your free trial');
+    expect(screen.getByText('Trial: 9 days left')).toBeInTheDocument();
   });
 });
 
