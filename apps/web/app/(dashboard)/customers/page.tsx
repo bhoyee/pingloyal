@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api, type TenantMe } from '@/lib/api';
 
 interface Customer {
   id: string;
@@ -20,17 +20,23 @@ interface Customer {
   tier: { tierLabel: string } | null;
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  qr_registration: 'QR Scan',
-  cashier: 'Cashier',
-  import: 'Import',
-  manual: 'Manual',
-};
+type SortField = 'totalSpend' | 'pointsBalance' | 'lastPurchaseAt';
+
+function tierBadge(tierLabel: string): { icon: string; classes: string } {
+  const l = tierLabel.toLowerCase();
+  if (l.includes('vip')) return { icon: '👑', classes: 'bg-amber-100 text-amber-700' };
+  if (l.includes('standard')) return { icon: '🌱', classes: 'bg-emerald-100 text-emerald-700' };
+  return { icon: '⭐', classes: 'bg-sky-100 text-sky-700' };
+}
+
+function isActiveCustomer(c: Customer): boolean {
+  return !!c.lastPurchaseAt && c.purchaseCount > 0;
+}
 
 function SkeletonRow() {
   return (
     <tr>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 animate-pulse rounded bg-slate-200" />
         </td>
@@ -44,6 +50,8 @@ export default function CustomersPage() {
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
+  const [tierFilter, setTierFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<SortField>('totalSpend');
 
   useEffect(() => {
     if (!localStorage.getItem('access_token')) {
@@ -53,6 +61,12 @@ export default function CustomersPage() {
     }
   }, [router]);
 
+  useEffect(() => {
+    if (searchParams.get('status') === 'inactive') {
+      setTierFilter('inactive');
+    }
+  }, [searchParams]);
+
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: ['customers'],
     queryFn: () => api.get<Customer[]>('/api/v1/customers'),
@@ -60,7 +74,23 @@ export default function CustomersPage() {
     staleTime: 60_000,
   });
 
-  const statusFilter = searchParams.get('status');
+  const { data: tenant } = useQuery<TenantMe>({
+    queryKey: ['tenant-me'],
+    queryFn: () => api.get<TenantMe>('/api/v1/tenants/me'),
+    enabled: mounted,
+    staleTime: 5 * 60_000,
+  });
+
+  const total = customers?.length ?? 0;
+  const activeCount = customers?.filter(isActiveCustomer).length ?? 0;
+  const inactiveCount = total - activeCount;
+
+  const tierCounts = new Map<string, number>();
+  for (const c of customers ?? []) {
+    if (c.tier) {
+      tierCounts.set(c.tier.tierLabel, (tierCounts.get(c.tier.tierLabel) ?? 0) + 1);
+    }
+  }
 
   const filtered = (customers ?? []).filter((c) => {
     if (search) {
@@ -69,134 +99,191 @@ export default function CustomersPage() {
         return false;
       }
     }
-    if (statusFilter === 'inactive') return !c.lastPurchaseAt || c.purchaseCount === 0;
-    if (statusFilter === 'active') return !!c.lastPurchaseAt && c.purchaseCount > 0;
+    if (tierFilter === 'inactive') return !isActiveCustomer(c);
+    if (tierFilter !== 'all') return c.tier?.tierLabel === tierFilter;
     return true;
   });
 
-  const total = customers?.length ?? 0;
-  const withPurchases = customers?.filter((c) => c.purchaseCount > 0).length ?? 0;
-  const waOptedIn = customers?.filter((c) => c.waOptedIn).length ?? 0;
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === 'lastPurchaseAt') {
+      const at = a.lastPurchaseAt ? new Date(a.lastPurchaseAt).getTime() : 0;
+      const bt = b.lastPurchaseAt ? new Date(b.lastPurchaseAt).getTime() : 0;
+      return bt - at;
+    }
+    return b[sortBy] - a[sortBy];
+  });
+
+  const pointsThreshold = tenant?.pointsThreshold ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-emerald-50/40">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Customers</h1>
-            <p className="text-xs text-slate-400 mt-0.5">All registered loyalty members</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isLoading ? 'Loading…' : `${total} total · ${activeCount} active`}
+            </p>
           </div>
-          <a
-            href="/cashier"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="self-start rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 sm:self-auto"
-          >
-            Open Cashier App ↗
-          </a>
+          <div className="flex gap-2 self-start sm:self-auto">
+            <a
+              href="/cashier"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400"
+            >
+              Open Cashier App ↗
+            </a>
+            <a
+              href="/campaigns/new"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              Send Campaign
+            </a>
+          </div>
         </div>
       </div>
 
       <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-6">
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-            <p className="text-lg font-bold text-slate-900 sm:text-2xl">{isLoading ? '—' : total}</p>
-            <p className="text-xs text-slate-500 sm:text-sm">Total Members</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-            <p className="text-lg font-bold text-slate-900 sm:text-2xl">{isLoading ? '—' : withPurchases}</p>
-            <p className="text-xs text-slate-500 sm:text-sm">Made a Purchase</p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-            <p className="text-lg font-bold text-slate-900 sm:text-2xl">{isLoading ? '—' : waOptedIn}</p>
-            <p className="text-xs text-slate-500 sm:text-sm">WA Opted-In</p>
-          </div>
+        {/* Tier filter pills */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setTierFilter('all')}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              tierFilter === 'all'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+            }`}
+          >
+            All ({total})
+          </button>
+          {[...tierCounts.entries()].map(([label, count]) => (
+            <button
+              key={label}
+              onClick={() => setTierFilter(label)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                tierFilter === label
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
+          <button
+            onClick={() => setTierFilter('inactive')}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              tierFilter === 'inactive'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+            }`}
+          >
+            Inactive ({inactiveCount})
+          </button>
         </div>
 
-        {/* Search + filters */}
+        {/* Search + sort */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="text"
             placeholder="Search by name or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A1628]"
+            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
-          {statusFilter && (
-            <button
-              onClick={() => router.push('/customers')}
-              className="self-start rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 hover:border-slate-400 sm:self-auto"
-            >
-              Showing: {statusFilter} ✕
-            </button>
-          )}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortField)}
+            className="self-start rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:self-auto"
+          >
+            <option value="totalSpend">Sort: Total Spend</option>
+            <option value="pointsBalance">Sort: Points</option>
+            <option value="lastPurchaseAt">Sort: Last Visit</option>
+          </select>
         </div>
 
         {/* Table */}
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Phone</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Customer</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Tier</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Points</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Spend</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Visits</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">WA</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Progress</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Total Spend</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Last Visit</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Joined</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">WA</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-              ) : filtered.length === 0 ? (
+              ) : sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-sm text-slate-400">
                     {search ? 'No customers match your search' : 'No customers yet — share your QR code to get started'}
                   </td>
                 </tr>
               ) : (
-                filtered.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div>
+                sorted.map((customer) => {
+                  const badge = customer.tier ? tierBadge(customer.tier.tierLabel) : null;
+                  const pct = pointsThreshold > 0
+                    ? Math.min(100, Math.round((customer.pointsBalance / pointsThreshold) * 100))
+                    : 0;
+                  return (
+                    <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{customer.fullName}</p>
-                        {customer.tier && (
-                          <span className="text-xs text-slate-400">{customer.tier.tierLabel}</span>
+                        <p className="text-xs text-slate-400 font-mono">{customer.phoneE164}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        {badge ? (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${badge.classes}`}>
+                            {badge.icon} {customer.tier!.tierLabel}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
                         )}
-                        {!customer.tier && (
-                          <span className="text-xs text-slate-400">{SOURCE_LABELS[customer.source] ?? customer.source}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-slate-900">{customer.pointsBalance.toLocaleString()}</span>
+                      </td>
+                      <td className="px-4 py-3 min-w-[120px]">
+                        <div className="h-1.5 w-full rounded-full bg-slate-200">
+                          <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">{pct}% to reward</p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        ₦{Number(customer.totalSpend).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        {customer.lastPurchaseAt
+                          ? formatDistanceToNow(new Date(customer.lastPurchaseAt), { addSuffix: true })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400">
+                        {formatDistanceToNow(new Date(customer.createdAt), { addSuffix: true })}
+                      </td>
+                      <td className="px-4 py-3">
+                        {customer.waOptedIn ? (
+                          <span className="text-green-600 font-semibold">✓</span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{customer.phoneE164}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-semibold text-slate-900">⭐ {customer.pointsBalance.toLocaleString()}</span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-700">
-                      ₦{Number(customer.totalSpend).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{customer.purchaseCount}</td>
-                    <td className="px-4 py-3">
-                      {customer.waOptedIn ? (
-                        <span className="text-green-600 font-semibold">✓</span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400">
-                      {formatDistanceToNow(new Date(customer.createdAt), { addSuffix: true })}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
-          {!isLoading && filtered.length > 0 && (
+          {!isLoading && sorted.length > 0 && (
             <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
-              Showing {filtered.length} of {total} customers
+              Showing {sorted.length} of {total} customers
             </div>
           )}
         </div>
