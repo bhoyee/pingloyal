@@ -269,7 +269,7 @@ export default function CampaignsPage() {
                       <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         {campaign.status === 'draft' && (
                           <button
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-sm"
+                            className="cursor-pointer rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-sm"
                             onClick={() => router.push(`/campaigns/${campaign.id}`)}
                           >
                             Edit
@@ -277,7 +277,7 @@ export default function CampaignsPage() {
                         )}
                         {campaign.status === 'draft' && (
                           <button
-                            className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 hover:shadow-sm"
+                            className="cursor-pointer rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 hover:shadow-sm"
                             onClick={(e) => void deleteCampaign(e, campaign.id)}
                           >
                             Delete
