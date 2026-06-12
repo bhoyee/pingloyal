@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { publicPost, ApiError } from '@/lib/api';
 
 interface LoginResponse {
@@ -10,10 +10,12 @@ interface LoginResponse {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const resetSuccess = searchParams.get('reset') === 'success';
 
   async function handleLogin(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -100,6 +102,9 @@ export default function LoginPage() {
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="text-sm font-medium text-slate-700">Password</label>
+                <a href="/forgot-password" className="text-sm font-medium text-[#0F1E35] hover:underline">
+                  Forgot password?
+                </a>
               </div>
               <input
                 type="password"
@@ -111,6 +116,12 @@ export default function LoginPage() {
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
               />
             </div>
+
+            {resetSuccess && !error && (
+              <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                Password reset successfully — sign in with your new password
+              </p>
+            )}
 
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">

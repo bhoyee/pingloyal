@@ -53,6 +53,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   emailVerificationExpiry: Date | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  passwordResetToken: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordResetExpiry: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

@@ -31,6 +31,8 @@ import { RegisterDto, Country } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Food & Groceries', slug: 'food' },
@@ -45,6 +47,7 @@ const DEFAULT_CATEGORIES = [
 
 const BCRYPT_ROUNDS = 12;
 const VERIFICATION_EXPIRY_HOURS = 24;
+const PASSWORD_RESET_EXPIRY_HOURS = 1;
 
 export interface AuthTokens {
   accessToken: string;
@@ -355,6 +358,96 @@ export class AuthService {
         'If the email exists and is unverified, a new code has been sent',
       ...(devCode ? { devCode } : {}),
     };
+  }
+
+  // ── Forgot password ───────────────────────────────────────────────────────
+
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<{ message: string; devCode?: string }> {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+
+    const genericResponse = {
+      message:
+        'If an account exists for this email, a reset code has been sent',
+    };
+
+    // Return generic response to prevent email enumeration
+    if (!user || !user.isActive) {
+      return genericResponse;
+    }
+
+    const { code, hashedCode } = this.generateVerificationCode();
+    const expiry = new Date(
+      Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+
+    await this.userRepo.update(user.id, {
+      passwordResetToken: hashedCode,
+      passwordResetExpiry: expiry,
+    });
+
+    let emailSent = false;
+    try {
+      await this.mailer.sendPasswordResetCode({
+        to: user.email,
+        name: user.fullName,
+        code,
+      });
+      emailSent = true;
+    } catch (err) {
+      this.logger.error(
+        `Failed to send password reset code to ${user.email}: ${String(err)}`,
+      );
+    }
+
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    const devCode = isDev && !emailSent ? code : undefined;
+
+    return {
+      ...genericResponse,
+      ...(devCode ? { devCode } : {}),
+    };
+  }
+
+  // ── Reset password ───────────────────────────────────────────────────────
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    if (
+      !user.passwordResetToken ||
+      !user.passwordResetExpiry ||
+      user.passwordResetExpiry < new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const incomingHash = crypto
+      .createHash('sha256')
+      .update(dto.code)
+      .digest('hex');
+
+    if (incomingHash !== user.passwordResetToken) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+
+    await this.userRepo.update(user.id, {
+      hashedPassword,
+      passwordResetToken: null,
+      passwordResetExpiry: null,
+    });
+
+    // Invalidate any existing session so the old password can't be used again
+    await this.redis.del(`refresh:${user.id}`);
+
+    return { message: 'Password reset successfully' };
   }
 
   // ── Refresh ───────────────────────────────────────────────────────────────

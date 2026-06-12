@@ -9,6 +9,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  ForgotPasswordThrottleGuard,
   LoginThrottleGuard,
   ResendVerificationThrottleGuard,
 } from '../../common/throttle/auth-throttle.guard';
@@ -22,6 +23,8 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -63,6 +66,26 @@ export class AuthController {
   @ApiOperation({ summary: 'Resend email verification code' })
   resendVerification(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerification(dto);
+  }
+
+  @Public()
+  @UseGuards(ForgotPasswordThrottleGuard)
+  @Throttle({ default: { ttl: 60 * 1000, limit: 3 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset code by email' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @UseGuards(ForgotPasswordThrottleGuard)
+  @Throttle({ default: { ttl: 60 * 1000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with a 6-digit email code' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Public()
