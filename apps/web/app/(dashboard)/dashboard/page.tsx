@@ -106,64 +106,33 @@ function SkeletonCard() {
   );
 }
 
-// ── Ring chart ────────────────────────────────────────────────────────────────
-
-function RingChart({ pct }: { pct: number }) {
-  const r = 20;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  const colour =
-    pct >= 90 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626';
-
-  return (
-    <svg viewBox="0 0 48 48" className="h-10 w-10">
-      <circle cx="24" cy="24" r={r} fill="none" stroke="#e2e8f0" strokeWidth="6" />
-      <circle
-        cx="24"
-        cy="24"
-        r={r}
-        fill="none"
-        stroke={colour}
-        strokeWidth="6"
-        strokeDasharray={`${dash} ${circ - dash}`}
-        strokeLinecap="round"
-        transform="rotate(-90 24 24)"
-      />
-    </svg>
-  );
-}
-
 // ── Metric card ───────────────────────────────────────────────────────────────
 
 function MetricCard({
-  icon,
   value,
   label,
+  valueColor = 'text-slate-900',
   sub,
+  subColor = 'text-slate-400',
   onClick,
-  ring,
 }: {
-  icon: string;
   value: string | number;
   label: string;
+  valueColor?: string;
   sub?: string;
+  subColor?: string;
   onClick?: () => void;
-  ring?: number;
 }) {
   return (
     <div
       onClick={onClick}
       className={`group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg sm:p-5 ${onClick ? 'cursor-pointer hover:border-[#0F1E35]' : 'hover:border-slate-300'}`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-xl transition-transform duration-200 ease-out group-hover:scale-110 sm:h-10 sm:w-10 sm:text-2xl">
-          {icon}
-        </span>
-        {ring !== undefined && <RingChart pct={ring} />}
-      </div>
-      <p className="text-xl font-bold text-slate-900 sm:text-2xl">{value}</p>
-      <p className="text-xs text-slate-500 sm:text-sm">{label}</p>
-      {sub && <p className="mt-1 text-xs text-slate-400">{sub}</p>}
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className={`mt-1 text-2xl font-bold sm:text-3xl ${valueColor}`}>{value}</p>
+      {sub && <p className={`mt-1 text-xs font-medium ${subColor}`}>{sub}</p>}
     </div>
   );
 }
@@ -358,6 +327,11 @@ export default function DashboardPage() {
       ? Math.round((s.activeCustomers / s.totalCustomers) * 100)
       : 0;
 
+  const redemptionRate =
+    s.pointsIssuedThisMonth > 0
+      ? Math.round((s.pointsRedeemedThisMonth / s.pointsIssuedThisMonth) * 100)
+      : 0;
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Page header */}
@@ -407,54 +381,54 @@ export default function DashboardPage() {
           ) : (
             <>
               <MetricCard
-                icon="👥"
                 value={s.totalCustomers}
                 label="Total Customers"
-                sub={s.newCustomersThisMonth > 0 ? `+${s.newCustomersThisMonth} this month` : 'No new customers yet'}
+                valueColor="text-emerald-600"
+                sub={s.newCustomersThisMonth > 0 ? `↑ +${s.newCustomersThisMonth} this month` : 'No new customers yet'}
+                subColor={s.newCustomersThisMonth > 0 ? 'text-emerald-600' : 'text-slate-400'}
+                onClick={() => router.push('/customers')}
               />
               <MetricCard
-                icon="✅"
                 value={s.activeCustomers}
-                label="Active Customers"
-                sub={s.totalCustomers > 0 ? `${activePercent}% of total` : 'Register your first customer'}
+                label={`Active (${tenant?.lapsedDays ?? 60}d)`}
+                valueColor="text-emerald-600"
+                sub={s.totalCustomers > 0 ? `${activePercent}% of total` : 'No active customers yet'}
+                onClick={() => router.push('/customers?status=active')}
               />
               <MetricCard
-                icon="😴"
                 value={s.inactiveCustomers}
-                label="Lapsed Customers"
-                sub={s.inactiveCustomers > 0 ? 'Click to view →' : 'None lapsed yet'}
-                onClick={s.inactiveCustomers > 0 ? () => router.push('/customers?status=inactive') : undefined}
+                label="Inactive"
+                valueColor="text-amber-600"
+                sub="View & send win-back →"
+                subColor="text-amber-600 underline"
+                onClick={() => router.push('/customers?status=inactive')}
               />
               <MetricCard
-                icon="⭐"
                 value={s.pointsIssuedThisMonth.toLocaleString()}
-                label="Points Issued"
+                label="Points Issued (Month)"
                 sub="This month"
               />
               <MetricCard
-                icon="🎁"
                 value={s.pointsRedeemedThisMonth.toLocaleString()}
                 label="Points Redeemed"
-                sub="This month"
+                sub={s.pointsIssuedThisMonth > 0 ? `${redemptionRate}% redemption rate` : 'This month'}
               />
               <MetricCard
-                icon="💬"
+                value={s.campaignsSentThisMonth}
+                label="Campaigns (Month)"
+                sub={s.avgDeliveryRate > 0 ? `${s.avgDeliveryRate}% delivery rate` : 'This month'}
+              />
+              <MetricCard
                 value={s.messagesSentThisMonth.toLocaleString()}
                 label="WA Messages Sent"
-                sub="This month"
+                sub="Triggers + campaigns"
+                subColor="font-semibold text-emerald-600"
               />
               <MetricCard
-                icon="📣"
-                value={s.campaignsSentThisMonth}
-                label="Campaigns Sent"
-                sub="This month"
-              />
-              <MetricCard
-                icon="📈"
                 value={s.avgDeliveryRate > 0 ? `${s.avgDeliveryRate}%` : '—'}
-                label="Avg Delivery Rate"
-                sub="Across all campaigns"
-                ring={s.avgDeliveryRate > 0 ? s.avgDeliveryRate : undefined}
+                label="Delivery Rate"
+                valueColor="text-emerald-600"
+                sub="Industry avg: 78%"
               />
             </>
           )}

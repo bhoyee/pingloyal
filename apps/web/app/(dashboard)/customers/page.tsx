@@ -70,6 +70,7 @@ export default function CustomersPage() {
       }
     }
     if (statusFilter === 'inactive') return !c.lastPurchaseAt || c.purchaseCount === 0;
+    if (statusFilter === 'active') return !!c.lastPurchaseAt && c.purchaseCount > 0;
     return true;
   });
 
