@@ -10,33 +10,6 @@ interface BillingStatus {
   planTier: string;
 }
 
-function TrialBanner({ days }: { days: number }) {
-  const urgent = days <= 3;
-  return (
-    <div
-      className={`flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
-        urgent
-          ? 'border-amber-200 bg-amber-50 text-amber-800'
-          : 'border-blue-200 bg-blue-50 text-blue-800'
-      }`}
-      data-testid="trial-banner"
-    >
-      <p className="text-sm font-medium">
-        {urgent
-          ? `⚠️ Trial ending soon: ${days} day${days === 1 ? '' : 's'} left! Subscribe now to avoid losing access.`
-          : `⏳ Free trial: ${days} days remaining. Subscribe now to keep your automations running.`}
-      </p>
-      <a
-        href="/billing"
-        className="shrink-0 rounded-lg bg-[#0F1E35] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1a3050] sm:ml-4"
-        data-testid="trial-subscribe-link"
-      >
-        Subscribe Now →
-      </a>
-    </div>
-  );
-}
-
 function PastDueBanner() {
   return (
     <div
@@ -141,10 +114,6 @@ function DashboardContent({ children }: { children: ReactNode }) {
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex flex-1 flex-col overflow-y-auto">
         <MobileTopBar onOpenMenu={() => setMenuOpen(true)} />
-        {billing?.status === 'trialing' &&
-          billing.trialDaysRemaining !== null && (
-            <TrialBanner days={billing.trialDaysRemaining} />
-          )}
         {billing?.status === 'past_due' && <PastDueBanner />}
         {children}
       </div>

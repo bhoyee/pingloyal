@@ -54,50 +54,6 @@ function mockApiResponses(billingStatus: Record<string, unknown>) {
   });
 }
 
-// T16: trialing 10 days → blue trial banner ───────────────────────────────────
-
-it('T16 — trialing with 10 days remaining shows blue trial banner', async () => {
-  mockApiResponses(
-    makeBillingStatus({ status: 'trialing', trialDaysRemaining: 10 }),
-  );
-
-  render(
-    <DashboardLayout>
-      <div data-testid="content">Dashboard</div>
-    </DashboardLayout>,
-    { wrapper },
-  );
-
-  await waitFor(() => {
-    expect(screen.getByTestId('trial-banner')).toBeInTheDocument();
-    expect(screen.getByTestId('trial-banner')).toHaveTextContent('10 days remaining');
-  });
-
-  // Content still shown (not hidden by banner)
-  expect(screen.getByTestId('content')).toBeInTheDocument();
-});
-
-// T17: trialing 2 days → urgent warning banner ────────────────────────────────
-
-it('T17 — trialing with 2 days remaining shows urgent warning banner', async () => {
-  mockApiResponses(
-    makeBillingStatus({ status: 'trialing', trialDaysRemaining: 2 }),
-  );
-
-  render(
-    <DashboardLayout>
-      <div>Dashboard</div>
-    </DashboardLayout>,
-    { wrapper },
-  );
-
-  await waitFor(() => {
-    const banner = screen.getByTestId('trial-banner');
-    expect(banner).toHaveTextContent('Trial ending soon');
-    expect(banner).toHaveTextContent('2 day');
-  });
-});
-
 // T18: past_due → amber payment banner ────────────────────────────────────────
 
 it('T18 — past_due status shows amber payment failed banner', async () => {
@@ -177,22 +133,24 @@ it('T21 — suspended overlay shows Subscribe button linking to /billing', async
   });
 });
 
-// T22: trial banner Subscribe button links to /billing ────────────────────────
+// T22: trialing status renders content without a layout-level trial banner ────
+// (the trial countdown now lives in the dashboard page's banner stack)
 
-it('T22 — trial banner Subscribe Now button links to /billing', async () => {
+it('T22 — trialing status does not show a layout-level trial banner', async () => {
   mockApiResponses(
     makeBillingStatus({ status: 'trialing', trialDaysRemaining: 8 }),
   );
 
   render(
     <DashboardLayout>
-      <div>Dashboard</div>
+      <div data-testid="content">Dashboard</div>
     </DashboardLayout>,
     { wrapper },
   );
 
   await waitFor(() => {
-    const link = screen.getByTestId('trial-subscribe-link') as HTMLAnchorElement;
-    expect(link.href).toContain('/billing');
+    expect(screen.getByTestId('content')).toBeInTheDocument();
   });
+
+  expect(screen.queryByTestId('trial-banner')).not.toBeInTheDocument();
 });
