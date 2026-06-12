@@ -146,15 +146,13 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-xl font-bold text-slate-900">Profile</h1>
-          <p className="text-sm text-slate-500">
-            Manage your account details, email, and password.
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900">Profile</h1>
+        <p className="text-sm text-slate-500">
+          Manage your account details, email, and password.
+        </p>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+      <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
         {/* ── Account details ────────────────────────────────────────────── */}
         <Card>
           <CardHeader>
