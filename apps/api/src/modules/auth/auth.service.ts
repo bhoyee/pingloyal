@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -367,14 +368,8 @@ export class AuthService {
   ): Promise<{ message: string; devCode?: string }> {
     const user = await this.userRepo.findOne({ where: { email: dto.email } });
 
-    const genericResponse = {
-      message:
-        'If an account exists for this email, a reset code has been sent',
-    };
-
-    // Return generic response to prevent email enumeration
     if (!user || !user.isActive) {
-      return genericResponse;
+      throw new NotFoundException('No account found with this email address');
     }
 
     const { code, hashedCode } = this.generateVerificationCode();
@@ -405,7 +400,7 @@ export class AuthService {
     const devCode = isDev && !emailSent ? code : undefined;
 
     return {
-      ...genericResponse,
+      message: 'A reset code has been sent to your email',
       ...(devCode ? { devCode } : {}),
     };
   }

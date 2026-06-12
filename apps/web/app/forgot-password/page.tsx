@@ -27,6 +27,10 @@ export default function ForgotPasswordPage() {
       if (res.devCode) params.set('devCode', res.devCode);
       router.push(`/reset-password?${params.toString()}`);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setError('No account found with this email address');
+        return;
+      }
       setError(err instanceof ApiError ? err.message : 'Something went wrong — please try again');
     } finally {
       setLoading(false);
