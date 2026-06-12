@@ -289,10 +289,10 @@ it('T16 — clicking inactive customers card navigates to /customers?status=inac
   render(<DashboardPage />, { wrapper });
 
   await waitFor(() => {
-    expect(screen.getByText('Lapsed Customers')).toBeInTheDocument();
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
-  await userEvent.click(screen.getByText('Lapsed Customers').closest('div')!);
+  await userEvent.click(screen.getByText('Inactive').closest('div')!);
 
   expect(mockPush).toHaveBeenCalledWith('/customers?status=inactive');
 });
@@ -325,10 +325,10 @@ it('T16c — clicking active customers card navigates to /customers?status=activ
   render(<DashboardPage />, { wrapper });
 
   await waitFor(() => {
-    expect(screen.getByText('Active Customers')).toBeInTheDocument();
+    expect(screen.getByText('Active (60d)')).toBeInTheDocument();
   });
 
-  await userEvent.click(screen.getByText('Active Customers').closest('div')!);
+  await userEvent.click(screen.getByText('Active (60d)').closest('div')!);
 
   expect(mockPush).toHaveBeenCalledWith('/customers?status=active');
 });
