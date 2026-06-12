@@ -33,6 +33,10 @@ function isActiveCustomer(c: Customer): boolean {
   return !!c.lastPurchaseAt && c.purchaseCount > 0;
 }
 
+const TIER_ORDER: Record<string, number> = { vip: 0, mid: 1, standard: 2 };
+
+const PAGE_SIZE = 10;
+
 function SkeletonRow() {
   return (
     <tr>
@@ -52,6 +56,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
   const [sortBy, setSortBy] = useState<SortField>('totalSpend');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!localStorage.getItem('access_token')) {
@@ -66,6 +71,10 @@ export default function CustomersPage() {
       setTierFilter('inactive');
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, tierFilter, sortBy]);
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: ['customers'],
@@ -91,6 +100,11 @@ export default function CustomersPage() {
       tierCounts.set(c.tier.tierLabel, (tierCounts.get(c.tier.tierLabel) ?? 0) + 1);
     }
   }
+  const sortedTiers = [...tierCounts.entries()].sort((a, b) => {
+    const ao = TIER_ORDER[a[0].toLowerCase()] ?? 99;
+    const bo = TIER_ORDER[b[0].toLowerCase()] ?? 99;
+    return ao - bo;
+  });
 
   const filtered = (customers ?? []).filter((c) => {
     if (search) {
@@ -114,6 +128,9 @@ export default function CustomersPage() {
   });
 
   const pointsThreshold = tenant?.pointsThreshold ?? 0;
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-emerald-50/40">
@@ -150,36 +167,39 @@ export default function CustomersPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setTierFilter('all')}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
               tierFilter === 'all'
                 ? 'bg-emerald-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+                : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
             }`}
           >
             All ({total})
           </button>
-          {[...tierCounts.entries()].map(([label, count]) => (
-            <button
-              key={label}
-              onClick={() => setTierFilter(label)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                tierFilter === label
-                  ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
-              }`}
-            >
-              {label} ({count})
-            </button>
-          ))}
+          {sortedTiers.map(([label, count]) => {
+            const badge = tierBadge(label);
+            return (
+              <button
+                key={label}
+                onClick={() => setTierFilter(label)}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                  tierFilter === label
+                    ? 'bg-emerald-600 text-white'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
+                }`}
+              >
+                {badge.icon} {label} ({count})
+              </button>
+            );
+          })}
           <button
             onClick={() => setTierFilter('inactive')}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
               tierFilter === 'inactive'
                 ? 'bg-emerald-600 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-300'
+                : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-300'
             }`}
           >
-            Inactive ({inactiveCount})
+            ⚠️ Inactive ({inactiveCount})
           </button>
         </div>
 
@@ -190,7 +210,7 @@ export default function CustomersPage() {
             placeholder="Search by name or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 sm:w-64"
           />
           <select
             value={sortBy}
@@ -228,7 +248,7 @@ export default function CustomersPage() {
                   </td>
                 </tr>
               ) : (
-                sorted.map((customer) => {
+                paginated.map((customer) => {
                   const badge = customer.tier ? tierBadge(customer.tier.tierLabel) : null;
                   const pct = pointsThreshold > 0
                     ? Math.min(100, Math.round((customer.pointsBalance / pointsThreshold) * 100))
@@ -282,8 +302,29 @@ export default function CustomersPage() {
             </tbody>
           </table>
           {!isLoading && sorted.length > 0 && (
-            <div className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
-              Showing {sorted.length} of {total} customers
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length} customers
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <span>Page {page} of {totalPages}</span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -205,6 +205,7 @@ export class CustomersService {
   async findAll(tenantId: string): Promise<Customer[]> {
     return this.customerRepo.find({
       where: { tenantId, isActive: true },
+      relations: ['tier'],
       order: { createdAt: 'DESC' },
     });
   }
