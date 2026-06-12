@@ -407,21 +407,21 @@ export default function DashboardPage() {
                 value={s.totalCustomers}
                 label="Total Customers"
                 sub={s.totalCustomers > 0 ? 'Click to view →' : (s.newCustomersThisMonth > 0 ? `+${s.newCustomersThisMonth} this month` : 'No new customers yet')}
-                onClick={s.totalCustomers > 0 ? () => router.push('/customers') : undefined}
+                onClick={() => router.push('/customers')}
               />
               <MetricCard
                 icon="✅"
                 value={s.activeCustomers}
                 label="Active Customers"
-                sub={s.activeCustomers > 0 ? 'Click to view →' : 'Register your first customer'}
-                onClick={s.activeCustomers > 0 ? () => router.push('/customers?status=active') : undefined}
+                sub={s.activeCustomers > 0 ? 'Click to view →' : 'No active customers yet'}
+                onClick={() => router.push('/customers?status=active')}
               />
               <MetricCard
                 icon="😴"
                 value={s.inactiveCustomers}
                 label="Lapsed Customers"
                 sub={s.inactiveCustomers > 0 ? 'Click to view →' : 'None lapsed yet'}
-                onClick={s.inactiveCustomers > 0 ? () => router.push('/customers?status=inactive') : undefined}
+                onClick={() => router.push('/customers?status=inactive')}
               />
               <MetricCard
                 icon="⭐"
