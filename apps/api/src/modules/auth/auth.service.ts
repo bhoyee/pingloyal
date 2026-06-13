@@ -6,6 +6,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -31,6 +32,11 @@ import { RegisterDto, Country } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangeEmailDto } from './dto/change-email.dto';
 
 const DEFAULT_CATEGORIES = [
   { name: 'Food & Groceries', slug: 'food' },
@@ -45,6 +51,7 @@ const DEFAULT_CATEGORIES = [
 
 const BCRYPT_ROUNDS = 12;
 const VERIFICATION_EXPIRY_HOURS = 24;
+const PASSWORD_RESET_EXPIRY_HOURS = 1;
 
 export interface AuthTokens {
   accessToken: string;
@@ -66,6 +73,16 @@ export interface RegisterResponse {
   email: string;
   /** Only present when Resend is not configured (dev/test environments) */
   devCode?: string;
+}
+
+export interface ProfileResponse {
+  id: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  emailVerified: boolean;
+  lastLoginAt: Date | null;
+  createdAt: Date;
 }
 
 @Injectable()
@@ -357,6 +374,90 @@ export class AuthService {
     };
   }
 
+  // ── Forgot password ───────────────────────────────────────────────────────
+
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<{ message: string; devCode?: string }> {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+
+    if (!user || !user.isActive) {
+      throw new NotFoundException('No account found with this email address');
+    }
+
+    const { code, hashedCode } = this.generateVerificationCode();
+    const expiry = new Date(
+      Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+
+    await this.userRepo.update(user.id, {
+      passwordResetToken: hashedCode,
+      passwordResetExpiry: expiry,
+    });
+
+    let emailSent = false;
+    try {
+      await this.mailer.sendPasswordResetCode({
+        to: user.email,
+        name: user.fullName,
+        code,
+      });
+      emailSent = true;
+    } catch (err) {
+      this.logger.error(
+        `Failed to send password reset code to ${user.email}: ${String(err)}`,
+      );
+    }
+
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    const devCode = isDev && !emailSent ? code : undefined;
+
+    return {
+      message: 'A reset code has been sent to your email',
+      ...(devCode ? { devCode } : {}),
+    };
+  }
+
+  // ── Reset password ───────────────────────────────────────────────────────
+
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    if (
+      !user.passwordResetToken ||
+      !user.passwordResetExpiry ||
+      user.passwordResetExpiry < new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const incomingHash = crypto
+      .createHash('sha256')
+      .update(dto.code)
+      .digest('hex');
+
+    if (incomingHash !== user.passwordResetToken) {
+      throw new BadRequestException('Invalid or expired reset code');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+
+    await this.userRepo.update(user.id, {
+      hashedPassword,
+      passwordResetToken: null,
+      passwordResetExpiry: null,
+    });
+
+    // Invalidate any existing session so the old password can't be used again
+    await this.redis.del(`refresh:${user.id}`);
+
+    return { message: 'Password reset successfully' };
+  }
+
   // ── Refresh ───────────────────────────────────────────────────────────────
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
@@ -409,6 +510,128 @@ export class AuthService {
   async logout(userId: string): Promise<{ message: string }> {
     await this.redis.del(`refresh:${userId}`);
     return { message: 'Logged out successfully' };
+  }
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+
+  async getProfile(userId: string): Promise<ProfileResponse> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      emailVerified: !!user.emailVerifiedAt,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<ProfileResponse> {
+    await this.userRepo.update(userId, { fullName: dto.fullName });
+    return this.getProfile(userId);
+  }
+
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      dto.currentPassword,
+      user.hashedPassword,
+    );
+    if (!passwordMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.userRepo.update(userId, { hashedPassword });
+
+    // Invalidate any existing session so the old password can't be used again
+    await this.redis.del(`refresh:${userId}`);
+
+    return { message: 'Password changed successfully' };
+  }
+
+  async changeEmail(
+    userId: string,
+    dto: ChangeEmailDto,
+  ): Promise<{ message: string; devCode?: string }> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      dto.password,
+      user.hashedPassword,
+    );
+    if (!passwordMatch) {
+      throw new BadRequestException('Password is incorrect');
+    }
+
+    if (dto.newEmail === user.email) {
+      throw new BadRequestException(
+        'New email must be different from your current email',
+      );
+    }
+
+    const existing = await this.userRepo.findOne({
+      where: { email: dto.newEmail },
+    });
+    if (existing) {
+      throw new BadRequestException('Email is already in use');
+    }
+
+    const { code, hashedCode } = this.generateVerificationCode();
+    const expiry = new Date(
+      Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
+
+    await this.userRepo.update(userId, {
+      email: dto.newEmail,
+      emailVerifiedAt: null,
+      emailVerificationToken: hashedCode,
+      emailVerificationExpiry: expiry,
+    });
+
+    // Invalidate the session — the user must verify the new email to sign in again
+    await this.redis.del(`refresh:${userId}`);
+
+    let emailSent = false;
+    try {
+      await this.mailer.sendVerificationCode({
+        to: dto.newEmail,
+        name: user.fullName,
+        code,
+      });
+      emailSent = true;
+    } catch (err) {
+      this.logger.error(
+        `Failed to send verification code to ${dto.newEmail}: ${String(err)}`,
+      );
+    }
+
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    const devCode = isDev && !emailSent ? code : undefined;
+
+    return {
+      message:
+        'Email updated — please verify your new email address to continue',
+      ...(devCode ? { devCode } : {}),
+    };
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

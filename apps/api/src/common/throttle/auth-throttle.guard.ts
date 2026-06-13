@@ -22,3 +22,14 @@ export class ResendVerificationThrottleGuard extends ThrottlerGuard {
     return super.shouldSkip(context);
   }
 }
+
+@Injectable()
+export class ForgotPasswordThrottleGuard extends ThrottlerGuard {
+  protected errorMessage =
+    'Too many requests. Please wait a minute before requesting another code.';
+
+  protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
+    if (process.env.NODE_ENV === 'test') return true;
+    return super.shouldSkip(context);
+  }
+}

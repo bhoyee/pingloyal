@@ -16,6 +16,7 @@ import {
   Plug,
   Wallet,
   CreditCard,
+  UserCircle,
   LogOut,
   X,
   type LucideIcon,
@@ -241,8 +242,20 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           {renderSection('Settings', SETTINGS)}
         </nav>
 
-        {/* Sign out */}
-        <div className="border-t border-white/10 p-3">
+        {/* Profile + Sign out */}
+        <div className="border-t border-white/10 p-3 space-y-0.5">
+          <Link
+            href="/profile"
+            onClick={onClose}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              pathname.startsWith('/profile')
+                ? 'bg-[#0DC56A] text-[#0A1628]'
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <UserCircle size={17} />
+            Profile
+          </Link>
           <button
             onClick={() => {
               localStorage.removeItem('access_token');

@@ -1,14 +1,17 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  ForgotPasswordThrottleGuard,
   LoginThrottleGuard,
   ResendVerificationThrottleGuard,
 } from '../../common/throttle/auth-throttle.guard';
@@ -22,6 +25,11 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangeEmailDto } from './dto/change-email.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -66,6 +74,26 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ForgotPasswordThrottleGuard)
+  @Throttle({ default: { ttl: 60 * 1000, limit: 3 } })
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset code by email' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Public()
+  @UseGuards(ForgotPasswordThrottleGuard)
+  @Throttle({ default: { ttl: 60 * 1000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with a 6-digit email code' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
+  }
+
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate access + refresh tokens' })
@@ -78,5 +106,39 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke refresh token' })
   logout(@CurrentUser() user: RequestUser) {
     return this.authService.logout(user.userId);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get the current user profile' })
+  getProfile(@CurrentUser() user: RequestUser) {
+    return this.authService.getProfile(user.userId);
+  }
+
+  @Patch('me')
+  @ApiOperation({ summary: 'Update the current user profile' })
+  updateProfile(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.userId, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change the current user password' })
+  changePassword(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.userId, dto);
+  }
+
+  @Post('change-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Change the current user email — requires re-verification',
+  })
+  changeEmail(@CurrentUser() user: RequestUser, @Body() dto: ChangeEmailDto) {
+    return this.authService.changeEmail(user.userId, dto);
   }
 }
