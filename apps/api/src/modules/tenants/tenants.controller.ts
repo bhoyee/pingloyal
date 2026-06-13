@@ -30,7 +30,10 @@ export class TenantsController {
   @Get('me')
   @SkipSubscriptionCheck()
   getMe(@Req() req: { user: RequestUser }) {
-    return this.tenantsService.getTenantFull(req.user.tenantId, req.user.userId);
+    return this.tenantsService.getTenantFull(
+      req.user.tenantId,
+      req.user.userId,
+    );
   }
 
   @Patch('settings')

@@ -50,7 +50,15 @@ if (!process.env.DATABASE_URL) {
 const SeedDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Tenant, TierConfig, ProductCategory, User, Customer, Campaign, CampaignLog],
+  entities: [
+    Tenant,
+    TierConfig,
+    ProductCategory,
+    User,
+    Customer,
+    Campaign,
+    CampaignLog,
+  ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,
   logging: false,
