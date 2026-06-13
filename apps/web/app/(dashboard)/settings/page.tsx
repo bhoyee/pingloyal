@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -77,6 +78,7 @@ const WA_STATUS_STYLES: Record<string, string> = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const queryClient = useQueryClient();
   const [tenant, setTenant] = useState<TenantMe | null>(null);
   const [tiers, setTiers] = useState<TierConfig[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -155,6 +157,7 @@ export default function SettingsPage() {
     try {
       const updated = await api.patch<TenantMe>('/api/v1/tenants/settings', values);
       setTenant(updated);
+      queryClient.setQueryData(['tenant-me'], updated);
       showToast('Business profile updated');
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : 'Failed to save business profile', 'error');
@@ -165,6 +168,7 @@ export default function SettingsPage() {
     try {
       const updated = await api.patch<TenantMe>('/api/v1/tenants/settings', values);
       setTenant(updated);
+      queryClient.setQueryData(['tenant-me'], updated);
       showToast('Loyalty programme settings updated');
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : 'Failed to save loyalty settings', 'error');

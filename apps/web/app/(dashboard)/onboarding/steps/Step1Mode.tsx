@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { StepCard } from '@/components/onboarding/StepCard';
 import { StepNavigation } from '@/components/onboarding/StepNavigation';
-import { api } from '@/lib/api';
+import { api, type TenantMe } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Info, Link, Sparkles } from 'lucide-react';
 
@@ -44,6 +45,7 @@ const options: {
 ];
 
 export function Step1Mode({ onComplete }: Step1ModeProps) {
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Mode>('native');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,7 +54,8 @@ export function Step1Mode({ onComplete }: Step1ModeProps) {
     setLoading(true);
     setError('');
     try {
-      await api.patch('/tenants/settings', { mode: selected });
+      const updated = await api.patch<TenantMe>('/tenants/settings', { mode: selected });
+      queryClient.setQueryData(['tenant-me'], updated);
       localStorage.setItem('onboarding_mode', selected);
       onComplete(selected);
     } catch (e) {
