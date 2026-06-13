@@ -179,7 +179,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         <div className="border-b border-white/10 px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0DC56A]/15">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0DC56A]/15">
                 <svg width="16" height="16" viewBox="0 0 22 22" fill="none" aria-hidden="true">
                   <path
                     d="M18 2H4C2.9 2 2 2.9 2 4v10c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
@@ -196,7 +196,17 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   />
                 </svg>
               </div>
-              <span className="text-sm font-bold text-white">PingLoyal</span>
+              <div className="min-w-0">
+                <p
+                  className="truncate text-sm font-bold text-white"
+                  title={tenant?.businessName}
+                >
+                  {tenant?.businessName ?? 'PingLoyal'}
+                </p>
+                <span className="mt-0.5 inline-flex w-fit items-center rounded-full bg-[#0DC56A]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0DC56A]">
+                  PingLoyal
+                </span>
+              </div>
             </div>
             {/* Close button — mobile only */}
             <button
@@ -207,17 +217,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
               <X size={18} />
             </button>
           </div>
-
-          {tenant && (
-            <div className="mt-3 flex items-center gap-2">
-              <span
-                className="max-w-full truncate rounded-full bg-blue-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-400"
-                title={tenant.businessName}
-              >
-                {tenant.businessName}
-              </span>
-            </div>
-          )}
 
           {tenant && (
             <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-medium text-slate-300">

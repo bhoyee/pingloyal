@@ -81,7 +81,7 @@ export default function SettingsPage() {
   const [tiers, setTiers] = useState<TierConfig[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,8 +117,8 @@ export default function SettingsPage() {
   const standardMax = midMin > 0 ? midMin - 1 : 0;
   const tierOverlap = vipMin <= midMax;
 
-  function showToast(message: string) {
-    setToast(message);
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   }
 
@@ -157,7 +157,7 @@ export default function SettingsPage() {
       setTenant(updated);
       showToast('Business profile updated');
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to save business profile');
+      showToast(e instanceof ApiError ? e.message : 'Failed to save business profile', 'error');
     }
   }
 
@@ -167,7 +167,7 @@ export default function SettingsPage() {
       setTenant(updated);
       showToast('Loyalty programme settings updated');
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to save loyalty settings');
+      showToast(e instanceof ApiError ? e.message : 'Failed to save loyalty settings', 'error');
     }
   }
 
@@ -203,7 +203,7 @@ export default function SettingsPage() {
       tiersForm.reset(tiersToFormValues(updated));
       showToast('Loyalty tiers updated');
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to save loyalty tiers');
+      showToast(e instanceof ApiError ? e.message : 'Failed to save loyalty tiers', 'error');
     }
   }
 
@@ -214,7 +214,7 @@ export default function SettingsPage() {
       categoryForm.reset({ name: '' });
       showToast(`Added category "${created.name}"`);
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to add category');
+      showToast(e instanceof ApiError ? e.message : 'Failed to add category', 'error');
     }
   }
 
@@ -228,7 +228,7 @@ export default function SettingsPage() {
       setTenant((prev) => (prev ? { ...prev, logoUrl: result.logoUrl } : prev));
       showToast('Logo updated');
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : 'Failed to upload logo');
+      showToast(err instanceof ApiError ? err.message : 'Failed to upload logo', 'error');
     } finally {
       setLogoUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -644,9 +644,11 @@ export default function SettingsPage() {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl bg-gray-800 px-4 py-3 text-center text-sm text-white shadow-lg"
+          className={`fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-center text-sm text-white shadow-lg ${
+            toast.type === 'success' ? 'bg-[#0DC56A]' : 'bg-red-600'
+          }`}
         >
-          {toast}
+          {toast.message}
         </div>
       )}
     </div>
