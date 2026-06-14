@@ -1,5 +1,6 @@
 'use client';
 import { type ReactNode, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { api, type TenantMe } from '@/lib/api';
@@ -82,6 +83,8 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
 }
 
 function DashboardContent({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const onOnboardingRoute = pathname.startsWith('/onboarding');
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Shared with Sidebar's and the dashboard page's ['tenant-me'] queries so
@@ -97,17 +100,19 @@ function DashboardContent({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    // Onboarding is complete once the QR code has been generated
-    if (tenant && !tenant.qrCodeUrl) {
+    // Onboarding is complete once the QR code has been generated. Skip this
+    // on the onboarding route itself — otherwise every reload there would
+    // immediately redirect back to itself, causing an infinite reload loop.
+    if (tenant && !tenant.qrCodeUrl && !onOnboardingRoute) {
       window.location.replace('/onboarding');
     }
-  }, [tenant]);
+  }, [tenant, onOnboardingRoute]);
 
   // Show a spinner instead of a blank screen while we check onboarding
   // status. If the tenant fetch errors (e.g. auth), tenantLoading becomes
   // false and we fall through to render the shell so the page underneath
   // can redirect to /login itself.
-  if (tenantLoading || (tenant && !tenant.qrCodeUrl)) {
+  if (tenantLoading || (tenant && !tenant.qrCodeUrl && !onOnboardingRoute)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <Spinner className="h-8 w-8" />
