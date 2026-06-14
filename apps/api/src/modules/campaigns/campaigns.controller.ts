@@ -13,7 +13,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { UserRole } from '@pingloyal/types';
+import { CampaignLogStatus, UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -23,6 +23,7 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { ScheduleCampaignDto } from './dto/schedule-campaign.dto';
 import { SegmentRulesDto } from './dto/segment-rules.dto';
+import { DeleteCampaignDto } from './dto/delete-campaign.dto';
 
 @Controller('campaigns')
 export class CampaignsController {
@@ -75,9 +76,11 @@ export class CampaignsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DeleteCampaignDto,
   ) {
-    return this.campaignsService.remove(tenantId, id);
+    return this.campaignsService.remove(tenantId, id, user.userId, dto.reason);
   }
 
   @Post(':id/send')
@@ -124,8 +127,9 @@ export class CampaignsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 50,
+    @Query('status') status?: CampaignLogStatus,
   ) {
-    return this.campaignsService.findLogs(tenantId, id, page, limit);
+    return this.campaignsService.findLogs(tenantId, id, page, limit, status);
   }
 }
 

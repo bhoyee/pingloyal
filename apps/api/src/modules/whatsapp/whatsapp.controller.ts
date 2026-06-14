@@ -23,6 +23,7 @@ import type { GupshupWebhookPayload } from './wa-onboarding.service';
 import { WaOnboardingService } from './wa-onboarding.service';
 import { WaBotService } from './wa-bot.service';
 import { ThrottleConfigs } from '../../common/throttle/throttle.config';
+import { CampaignsService } from '../campaigns/campaigns.service';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -32,6 +33,7 @@ export class WhatsappController {
     private readonly onboardingService: WaOnboardingService,
     private readonly botService: WaBotService,
     private readonly config: ConfigService,
+    private readonly campaignsService: CampaignsService,
   ) {}
 
   @Post('onboarding/initiate')
@@ -90,7 +92,20 @@ export class WhatsappController {
     try {
       const payload = req.body;
 
-      // Ignore non-message events (status updates, user events)
+      // Message delivery/read/failure receipts → campaign log status
+      if (payload.type === 'message-event') {
+        const event = payload.payload;
+        if (event?.id && event.type) {
+          await this.campaignsService.handleDeliveryStatusEvent(
+            event.id,
+            event.type,
+            event.payload?.reason,
+          );
+        }
+        return { status: 'ok' };
+      }
+
+      // Ignore non-message events (user events, etc.)
       if (payload.type !== 'message') {
         return { status: 'ok' };
       }

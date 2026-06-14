@@ -9,7 +9,11 @@ import { Customer } from '../../src/modules/customers/entities/customer.entity';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
-import { CampaignStatus, WaVerificationStatus } from '@pingloyal/types';
+import {
+  CampaignLogStatus,
+  CampaignStatus,
+  WaVerificationStatus,
+} from '@pingloyal/types';
 
 jest.mock('bullmq', () => ({
   Worker: jest
@@ -47,6 +51,9 @@ function makeCampaign(overrides: Partial<Campaign> = {}): Campaign {
     failedCount: 0,
     createdBy: null,
     campaignLogs: [],
+    deletedAt: null,
+    deletedBy: null,
+    deletionReason: null,
     tenant: null as never,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -104,6 +111,13 @@ describe('CampaignsService', () => {
     findOne: jest.Mock;
     update: jest.Mock;
     remove: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let mockCampaignLogRepo: {
+    createQueryBuilder: jest.Mock;
+    count: jest.Mock;
+    findOne: jest.Mock;
+    update: jest.Mock;
   };
   let mockCustomerRepo: { createQueryBuilder: jest.Mock };
   let mockSubscriptionRepo: { findOne: jest.Mock };
@@ -122,6 +136,23 @@ describe('CampaignsService', () => {
       findOne: jest.fn(),
       update: jest.fn().mockResolvedValue(undefined),
       remove: jest.fn().mockResolvedValue(undefined),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      }),
+    };
+    mockCampaignLogRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue({}),
+      }),
+      count: jest.fn().mockResolvedValue(0),
+      findOne: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
     };
     mockCustomerRepo = { createQueryBuilder: jest.fn() };
     mockSubscriptionRepo = {
@@ -145,15 +176,7 @@ describe('CampaignsService', () => {
         { provide: getRepositoryToken(Campaign), useValue: mockCampaignRepo },
         {
           provide: getRepositoryToken(CampaignLog),
-          useValue: {
-            createQueryBuilder: jest.fn().mockReturnValue({
-              insert: jest.fn().mockReturnThis(),
-              into: jest.fn().mockReturnThis(),
-              values: jest.fn().mockReturnThis(),
-              execute: jest.fn().mockResolvedValue({}),
-            }),
-            count: jest.fn().mockResolvedValue(0),
-          },
+          useValue: mockCampaignLogRepo,
         },
         { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
         {
@@ -212,9 +235,9 @@ describe('CampaignsService', () => {
       makeCampaign({ status: CampaignStatus.SENT }),
     );
 
-    await expect(service.remove(TENANT_ID, CAMPAIGN_ID)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(
+      service.remove(TENANT_ID, CAMPAIGN_ID, USER_ID),
+    ).rejects.toThrow(BadRequestException);
   });
 
   // ── T4: Send already-sending campaign → 400 ───────────────────────────────
@@ -391,5 +414,65 @@ describe('CampaignsService', () => {
     await expect(service.cancel(TENANT_ID, CAMPAIGN_ID)).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  // ── handleDeliveryStatusEvent ──────────────────────────────────────────────
+
+  it("T17 — 'delivered' event marks a sent log delivered and increments deliveredCount", async () => {
+    mockCampaignLogRepo.findOne.mockResolvedValue({
+      id: 'log-1',
+      status: CampaignLogStatus.SENT,
+      campaign: { id: CAMPAIGN_ID },
+    });
+
+    await service.handleDeliveryStatusEvent('wamid.abc123', 'delivered');
+
+    expect(mockCampaignLogRepo.update).toHaveBeenCalledWith(
+      'log-1',
+      expect.objectContaining({ status: CampaignLogStatus.DELIVERED }),
+    );
+    expect(mockCampaignRepo.createQueryBuilder).toHaveBeenCalled();
+  });
+
+  it("T18 — 'failed' event marks a sent log failed with reason and increments failedCount", async () => {
+    mockCampaignLogRepo.findOne.mockResolvedValue({
+      id: 'log-2',
+      status: CampaignLogStatus.SENT,
+      campaign: { id: CAMPAIGN_ID },
+    });
+
+    await service.handleDeliveryStatusEvent(
+      'wamid.def456',
+      'failed',
+      'invalid number',
+    );
+
+    expect(mockCampaignLogRepo.update).toHaveBeenCalledWith(
+      'log-2',
+      expect.objectContaining({
+        status: CampaignLogStatus.FAILED,
+        errorMessage: 'invalid number',
+      }),
+    );
+  });
+
+  it('T19 — event for unknown waMessageId is a no-op', async () => {
+    mockCampaignLogRepo.findOne.mockResolvedValue(null);
+
+    await service.handleDeliveryStatusEvent('wamid.unknown', 'delivered');
+
+    expect(mockCampaignLogRepo.update).not.toHaveBeenCalled();
+  });
+
+  it("T20 — 'delivered' event is ignored for a log already marked delivered (idempotent)", async () => {
+    mockCampaignLogRepo.findOne.mockResolvedValue({
+      id: 'log-3',
+      status: CampaignLogStatus.DELIVERED,
+      campaign: { id: CAMPAIGN_ID },
+    });
+
+    await service.handleDeliveryStatusEvent('wamid.ghi789', 'read');
+
+    expect(mockCampaignLogRepo.update).not.toHaveBeenCalled();
   });
 });

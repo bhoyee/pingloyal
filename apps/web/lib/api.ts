@@ -143,8 +143,11 @@ export const api = {
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: <T>(path: string) =>
-    request<T>(path, { method: 'DELETE' }),
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: 'DELETE',
+      ...(body !== undefined && { body: JSON.stringify(body) }),
+    }),
   upload: <T>(path: string, file: File) => upload<T>(path, file),
 };
 
@@ -293,6 +296,7 @@ export interface CampaignLogRow {
   customerId: string;
   customerName: string;
   status: string;
+  waMessageId: string | null;
   sentAt: string | null;
   deliveredAt: string | null;
   failedAt: string | null;
