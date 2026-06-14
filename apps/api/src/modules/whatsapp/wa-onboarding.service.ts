@@ -26,9 +26,10 @@ export interface GupshupWebhookPayload {
   app: string; // Gupshup App ID
   type: string; // 'message' | 'message-event' | 'user-event'
   payload: {
-    source: string; // sender phone E.164
-    type: string; // 'text' | 'image' | 'audio' etc
-    payload: { text?: string };
+    id?: string; // message-event: Gupshup message ID (gsId)
+    source?: string; // sender phone E.164
+    type: string; // message: 'text' | 'image' | ...; message-event: 'sent' | 'delivered' | 'read' | 'failed' | 'enqueued'
+    payload?: { text?: string; reason?: string; code?: string | number };
   };
 }
 
@@ -134,7 +135,7 @@ export class WaOnboardingService {
   // ── handleVerificationReply ────────────────────────────────────────────────
 
   async handleVerificationReply(payload: GupshupWebhookPayload): Promise<void> {
-    const messageText = payload.payload.payload.text ?? '';
+    const messageText = payload.payload.payload?.text ?? '';
     if (messageText.toLowerCase().trim() !== 'yes') return;
 
     const appId = payload.app;

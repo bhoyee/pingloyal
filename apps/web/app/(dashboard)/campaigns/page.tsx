@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { api, type Campaign, type CampaignStatus, type Category, type TenantMe, type TierConfig } from '@/lib/api';
+import { api, ApiError, type Campaign, type CampaignStatus, type Category, type TenantMe, type TierConfig } from '@/lib/api';
+import { describeAudience } from '@/lib/audience';
 import { StatusBadge } from '@/components/campaigns/StatusBadge';
 import { Button } from '@/components/ui/button';
 
@@ -29,42 +30,9 @@ function formatDate(campaign: Campaign): string {
   }
 }
 
-function deliveryRate(c: Campaign): string {
-  if (c.sentCount === 0) return '—';
-  return `${Math.round((c.deliveredCount / c.sentCount) * 100)}%`;
-}
-
-function describeAudience(
-  campaign: Campaign,
-  tiers: TierConfig[],
-  categories: Category[],
-  lapsedDays: number,
-): string {
-  const r = campaign.segmentRules;
-
-  if (r.tierIds?.length) {
-    const labels = r.tierIds.map((id) => tiers.find((t) => t.id === id)?.tierLabel ?? 'Tier');
-    return `${labels.join(', ')} tier only`;
-  }
-
-  if (r.categoryIds?.length) {
-    const labels = r.categoryIds.map((id) => categories.find((c) => c.id === id)?.name ?? 'category');
-    return `Bought ${labels.join(', ').toLowerCase()} items`;
-  }
-
-  if (r.activityStatus === 'inactive') {
-    return `Inactive ${lapsedDays}+ days`;
-  }
-
-  if (r.minPoints) {
-    return `${r.minPoints}+ points`;
-  }
-
-  if (r.activityStatus === 'active') {
-    return 'All active customers';
-  }
-
-  return 'All customers';
+function deliveryRatePercent(c: Campaign): number | null {
+  if (c.sentCount === 0) return null;
+  return Math.round((c.deliveredCount / c.sentCount) * 100);
 }
 
 export default function CampaignsPage() {
@@ -80,6 +48,15 @@ export default function CampaignsPage() {
   const [tiers, setTiers] = useState<TierConfig[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [lapsedDays, setLapsedDays] = useState(60);
+  const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -117,11 +94,27 @@ export default function CampaignsPage() {
     router.push(`/campaigns?${params.toString()}`);
   }
 
-  async function deleteCampaign(e: React.MouseEvent, id: string) {
+  function requestDelete(e: React.MouseEvent, campaign: Campaign) {
     e.stopPropagation();
-    if (!confirm('Delete this campaign?')) return;
-    await api.patch(`/api/v1/campaigns/${id}`, { status: 'cancelled' }).catch(() => null);
-    setCampaigns((prev) => prev.filter((c) => c.id !== id));
+    setDeleteReason('');
+    setDeleteTarget(campaign);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/v1/campaigns/${deleteTarget.id}`, {
+        reason: deleteReason.trim() || undefined,
+      });
+      setCampaigns((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      showToast('Campaign deleted');
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : 'Failed to delete campaign', 'error');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -150,18 +143,18 @@ export default function CampaignsPage() {
               key={key}
               data-testid={`filter-tab-${key}`}
               onClick={() => setFilter(key)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F1E35] focus-visible:ring-offset-2 ${
                 statusFilter === key
-                  ? 'bg-[#0F1E35] text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'border-[#0F1E35] bg-[#0F1E35] text-white shadow-sm hover:bg-[#1a3050]'
+                  : 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900 hover:shadow-sm'
               }`}
             >
               {label}
               <span
-                className={`rounded-full px-1.5 py-0.5 text-xs ${
+                className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                   statusFilter === key
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-100 text-slate-500'
+                    ? 'bg-white/15 text-white ring-1 ring-white/25'
+                    : 'bg-slate-100 text-slate-500 ring-1 ring-slate-200'
                 }`}
               >
                 {countByStatus(key)}
@@ -263,24 +256,56 @@ export default function CampaignsPage() {
                       <StatusBadge status={campaign.status} />
                     </td>
                     <td className="px-4 py-3 text-slate-600">{campaign.totalRecipients}</td>
-                    <td className="px-4 py-3 text-slate-600">{deliveryRate(campaign)}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const pct = deliveryRatePercent(campaign);
+                        if (pct === null) {
+                          return <span className="text-slate-400">—</span>;
+                        }
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className={`h-full rounded-full ${
+                                  pct >= 80
+                                    ? 'bg-emerald-500'
+                                    : pct >= 50
+                                      ? 'bg-amber-500'
+                                      : 'bg-red-400'
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-slate-600">{pct}%</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3 text-slate-500 text-xs">{formatDate(campaign)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         {campaign.status === 'draft' && (
                           <button
-                            className="cursor-pointer rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:bg-white hover:text-slate-900 hover:shadow-sm"
-                            onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                            className="cursor-pointer rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-100 hover:text-blue-700 hover:shadow-sm"
+                            onClick={() => router.push(`/campaigns/${campaign.id}/edit`)}
                           >
                             Edit
                           </button>
                         )}
                         {campaign.status === 'draft' && (
                           <button
-                            className="cursor-pointer rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 hover:shadow-sm"
-                            onClick={(e) => void deleteCampaign(e, campaign.id)}
+                            className="cursor-pointer rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 hover:text-red-700 hover:shadow-sm"
+                            onClick={(e) => requestDelete(e, campaign)}
                           >
                             Delete
+                          </button>
+                        )}
+                        {campaign.status === 'sent' && (
+                          <button
+                            className="cursor-pointer rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-600 transition-colors hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-700 hover:shadow-sm"
+                            onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                          >
+                            View
                           </button>
                         )}
                       </div>
@@ -316,6 +341,59 @@ export default function CampaignsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900">Delete campaign?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Are you sure you want to delete <span className="font-medium text-slate-900">&quot;{deleteTarget.name}&quot;</span>?
+              This action cannot be undone.
+            </p>
+            <label className="mt-4 block text-xs font-medium text-slate-500">
+              Reason (optional)
+            </label>
+            <textarea
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              rows={2}
+              placeholder="Why are you deleting this campaign?"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0F1E35] focus:border-transparent"
+            />
+            <div className="mt-4 flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => void confirmDelete()}
+                loading={deleting}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          role="status"
+          className={`fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-center text-sm text-white shadow-lg ${
+            toast.type === 'success' ? 'bg-[#0DC56A]' : 'bg-red-600'
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

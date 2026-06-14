@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { WhatsappController } from '../../src/modules/whatsapp/whatsapp.controller';
 import { WaOnboardingService } from '../../src/modules/whatsapp/wa-onboarding.service';
 import { WaBotService } from '../../src/modules/whatsapp/wa-bot.service';
+import { CampaignsService } from '../../src/modules/campaigns/campaigns.service';
 import type { GupshupWebhookPayload } from '../../src/modules/whatsapp/wa-onboarding.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ describe('WhatsappController.gupshupWebhook', () => {
   let mockOnboarding: { handleVerificationReply: jest.Mock };
   let mockBot: { handleInbound: jest.Mock };
   let mockConfig: { getOrThrow: jest.Mock };
+  let mockCampaigns: { handleDeliveryStatusEvent: jest.Mock };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -66,6 +68,9 @@ describe('WhatsappController.gupshupWebhook', () => {
     };
     mockBot = { handleInbound: jest.fn().mockResolvedValue(undefined) };
     mockConfig = { getOrThrow: jest.fn().mockReturnValue(SECRET) };
+    mockCampaigns = {
+      handleDeliveryStatusEvent: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WhatsappController],
@@ -73,6 +78,7 @@ describe('WhatsappController.gupshupWebhook', () => {
         { provide: WaOnboardingService, useValue: mockOnboarding },
         { provide: WaBotService, useValue: mockBot },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: CampaignsService, useValue: mockCampaigns },
       ],
     }).compile();
 
@@ -173,5 +179,47 @@ describe('WhatsappController.gupshupWebhook', () => {
       messageText: 'my balance',
     });
     expect(mockOnboarding.handleVerificationReply).not.toHaveBeenCalled();
+  });
+
+  // ── T22: 'delivered' message-event → CampaignsService.handleDeliveryStatusEvent ─
+
+  it("T22 — message-event type='delivered' forwards waMessageId to CampaignsService", async () => {
+    const payload = makePayload({
+      type: 'message-event',
+      payload: { id: 'wamid.abc123', type: 'delivered' },
+    });
+    const req = makeReq(payload);
+
+    const result = await controller.gupshupWebhook(req);
+
+    expect(result).toEqual({ status: 'ok' });
+    expect(mockCampaigns.handleDeliveryStatusEvent).toHaveBeenCalledWith(
+      'wamid.abc123',
+      'delivered',
+      undefined,
+    );
+    expect(mockBot.handleInbound).not.toHaveBeenCalled();
+  });
+
+  // ── T23: 'failed' message-event with reason → forwarded to CampaignsService ───
+
+  it("T23 — message-event type='failed' forwards waMessageId and reason", async () => {
+    const payload = makePayload({
+      type: 'message-event',
+      payload: {
+        id: 'wamid.def456',
+        type: 'failed',
+        payload: { reason: 'invalid number', code: '470' },
+      },
+    });
+    const req = makeReq(payload);
+
+    await controller.gupshupWebhook(req);
+
+    expect(mockCampaigns.handleDeliveryStatusEvent).toHaveBeenCalledWith(
+      'wamid.def456',
+      'failed',
+      'invalid number',
+    );
   });
 });

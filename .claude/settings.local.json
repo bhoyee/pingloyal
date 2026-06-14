@@ -22,7 +22,8 @@
       "Bash(npx eslint *)",
       "Bash(npx next *)",
       "Bash(cd \"/c/Users/bhoyee-pc/Desktop/pingloyal/apps/web\" && cat node_modules/next/package.json | grep '\"version\"' | head -1)",
-      "Read(//c/c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/node_modules/next/**)"
+      "Read(//c/c/Users/bhoyee-pc/Desktop/pingloyal/apps/web/node_modules/next/**)",
+      "PowerShell(Get-Process -Id 49560 -ErrorAction SilentlyContinue)"
     ]
   }
 }

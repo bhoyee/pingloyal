@@ -20,6 +20,7 @@ import * as dotenv from 'dotenv';
 import { DataSource } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import {
+  CampaignLogStatus,
   CampaignStatus,
   CustomerSource,
   PlanTier,
@@ -35,6 +36,7 @@ import { User } from '../../modules/auth/entities/user.entity';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 import { Campaign } from '../../modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../../modules/campaigns/entities/campaign-log.entity';
+import { TriggerLog } from '../../modules/triggers/entities/trigger-log.entity';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 dotenv.config({ path: path.join(__dirname, '../../../../../.env') });
@@ -50,7 +52,16 @@ if (!process.env.DATABASE_URL) {
 const SeedDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Tenant, TierConfig, ProductCategory, User, Customer, Campaign, CampaignLog],
+  entities: [
+    Tenant,
+    TierConfig,
+    ProductCategory,
+    User,
+    Customer,
+    Campaign,
+    CampaignLog,
+    TriggerLog,
+  ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,
   logging: false,
@@ -74,6 +85,8 @@ async function main() {
       where: { slug: TENANT_SLUG },
     });
     if (existing) {
+      await manager.delete(CampaignLog, { tenantId: existing.id });
+      await manager.delete(TriggerLog, { tenantId: existing.id });
       await manager.delete(Tenant, { id: existing.id });
     }
 
@@ -271,85 +284,168 @@ async function main() {
         isActive: true,
       }),
     ]);
-    void customers;
 
     // ── Campaigns — one per audience description on the Campaigns page ─────────
-    await manager.save(Campaign, [
-      manager.create(Campaign, {
+    const [vipCampaign, , lapsedCampaign, , activeCampaign] =
+      await manager.save(Campaign, [
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: 'VIP Appreciation Night',
+          messageBody:
+            "You're one of our top customers! Join us this Friday for an exclusive VIP shopping night with special discounts. 🎉",
+          segmentRules: { tierIds: [vipTier.id] },
+          status: CampaignStatus.SENT,
+          sentAt: daysAgo(7),
+          totalRecipients: 2,
+          sentCount: 2,
+          deliveredCount: 2,
+          failedCount: 0,
+        }),
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: 'New Baby Products Arrived',
+          messageBody:
+            'We just restocked baby essentials — diapers, formula and more, now available at Jadefy Store. Come check them out!',
+          segmentRules: { categoryIds: [babyCategory.id] },
+          status: CampaignStatus.DRAFT,
+          totalRecipients: 0,
+          sentCount: 0,
+          deliveredCount: 0,
+          failedCount: 0,
+        }),
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: 'We Miss You!',
+          messageBody:
+            "It's been a while since your last visit. Come back this week and enjoy a special welcome-back discount on us!",
+          segmentRules: { activityStatus: 'inactive' },
+          status: CampaignStatus.SENT,
+          sentAt: daysAgo(3),
+          totalRecipients: 2,
+          sentCount: 2,
+          deliveredCount: 1,
+          failedCount: 1,
+        }),
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: '500 Points Bonus Reward',
+          messageBody:
+            "You've earned 500+ points! Redeem them on your next visit for a free gift at Jadefy Store. Don't miss out!",
+          segmentRules: { minPoints: 500 },
+          status: CampaignStatus.SCHEDULED,
+          scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+          totalRecipients: 0,
+          sentCount: 0,
+          deliveredCount: 0,
+          failedCount: 0,
+        }),
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: 'Thank You For Shopping',
+          messageBody:
+            'Thank you for being a loyal Jadefy Store customer! Enjoy 10% off your next purchase as a token of our appreciation.',
+          segmentRules: { activityStatus: 'active' },
+          status: CampaignStatus.SENT,
+          sentAt: daysAgo(1),
+          totalRecipients: 4,
+          sentCount: 4,
+          deliveredCount: 4,
+          failedCount: 0,
+        }),
+        manager.create(Campaign, {
+          tenantId: tenant.id,
+          name: 'Store Re-Launch Announcement',
+          messageBody:
+            "Big news! Jadefy Store has a fresh new look and even better deals. Visit us this week to see what's new.",
+          segmentRules: {},
+          status: CampaignStatus.DRAFT,
+          totalRecipients: 0,
+          sentCount: 0,
+          deliveredCount: 0,
+          failedCount: 0,
+        }),
+      ]);
+
+    // ── Campaign logs — recipient-level detail for the campaign detail page ────
+    const [adaeze, chidinma, tunde, funke, ibrahim, grace] = customers;
+
+    await manager.save(CampaignLog, [
+      // VIP Appreciation Night — sent 7 days ago, both delivered
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: 'VIP Appreciation Night',
-        messageBody:
-          "You're one of our top customers! Join us this Friday for an exclusive VIP shopping night with special discounts. 🎉",
-        segmentRules: { tierIds: [vipTier.id] },
-        status: CampaignStatus.SENT,
+        campaign: { id: vipCampaign.id },
+        customer: { id: adaeze.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFBAA==',
         sentAt: daysAgo(7),
-        totalRecipients: 2,
-        sentCount: 2,
-        deliveredCount: 2,
-        failedCount: 0,
+        deliveredAt: daysAgo(7),
       }),
-      manager.create(Campaign, {
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: 'New Baby Products Arrived',
-        messageBody:
-          'We just restocked baby essentials — diapers, formula and more, now available at Jadefy Store. Come check them out!',
-        segmentRules: { categoryIds: [babyCategory.id] },
-        status: CampaignStatus.DRAFT,
-        totalRecipients: 0,
-        sentCount: 0,
-        deliveredCount: 0,
-        failedCount: 0,
+        campaign: { id: vipCampaign.id },
+        customer: { id: chidinma.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFCQQ==',
+        sentAt: daysAgo(7),
+        deliveredAt: daysAgo(7),
       }),
-      manager.create(Campaign, {
+
+      // We Miss You! — sent 3 days ago, 1 delivered, 1 failed (not opted in)
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: 'We Miss You!',
-        messageBody:
-          "It's been a while since your last visit. Come back this week and enjoy a special welcome-back discount on us!",
-        segmentRules: { activityStatus: 'inactive' },
-        status: CampaignStatus.SENT,
+        campaign: { id: lapsedCampaign.id },
+        customer: { id: funke.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwNBUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQg==',
         sentAt: daysAgo(3),
-        totalRecipients: 2,
-        sentCount: 2,
-        deliveredCount: 1,
-        failedCount: 1,
+        deliveredAt: daysAgo(3),
       }),
-      manager.create(Campaign, {
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: '500 Points Bonus Reward',
-        messageBody:
-          "You've earned 500+ points! Redeem them on your next visit for a free gift at Jadefy Store. Don't miss out!",
-        segmentRules: { minPoints: 500 },
-        status: CampaignStatus.SCHEDULED,
-        scheduledAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-        totalRecipients: 0,
-        sentCount: 0,
-        deliveredCount: 0,
-        failedCount: 0,
+        campaign: { id: lapsedCampaign.id },
+        customer: { id: grace.id },
+        status: CampaignLogStatus.FAILED,
+        waMessageId: null,
+        errorMessage: 'customer_not_opted_in',
+        failedAt: daysAgo(3),
       }),
-      manager.create(Campaign, {
+
+      // Thank You For Shopping — sent yesterday, all 4 delivered
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: 'Thank You For Shopping',
-        messageBody:
-          'Thank you for being a loyal Jadefy Store customer! Enjoy 10% off your next purchase as a token of our appreciation.',
-        segmentRules: { activityStatus: 'active' },
-        status: CampaignStatus.SENT,
+        campaign: { id: activeCampaign.id },
+        customer: { id: adaeze.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQw==',
         sentAt: daysAgo(1),
-        totalRecipients: 4,
-        sentCount: 4,
-        deliveredCount: 4,
-        failedCount: 0,
+        deliveredAt: daysAgo(1),
       }),
-      manager.create(Campaign, {
+      manager.create(CampaignLog, {
         tenantId: tenant.id,
-        name: 'Store Re-Launch Announcement',
-        messageBody:
-          "Big news! Jadefy Store has a fresh new look and even better deals. Visit us this week to see what's new.",
-        segmentRules: {},
-        status: CampaignStatus.DRAFT,
-        totalRecipients: 0,
-        sentCount: 0,
-        deliveredCount: 0,
-        failedCount: 0,
+        campaign: { id: activeCampaign.id },
+        customer: { id: chidinma.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFERA==',
+        sentAt: daysAgo(1),
+        deliveredAt: daysAgo(1),
+      }),
+      manager.create(CampaignLog, {
+        tenantId: tenant.id,
+        campaign: { id: activeCampaign.id },
+        customer: { id: tunde.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMxUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFFRQ==',
+        sentAt: daysAgo(1),
+        deliveredAt: daysAgo(1),
+      }),
+      manager.create(CampaignLog, {
+        tenantId: tenant.id,
+        campaign: { id: activeCampaign.id },
+        customer: { id: ibrahim.id },
+        status: CampaignLogStatus.DELIVERED,
+        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwNRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFGRg==',
+        sentAt: daysAgo(1),
+        deliveredAt: daysAgo(1),
       }),
     ]);
 

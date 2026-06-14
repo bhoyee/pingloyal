@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SkipThrottle } from '@nestjs/throttler';
 import 'multer';
 import { UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
@@ -29,8 +30,15 @@ export class TenantsController {
 
   @Get('me')
   @SkipSubscriptionCheck()
+  // Polled by the sidebar, layout, and onboarding wizard on every page —
+  // the shared per-route throttler buckets (30/min) are far too tight for
+  // this and were causing 429s and a slow/janky login → dashboard transition.
+  @SkipThrottle()
   getMe(@Req() req: { user: RequestUser }) {
-    return this.tenantsService.getTenantFull(req.user.tenantId, req.user.userId);
+    return this.tenantsService.getTenantFull(
+      req.user.tenantId,
+      req.user.userId,
+    );
   }
 
   @Patch('settings')

@@ -54,9 +54,14 @@ import { createWinstonConfig } from './common/logger/winston.config';
         process.env.LOG_LEVEL ?? 'info',
       ),
     ),
+    // Every named throttler below applies to every route by default — routes
+    // that need a tight limit (login, register, campaign send, etc.) set their
+    // own `@Throttle()` override, which takes precedence over these defaults.
+    // Keep these defaults generous so unrelated routes (e.g. GET /tenants/me)
+    // aren't 429'd by a bucket meant for a different endpoint.
     ThrottlerModule.forRoot([
-      { name: 'login', ttl: 900_000, limit: 5 },
-      { name: 'register_account', ttl: 3_600_000, limit: 10 },
+      { name: 'login', ttl: 900_000, limit: 1000 },
+      { name: 'register_account', ttl: 3_600_000, limit: 1000 },
       { name: 'customer_reg', ttl: 60_000, limit: 30 },
       { name: 'tenant_info', ttl: 60_000, limit: 30 },
       { name: 'webhook_gupshup', ttl: 60_000, limit: 500 },
@@ -64,7 +69,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
       { name: 'lookup', ttl: 60_000, limit: 60 },
       { name: 'transactions', ttl: 60_000, limit: 120 },
       { name: 'dashboard', ttl: 60_000, limit: 30 },
-      { name: 'campaign_send', ttl: 60_000, limit: 5 },
+      { name: 'campaign_send', ttl: 60_000, limit: 1000 },
       { name: 'default', ttl: 60_000, limit: 100 },
     ]),
     EventEmitterModule.forRoot(),

@@ -9,7 +9,7 @@ import {
 import { InjectQueue } from '@nestjs/bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { Queue } from 'bullmq';
 import type Redis from 'ioredis';
 import {
@@ -54,6 +54,7 @@ export interface CampaignLogRow {
   customerId: string;
   customerName: string;
   status: string;
+  waMessageId: string | null;
   sentAt: Date | null;
   deliveredAt: Date | null;
   failedAt: Date | null;
@@ -153,14 +154,14 @@ export class CampaignsService {
 
   async findAll(tenantId: string): Promise<Campaign[]> {
     return this.campaignRepo.find({
-      where: { tenantId },
+      where: { tenantId, deletedAt: IsNull() },
       order: { createdAt: 'DESC' },
     });
   }
 
   async findOne(tenantId: string, id: string): Promise<Campaign> {
     const campaign = await this.campaignRepo.findOne({
-      where: { id, tenantId },
+      where: { id, tenantId, deletedAt: IsNull() },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
     return campaign;
@@ -188,12 +189,21 @@ export class CampaignsService {
     return this.campaignRepo.save(campaign);
   }
 
-  async remove(tenantId: string, id: string): Promise<void> {
+  async remove(
+    tenantId: string,
+    id: string,
+    userId: string,
+    reason?: string,
+  ): Promise<void> {
     const campaign = await this.findOne(tenantId, id);
     if (campaign.status === CampaignStatus.SENT) {
       throw new BadRequestException('Sent campaigns cannot be deleted');
     }
-    await this.campaignRepo.remove(campaign);
+    await this.campaignRepo.update(id, {
+      deletedAt: new Date(),
+      deletedBy: { id: userId } as never,
+      deletionReason: reason ?? null,
+    });
   }
 
   // ── Audience ──────────────────────────────────────────────────────────────
@@ -485,11 +495,16 @@ export class CampaignsService {
     campaignId: string,
     page: number,
     limit: number,
+    status?: CampaignLogStatus,
   ): Promise<{ data: CampaignLogRow[]; total: number; page: number }> {
     await this.findOne(tenantId, campaignId);
 
     const [logs, total] = await this.campaignLogRepo.findAndCount({
-      where: { campaign: { id: campaignId }, tenantId },
+      where: {
+        campaign: { id: campaignId },
+        tenantId,
+        ...(status && { status }),
+      },
       relations: { customer: true },
       order: { queuedAt: 'DESC' },
       skip: (page - 1) * limit,
@@ -501,6 +516,7 @@ export class CampaignsService {
         customerId: log.customer.id,
         customerName: log.customer.fullName,
         status: log.status,
+        waMessageId: log.waMessageId,
         sentAt: log.sentAt,
         deliveredAt: log.deliveredAt,
         failedAt: log.failedAt,
@@ -673,6 +689,50 @@ export class CampaignsService {
         { id: campaignId, tenantId },
         { status: CampaignStatus.SENT },
       );
+    }
+  }
+
+  // ── Gupshup delivery status webhook ──────────────────────────────────────
+
+  async handleDeliveryStatusEvent(
+    waMessageId: string,
+    eventType: string,
+    errorReason?: string,
+  ): Promise<void> {
+    const log = await this.campaignLogRepo.findOne({
+      where: { waMessageId },
+      relations: { campaign: true },
+    });
+    if (!log) return;
+
+    if (eventType === 'delivered' || eventType === 'read') {
+      if (log.status !== CampaignLogStatus.SENT) return;
+      await this.campaignLogRepo.update(log.id, {
+        status: CampaignLogStatus.DELIVERED,
+        deliveredAt: new Date(),
+      });
+      await this.campaignRepo
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({ deliveredCount: () => 'delivered_count + 1' })
+        .where('id = :id', { id: log.campaign.id })
+        .execute();
+      return;
+    }
+
+    if (eventType === 'failed') {
+      if (log.status !== CampaignLogStatus.SENT) return;
+      await this.campaignLogRepo.update(log.id, {
+        status: CampaignLogStatus.FAILED,
+        failedAt: new Date(),
+        errorMessage: errorReason ?? 'delivery_failed',
+      });
+      await this.campaignRepo
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({ failedCount: () => 'failed_count + 1' })
+        .where('id = :id', { id: log.campaign.id })
+        .execute();
     }
   }
 }

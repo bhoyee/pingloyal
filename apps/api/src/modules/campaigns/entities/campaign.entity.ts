@@ -65,6 +65,16 @@ export class Campaign {
   @OneToMany(() => CampaignLog, (log) => log.campaign)
   campaignLogs: CampaignLog[];
 
+  @Column({ type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'deleted_by' })
+  deletedBy: User | null;
+
+  @Column({ type: 'text', nullable: true })
+  deletionReason: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

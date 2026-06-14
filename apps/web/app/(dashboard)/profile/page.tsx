@@ -65,7 +65,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -82,8 +82,8 @@ export default function ProfilePage() {
     defaultValues: { newEmail: '', password: '' },
   });
 
-  function showToast(message: string) {
-    setToast(message);
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   }
 
@@ -105,7 +105,7 @@ export default function ProfilePage() {
       setProfile(updated);
       showToast('Profile updated');
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to update profile');
+      showToast(e instanceof ApiError ? e.message : 'Failed to update profile', 'error');
     }
   }
 
@@ -118,7 +118,7 @@ export default function ProfilePage() {
       passwordForm.reset({ currentPassword: '', newPassword: '', confirmPassword: '' });
       showToast('Password changed successfully');
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to change password');
+      showToast(e instanceof ApiError ? e.message : 'Failed to change password', 'error');
     }
   }
 
@@ -131,7 +131,7 @@ export default function ProfilePage() {
       if (res.devCode) params.set('devCode', res.devCode);
       router.push(`/verify-email?${params.toString()}`);
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : 'Failed to change email');
+      showToast(e instanceof ApiError ? e.message : 'Failed to change email', 'error');
     }
   }
 
@@ -351,9 +351,11 @@ export default function ProfilePage() {
       {toast && (
         <div
           role="status"
-          className="fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl bg-gray-800 px-4 py-3 text-center text-sm text-white shadow-lg"
+          className={`fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl px-4 py-3 text-center text-sm text-white shadow-lg ${
+            toast.type === 'success' ? 'bg-[#0DC56A]' : 'bg-red-600'
+          }`}
         >
-          {toast}
+          {toast.message}
         </div>
       )}
     </div>
