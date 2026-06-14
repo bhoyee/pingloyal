@@ -263,7 +263,7 @@ export default function EditCampaignPage() {
       <div className="min-h-screen bg-slate-50">
         {/* Header */}
         <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-          <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -288,7 +288,7 @@ export default function EditCampaignPage() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8">
+        <div className="space-y-6 px-4 py-6 sm:space-y-8 sm:px-6 sm:py-8">
           {/* Campaign name */}
           <div className="space-y-1">
             <Label htmlFor="name">Campaign Name *</Label>
