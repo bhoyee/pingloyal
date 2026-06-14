@@ -1,8 +1,11 @@
 'use client';
 import { type ReactNode, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { api, type TenantMe } from '@/lib/api';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { Spinner } from '@/components/ui/spinner';
 
 interface BillingStatus {
   status: string;
@@ -80,30 +83,42 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
 }
 
 function DashboardContent({ children }: { children: ReactNode }) {
-  const [billing, setBilling] = useState<BillingStatus | null>(null);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const pathname = usePathname();
+  const onOnboardingRoute = pathname.startsWith('/onboarding');
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Shared with Sidebar's and the dashboard page's ['tenant-me'] queries so
+  // they dedupe into a single request instead of each firing their own.
+  const { data: tenant, isLoading: tenantLoading } = useQuery<TenantMe>({
+    queryKey: ['tenant-me'],
+    queryFn: () => api.get<TenantMe>('/api/v1/tenants/me'),
+  });
+
+  const { data: billing } = useQuery<BillingStatus>({
+    queryKey: ['billing-status'],
+    queryFn: () => api.get<BillingStatus>('/api/v1/billing/status'),
+  });
+
   useEffect(() => {
-    void api
-      .get<TenantMe>('/api/v1/tenants/me')
-      .then((t) => {
-        // Onboarding is complete once the QR code has been generated
-        if (!t.qrCodeUrl) {
-          window.location.replace('/onboarding');
-        } else {
-          setOnboardingChecked(true);
-        }
-      })
-      .catch(() => setOnboardingChecked(true)); // Let the page handle auth errors
+    // Onboarding is complete once the QR code has been generated. Skip this
+    // on the onboarding route itself — otherwise every reload there would
+    // immediately redirect back to itself, causing an infinite reload loop.
+    if (tenant && !tenant.qrCodeUrl && !onOnboardingRoute) {
+      window.location.replace('/onboarding');
+    }
+  }, [tenant, onOnboardingRoute]);
 
-    void api
-      .get<BillingStatus>('/api/v1/billing/status')
-      .then(setBilling)
-      .catch(() => null);
-  }, []);
-
-  if (!onboardingChecked) return null;
+  // Show a spinner instead of a blank screen while we check onboarding
+  // status. If the tenant fetch errors (e.g. auth), tenantLoading becomes
+  // false and we fall through to render the shell so the page underneath
+  // can redirect to /login itself.
+  if (tenantLoading || (tenant && !tenant.qrCodeUrl && !onOnboardingRoute)) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
 
   if (billing?.status === 'suspended') {
     return <SuspendedOverlay />;
