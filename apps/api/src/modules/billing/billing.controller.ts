@@ -10,6 +10,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -36,9 +37,13 @@ export class BillingController {
     return this.billingService.getPlans(tenantCurrency, currentPlanTier);
   }
 
+  // Polled on every dashboard page load to check for suspension/past-due —
+  // the shared per-route throttler buckets (30/min) are far too tight for
+  // this and were causing 429s during normal navigation.
   @Get('status')
   @Roles(UserRole.OWNER)
   @SkipSubscriptionCheck()
+  @SkipThrottle()
   getStatus(@Req() req: { user: RequestUser }) {
     return this.billingService.getStatus(req.user.tenantId);
   }

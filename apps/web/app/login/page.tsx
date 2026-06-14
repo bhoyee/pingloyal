@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { publicPost, ApiError } from '@/lib/api';
+import { api, publicPost, ApiError, type TenantMe } from '@/lib/api';
 
 interface LoginResponse {
   accessToken: string;
@@ -30,8 +30,10 @@ export default function LoginPage() {
       if (res.refreshToken) {
         localStorage.setItem('refresh_token', res.refreshToken);
       }
-      // Onboarding wizard handles the dashboard redirect once setup is complete
-      router.replace('/onboarding');
+      // Check onboarding status up front so already-onboarded users go
+      // straight to the dashboard instead of bouncing through /onboarding.
+      const tenant = await api.get<TenantMe>('/tenants/me').catch(() => null);
+      router.replace(tenant?.qrCodeUrl ? '/dashboard' : '/onboarding');
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         router.replace(`/verify-email?email=${encodeURIComponent(email)}`);
