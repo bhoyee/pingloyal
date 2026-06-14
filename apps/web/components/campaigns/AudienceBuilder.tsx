@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useFormContext } from 'react-hook-form';
+import { ChevronDown } from 'lucide-react';
 import { api, type AudiencePreview, type TierConfig, type TenantMe } from '@/lib/api';
 import type { Category } from '@/lib/api';
 
@@ -9,6 +10,67 @@ interface Props {
   audienceCount: number | null;
   sampleNames: string[];
   previewLoading: boolean;
+}
+
+interface CategoryDropdownProps {
+  categories: Category[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}
+
+function CategoryDropdown({ categories, selected, onChange }: CategoryDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  }
+
+  const label =
+    selected.length === 0
+      ? 'Select categories'
+      : selected.length === 1
+        ? categories.find((c) => c.id === selected[0])?.name ?? '1 category selected'
+        : `${selected.length} categories selected`;
+
+  return (
+    <div ref={ref} className="relative max-w-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-[#0F1E35]"
+      >
+        <span className={selected.length ? 'text-slate-700' : 'text-slate-400'}>{label}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+      </button>
+      {open && (
+        <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {categories.map((cat) => (
+            <label
+              key={cat.id}
+              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(cat.id)}
+                onChange={() => toggle(cat.id)}
+                className="h-4 w-4 accent-[#0F1E35]"
+              />
+              <span className="text-slate-700">{cat.name}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AudienceBuilder({ tenant, audienceCount, sampleNames, previewLoading }: Props) {
@@ -103,29 +165,12 @@ export function AudienceBuilder({ tenant, audienceCount, sampleNames, previewLoa
           </span>
         </label>
         {useCategoryFilter && categories.length > 0 && (
-          <div className="ml-7 flex flex-wrap gap-2">
-            {categories.map((cat) => {
-              const selected = (segmentRules?.categoryIds ?? []).includes(cat.id) as boolean;
-              return (
-                <label key={cat.id} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    className="h-4 w-4 accent-[#0F1E35]"
-                    onChange={(e) => {
-                      const current = (segmentRules?.categoryIds ?? []) as string[];
-                      setValue(
-                        'segmentRules.categoryIds',
-                        e.target.checked
-                          ? [...current, cat.id]
-                          : current.filter((id: string) => id !== cat.id),
-                      );
-                    }}
-                  />
-                  <span className="text-sm text-slate-600">{cat.name}</span>
-                </label>
-              );
-            })}
+          <div className="ml-7">
+            <CategoryDropdown
+              categories={categories}
+              selected={(segmentRules?.categoryIds ?? []) as string[]}
+              onChange={(ids) => setValue('segmentRules.categoryIds', ids)}
+            />
           </div>
         )}
       </div>
