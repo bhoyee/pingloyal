@@ -15,6 +15,11 @@ export class TriggersController {
     return this.triggersService.getConfig(req.user.tenantId);
   }
 
+  @Get('bot')
+  getBotConfig(@Req() req: { user: RequestUser }) {
+    return this.triggersService.getBotConfig(req.user.tenantId);
+  }
+
   @Patch(':type')
   @Roles(UserRole.OWNER)
   setEnabled(

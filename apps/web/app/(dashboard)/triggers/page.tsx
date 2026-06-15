@@ -14,6 +14,8 @@ import {
 import { api, type TenantMe } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { StatBadge } from '@/components/ui/stat-badge';
+import { ToggleSwitch } from '@/components/ui/toggle-switch';
 import { formatNaira } from '@/lib/utils';
 
 interface TriggerConfig {
@@ -61,44 +63,6 @@ const TRIGGER_META: Record<
       `Sent to customers who haven't visited in over ${tenant?.lapsedDays ?? 60} days, encouraging them to return.`,
   },
 };
-
-function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
-      {label}
-      <span className="font-semibold">{value}</span>
-    </span>
-  );
-}
-
-function ToggleSwitch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-        checked ? 'bg-emerald-500' : 'bg-slate-300'
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
 
 function TriggerCard({
   config,

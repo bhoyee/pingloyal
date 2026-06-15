@@ -17,6 +17,13 @@ export const TOGGLEABLE_TRIGGER_TYPES = [
   TriggerType.LAPSED_WINBACK,
 ] as const;
 
+// All trigger types that can be toggled via PATCH /triggers/:type, including
+// the WA Bot's balance-reply (configured from its own page, not the Triggers page).
+const ALL_TOGGLEABLE_TYPES = [
+  ...TOGGLEABLE_TRIGGER_TYPES,
+  TriggerType.BALANCE_BOT_REPLY,
+] as const;
+
 interface TriggerLogCountRow {
   trigger_type: string;
   today: string;
@@ -46,7 +53,45 @@ export class TriggersService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const tenantNow = DateTime.now().setZone(tenant.timezone);
+    const countByType = await this.getLogCounts(tenantId, tenant.timezone);
+    const pendingLapsed = await this.countPendingLapsed(tenant);
+
+    return TOGGLEABLE_TRIGGER_TYPES.map((type) =>
+      this.buildConfig(tenant, type, countByType, pendingLapsed),
+    );
+  }
+
+  async getBotConfig(tenantId: string): Promise<TriggerConfigResponse> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const countByType = await this.getLogCounts(tenantId, tenant.timezone);
+    return this.buildConfig(tenant, TriggerType.BALANCE_BOT_REPLY, countByType, null);
+  }
+
+  private buildConfig(
+    tenant: Tenant,
+    type: string,
+    countByType: Map<string, TriggerLogCountRow>,
+    pendingLapsed: number | null,
+  ): TriggerConfigResponse {
+    const row = countByType.get(type);
+    return {
+      type,
+      enabled: isTriggerEnabled(tenant.enabledTriggers, type),
+      sentToday: row ? Number(row.today) : 0,
+      sentThisMonth: row ? Number(row.this_month) : 0,
+      allTime: row ? Number(row.all_time) : 0,
+      pendingToday: type === TriggerType.LAPSED_WINBACK ? pendingLapsed : null,
+      timezone: tenant.timezone,
+    };
+  }
+
+  private async getLogCounts(
+    tenantId: string,
+    timezone: string,
+  ): Promise<Map<string, TriggerLogCountRow>> {
+    const tenantNow = DateTime.now().setZone(timezone);
     const startOfToday = tenantNow.startOf('day').toUTC().toJSDate();
     const startOfMonth = tenantNow.startOf('month').toUTC().toJSDate();
 
@@ -60,22 +105,7 @@ export class TriggersService {
        GROUP BY trigger_type`,
       [tenantId, startOfToday, startOfMonth],
     );
-    const countByType = new Map(counts.map((row) => [row.trigger_type, row]));
-
-    const pendingLapsed = await this.countPendingLapsed(tenant);
-
-    return TOGGLEABLE_TRIGGER_TYPES.map((type) => {
-      const row = countByType.get(type);
-      return {
-        type,
-        enabled: isTriggerEnabled(tenant.enabledTriggers, type),
-        sentToday: row ? Number(row.today) : 0,
-        sentThisMonth: row ? Number(row.this_month) : 0,
-        allTime: row ? Number(row.all_time) : 0,
-        pendingToday: type === TriggerType.LAPSED_WINBACK ? pendingLapsed : null,
-        timezone: tenant.timezone,
-      };
-    });
+    return new Map(counts.map((row) => [row.trigger_type, row]));
   }
 
   async setEnabled(
@@ -83,7 +113,7 @@ export class TriggersService {
     type: string,
     enabled: boolean,
   ): Promise<{ type: string; enabled: boolean }> {
-    if (!(TOGGLEABLE_TRIGGER_TYPES as readonly string[]).includes(type)) {
+    if (!(ALL_TOGGLEABLE_TYPES as readonly string[]).includes(type)) {
       throw new BadRequestException(`Unknown trigger type: ${type}`);
     }
 

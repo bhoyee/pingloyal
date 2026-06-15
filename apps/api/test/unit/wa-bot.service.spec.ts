@@ -16,6 +16,7 @@ import {
 jest.mock('@pingloyal/utils', () => ({
   decrypt: jest.fn(() => 'decrypted-api-key'),
   maskPhone: jest.fn((p: string) => p.slice(0, 4) + '****'),
+  isTriggerEnabled: jest.fn(() => true),
 }));
 
 // Mock global fetch
