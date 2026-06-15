@@ -23,6 +23,8 @@ jest.mock('@pingloyal/utils', () => ({
 
   encrypt: jest.fn(),
   decrypt: jest.fn(),
+
+  isTriggerEnabled: jest.fn(() => true),
 }));
 
 import { normalisePhone, PhoneNormalisationError } from '@pingloyal/utils';
