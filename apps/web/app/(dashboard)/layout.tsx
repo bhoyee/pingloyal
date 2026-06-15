@@ -65,6 +65,22 @@ function SuspendedOverlay() {
   );
 }
 
+function Footer() {
+  return (
+    <footer className="border-t border-slate-200 bg-white px-4 py-3 text-center text-xs text-slate-400 sm:px-6">
+      Powered by{' '}
+      <a
+        href="https://salisu.dev"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-slate-500 hover:underline"
+      >
+        Bhoyee · salisu.dev
+      </a>
+    </footer>
+  );
+}
+
 function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
   return (
     <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
@@ -130,7 +146,8 @@ function DashboardContent({ children }: { children: ReactNode }) {
       <div className="flex flex-1 flex-col overflow-y-auto">
         <MobileTopBar onOpenMenu={() => setMenuOpen(true)} />
         {billing?.status === 'past_due' && <PastDueBanner />}
-        {children}
+        <div className="flex-1">{children}</div>
+        <Footer />
       </div>
     </div>
   );
