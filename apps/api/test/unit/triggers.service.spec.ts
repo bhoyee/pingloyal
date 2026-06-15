@@ -80,7 +80,9 @@ describe('TriggersService', () => {
     it('fills in counts from trigger_logs and respects enabledTriggers', async () => {
       const result = await service.getConfig('tenant-1');
 
-      const welcome = result.find((r) => r.type === TriggerType.WELCOME);
+      const welcome = result.find(
+        (r) => r.type === (TriggerType.WELCOME as string),
+      );
       expect(welcome).toMatchObject({
         sentToday: 2,
         sentThisMonth: 5,
@@ -88,11 +90,15 @@ describe('TriggersService', () => {
         enabled: true,
       });
 
-      const lapsed = result.find((r) => r.type === TriggerType.LAPSED_WINBACK);
+      const lapsed = result.find(
+        (r) => r.type === (TriggerType.LAPSED_WINBACK as string),
+      );
       expect(lapsed?.enabled).toBe(false);
       expect(lapsed?.pendingToday).toBe(4);
 
-      const birthday = result.find((r) => r.type === TriggerType.BIRTHDAY);
+      const birthday = result.find(
+        (r) => r.type === (TriggerType.BIRTHDAY as string),
+      );
       expect(birthday?.pendingToday).toBeNull();
       expect(birthday?.sentToday).toBe(0);
     });
