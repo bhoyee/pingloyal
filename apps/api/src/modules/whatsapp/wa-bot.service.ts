@@ -86,7 +86,9 @@ export class WaBotService {
       return;
     }
 
-    if (!isTriggerEnabled(tenant.enabledTriggers, TriggerType.BALANCE_BOT_REPLY)) {
+    if (
+      !isTriggerEnabled(tenant.enabledTriggers, TriggerType.BALANCE_BOT_REPLY)
+    ) {
       return;
     }
 

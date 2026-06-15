@@ -27,6 +27,10 @@ export class TriggersController {
     @Param('type') type: string,
     @Body() dto: UpdateTriggerConfigDto,
   ) {
-    return this.triggersService.setEnabled(req.user.tenantId, type, dto.enabled);
+    return this.triggersService.setEnabled(
+      req.user.tenantId,
+      type,
+      dto.enabled,
+    );
   }
 }

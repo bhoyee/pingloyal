@@ -16,7 +16,11 @@ import {
   PhoneNormalisationError,
   isTriggerEnabled,
 } from '@pingloyal/utils';
-import { CustomerSource, TriggerType, WaVerificationStatus } from '@pingloyal/types';
+import {
+  CustomerSource,
+  TriggerType,
+  WaVerificationStatus,
+} from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from './entities/customer.entity';
@@ -146,7 +150,11 @@ export class CustomersService {
     }
 
     // ── WhatsApp welcome trigger gate ──────────────────────────────────────────
-    if (dto.waOptedIn && isNew && isTriggerEnabled(tenant.enabledTriggers, TriggerType.WELCOME)) {
+    if (
+      dto.waOptedIn &&
+      isNew &&
+      isTriggerEnabled(tenant.enabledTriggers, TriggerType.WELCOME)
+    ) {
       if (tenant.waVerificationStatus === WaVerificationStatus.VERIFIED) {
         await this.waMessagesQueue.add(
           'send-message',

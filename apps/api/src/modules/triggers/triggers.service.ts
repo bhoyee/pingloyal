@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { DateTime } from 'luxon';
@@ -66,7 +71,12 @@ export class TriggersService {
     if (!tenant) throw new NotFoundException('Tenant not found');
 
     const countByType = await this.getLogCounts(tenantId, tenant.timezone);
-    return this.buildConfig(tenant, TriggerType.BALANCE_BOT_REPLY, countByType, null);
+    return this.buildConfig(
+      tenant,
+      TriggerType.BALANCE_BOT_REPLY,
+      countByType,
+      null,
+    );
   }
 
   private buildConfig(
@@ -82,7 +92,8 @@ export class TriggersService {
       sentToday: row ? Number(row.today) : 0,
       sentThisMonth: row ? Number(row.this_month) : 0,
       allTime: row ? Number(row.all_time) : 0,
-      pendingToday: type === TriggerType.LAPSED_WINBACK ? pendingLapsed : null,
+      pendingToday:
+        type === (TriggerType.LAPSED_WINBACK as string) ? pendingLapsed : null,
       timezone: tenant.timezone,
     };
   }
@@ -120,7 +131,10 @@ export class TriggersService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const enabledTriggers = { ...(tenant.enabledTriggers ?? {}), [type]: enabled };
+    const enabledTriggers = {
+      ...(tenant.enabledTriggers ?? {}),
+      [type]: enabled,
+    };
     await this.tenantRepo.update(tenantId, { enabledTriggers });
     await Promise.all([
       this.redis.del(`tenant:${tenantId}`),
@@ -132,7 +146,9 @@ export class TriggersService {
   }
 
   private async countPendingLapsed(tenant: Tenant): Promise<number> {
-    const cutoffDate = new Date(Date.now() - tenant.lapsedDays * 24 * 3600 * 1000);
+    const cutoffDate = new Date(
+      Date.now() - tenant.lapsedDays * 24 * 3600 * 1000,
+    );
     const cooldownDate = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 
     const rows: Array<{ count: string }> = await this.dataSource.query(
