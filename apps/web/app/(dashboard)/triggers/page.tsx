@@ -51,7 +51,8 @@ const TRIGGER_META: Record<
   birthday: {
     title: 'Birthday Message',
     icon: Cake,
-    describe: () => "Sent on a customer's birthday with a special offer.",
+    describe: (tenant) =>
+      `Sent on a customer's birthday with a special offer. Runs daily around 8:00 AM (${tenant?.timezone ?? 'Africa/Lagos'}).`,
   },
   lapsed_winback: {
     title: 'Lapsed Customer Win-back',
@@ -60,6 +61,15 @@ const TRIGGER_META: Record<
       `Sent to customers who haven't visited in over ${tenant?.lapsedDays ?? 60} days, encouraging them to return.`,
   },
 };
+
+function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
+      {label}
+      <span className="font-semibold">{value}</span>
+    </span>
+  );
+}
 
 function ToggleSwitch({
   checked,
@@ -115,12 +125,12 @@ function TriggerCard({
           <div>
             <h3 className="font-semibold text-slate-900">{meta.title}</h3>
             <p className="mt-1 max-w-xl text-sm text-slate-500">{meta.describe(tenant)}</p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-              <span>Sent today: <span className="font-medium text-slate-600">{config.sentToday}</span></span>
-              <span>This month: <span className="font-medium text-slate-600">{config.sentThisMonth}</span></span>
-              <span>All time: <span className="font-medium text-slate-600">{config.allTime}</span></span>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <StatBadge label="Sent today" value={config.sentToday} color="bg-blue-100 text-blue-700" />
+              <StatBadge label="This month" value={config.sentThisMonth} color="bg-purple-100 text-purple-700" />
+              <StatBadge label="All time" value={config.allTime} color="bg-slate-100 text-slate-600" />
               {config.pendingToday !== null && (
-                <span>Pending today: <span className="font-medium text-slate-600">{config.pendingToday}</span></span>
+                <StatBadge label="Pending today" value={config.pendingToday} color="bg-amber-100 text-amber-700" />
               )}
             </div>
             {config.type === 'lapsed_winback' && (
@@ -171,17 +181,15 @@ export default function TriggersPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="text-xl font-bold text-slate-900">Automation Triggers</h1>
-          {!isLoading && (
-            <p className="mt-1 text-sm text-slate-500">
-              {activeCount} active — running automatically
-            </p>
-          )}
-        </div>
+        <h1 className="text-xl font-bold text-slate-900">Automation Triggers</h1>
+        {!isLoading && (
+          <p className="mt-1 text-sm text-slate-500">
+            {activeCount} active — running automatically
+          </p>
+        )}
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:px-6">
+      <div className="space-y-6 px-4 py-6 sm:px-6">
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
           <p>
