@@ -8,17 +8,21 @@ import {
   Cake,
   UserX,
   ShoppingCart,
+  Megaphone,
   Pencil,
   RotateCcw,
   Check,
   X,
   ChevronDown,
   ChevronUp,
+  Copy,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 interface TemplateEntry {
   triggerType: string;
@@ -31,6 +35,14 @@ interface TemplateEntry {
   updatedAt: string | null;
 }
 
+interface CampaignTemplate {
+  id: string;
+  name: string;
+  body: string;
+}
+
+// ── Trigger metadata ───────────────────────────────────────────────────────────
+
 const TRIGGER_META: Record<string, { icon: LucideIcon; color: string }> = {
   welcome: { icon: Sparkles, color: 'bg-emerald-100 text-emerald-700' },
   purchase_confirmation: { icon: ShoppingCart, color: 'bg-blue-100 text-blue-700' },
@@ -40,13 +52,9 @@ const TRIGGER_META: Record<string, { icon: LucideIcon; color: string }> = {
   lapsed_winback: { icon: UserX, color: 'bg-slate-100 text-slate-600' },
 };
 
-function VariableChip({
-  name,
-  onInsert,
-}: {
-  name: string;
-  onInsert: (v: string) => void;
-}) {
+// ── Small helpers ──────────────────────────────────────────────────────────────
+
+function VariableChip({ name, onInsert }: { name: string; onInsert: (v: string) => void }) {
   return (
     <button
       type="button"
@@ -58,7 +66,9 @@ function VariableChip({
   );
 }
 
-function TemplateCard({
+// ── Editable trigger template card ────────────────────────────────────────────
+
+function TriggerTemplateCard({
   entry,
   onSave,
   onReset,
@@ -91,14 +101,10 @@ function TemplateCard({
 
   function insertVar(token: string) {
     const el = textareaRef.current;
-    if (!el) {
-      setDraft((d) => d + token);
-      return;
-    }
+    if (!el) { setDraft((d) => d + token); return; }
     const start = el.selectionStart;
     const end = el.selectionEnd;
-    const next = draft.slice(0, start) + token + draft.slice(end);
-    setDraft(next);
+    setDraft(draft.slice(0, start) + token + draft.slice(end));
     requestAnimationFrame(() => {
       el.focus();
       el.setSelectionRange(start + token.length, start + token.length);
@@ -127,17 +133,15 @@ function TemplateCard({
     }
   }
 
-  const charCount = draft.length;
-  const charOver = charCount > 1024;
+  const charOver = draft.length > 1024;
 
   return (
     <Card>
       <CardContent className="p-0">
-        {/* Header */}
         <div className="flex items-start justify-between gap-4 p-5">
           <div className="flex items-start gap-3">
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconColor}`}>
-              <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" />
+              <Icon className="h-[18px] w-[18px]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -171,21 +175,15 @@ function TemplateCard({
               className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 transition-colors"
               aria-label={expanded ? 'Collapse' : 'Expand'}
             >
-              {expanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           </div>
         </div>
 
-        {/* Body preview / editor */}
         {expanded && (
           <div className="border-t border-slate-100 px-5 pb-5 pt-4">
             {editing ? (
               <div className="space-y-3">
-                {/* Variable chips */}
                 <div>
                   <p className="mb-2 text-xs font-medium text-slate-500">Insert variable:</p>
                   <div className="flex flex-wrap gap-1.5">
@@ -195,7 +193,6 @@ function TemplateCard({
                   </div>
                 </div>
 
-                {/* Textarea */}
                 <div>
                   <textarea
                     ref={textareaRef}
@@ -203,18 +200,15 @@ function TemplateCard({
                     onChange={(e) => setDraft(e.target.value)}
                     rows={6}
                     className={`w-full resize-y rounded-lg border px-3 py-2.5 font-mono text-sm leading-relaxed text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/30 ${
-                      charOver
-                        ? 'border-red-300 focus:border-red-400'
-                        : 'border-slate-300 focus:border-[#0F1E35]'
+                      charOver ? 'border-red-300 focus:border-red-400' : 'border-slate-300 focus:border-[#0F1E35]'
                     }`}
                     placeholder="Type your WhatsApp message here…"
                   />
                   <div className={`mt-1 text-right text-xs ${charOver ? 'text-red-500' : 'text-slate-400'}`}>
-                    {charCount} / 1024
+                    {draft.length} / 1024
                   </div>
                 </div>
 
-                {/* Action row */}
                 <div className="flex items-center justify-between gap-3">
                   {entry.isCustom ? (
                     <button
@@ -258,7 +252,12 @@ function TemplateCard({
                 </p>
                 {entry.isCustom && entry.updatedAt && (
                   <p className="mt-2 text-xs text-slate-400">
-                    Last updated {new Date(entry.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Last updated{' '}
+                    {new Date(entry.updatedAt).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
                   </p>
                 )}
                 {!entry.isCustom && (
@@ -273,15 +272,97 @@ function TemplateCard({
   );
 }
 
+// ── Read-only campaign template card ──────────────────────────────────────────
+
+function CampaignTemplateCard({ template }: { template: CampaignTemplate }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(template.body);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex items-start justify-between gap-4 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+              <Megaphone className="h-[18px] w-[18px]" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">{template.name}</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Starter template — copy and paste into a campaign
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-emerald-600">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 transition-colors"
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {expanded && (
+          <div className="border-t border-slate-100 px-5 pb-5 pt-4">
+            <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
+              {template.body}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              Copy this text, then paste it when creating a new campaign message.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function TemplatesPage() {
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { data: templates, isLoading, error: loadError } = useQuery<TemplateEntry[]>({
-    queryKey: ['wa-templates'],
-    queryFn: () => api.get<TemplateEntry[]>('/api/v1/wa-templates'),
-    retry: 1,
-  });
+  const { data: triggerTemplates, isLoading: loadingTriggers, error: triggerError } =
+    useQuery<TemplateEntry[]>({
+      queryKey: ['wa-templates'],
+      queryFn: () => api.get<TemplateEntry[]>('/api/v1/wa-templates'),
+      retry: 1,
+    });
+
+  const { data: campaignTemplates, isLoading: loadingCampaigns } =
+    useQuery<CampaignTemplate[]>({
+      queryKey: ['campaign-templates'],
+      queryFn: () => api.get<CampaignTemplate[]>('/api/v1/templates'),
+      retry: 1,
+    });
 
   async function handleSave(triggerType: string, body: string) {
     setErrorMsg(null);
@@ -314,75 +395,89 @@ export default function TemplatesPage() {
     }
   }
 
-  const customCount = templates?.filter((t) => t.isCustom).length ?? 0;
+  const customCount = triggerTemplates?.filter((t) => t.isCustom).length ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 pb-6">
       {/* Page header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
         <h1 className="text-xl font-bold text-slate-900">Message Templates</h1>
-        {!isLoading && templates && (
+        {!loadingTriggers && triggerTemplates && (
           <p className="mt-1 text-sm text-slate-500">
             {customCount > 0
-              ? `${customCount} custom template${customCount !== 1 ? 's' : ''} — rest using defaults`
-              : 'Using default templates for all triggers'}
+              ? `${customCount} custom trigger template${customCount !== 1 ? 's' : ''} · ${campaignTemplates?.length ?? 0} campaign starters`
+              : `Default trigger templates · ${campaignTemplates?.length ?? 0} campaign starters`}
           </p>
         )}
       </div>
 
-      <div className="space-y-6 px-4 py-6 sm:px-6">
-        {/* Info banner */}
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <p className="font-medium">Customise what gets sent</p>
-          <p className="mt-0.5 text-blue-700">
-            Each trigger uses a WhatsApp template with dynamic variables like{' '}
-            <code className="rounded bg-blue-100 px-1 font-mono text-xs">{'{{firstName}}'}</code>.
-            Changes take effect immediately on the next send.
-          </p>
-        </div>
+      <div className="space-y-8 px-4 py-6 sm:px-6">
 
-        {errorMsg && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {errorMsg}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Spinner className="h-8 w-8" />
-          </div>
-        ) : loadError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-            <p className="font-medium">Could not load templates</p>
-            <p className="mt-1 text-red-600">
-              {loadError instanceof Error ? loadError.message : 'An unexpected error occurred. Please refresh the page.'}
+        {/* ── Automation Trigger Templates ── */}
+        <section>
+          <div className="mb-3">
+            <h2 className="text-base font-semibold text-slate-900">Automation Trigger Templates</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Sent automatically based on customer activity. Edit to match your brand voice — variables like{' '}
+              <code className="rounded bg-slate-100 px-1 font-mono text-xs">{'{{firstName}}'}</code> are filled in at send time.
             </p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {templates?.map((entry) => (
-              <TemplateCard
-                key={entry.triggerType}
-                entry={entry}
-                onSave={handleSave}
-                onReset={handleReset}
-              />
-            ))}
-          </div>
-        )}
-      </div>
 
-      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
-        Powered by{' '}
-        <a
-          href="https://salisu.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-slate-500 hover:underline"
-        >
-          Bhoyee salisu.dev
-        </a>
-      </footer>
+          {errorMsg && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
+          {loadingTriggers ? (
+            <div className="flex justify-center py-10">
+              <Spinner className="h-7 w-7" />
+            </div>
+          ) : triggerError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+              <p className="font-medium">Could not load trigger templates</p>
+              <p className="mt-1 text-red-600">
+                {triggerError instanceof Error
+                  ? triggerError.message
+                  : 'An unexpected error occurred. Please refresh the page.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {triggerTemplates?.map((entry) => (
+                <TriggerTemplateCard
+                  key={entry.triggerType}
+                  entry={entry}
+                  onSave={handleSave}
+                  onReset={handleReset}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Campaign Templates ── */}
+        <section>
+          <div className="mb-3">
+            <h2 className="text-base font-semibold text-slate-900">Campaign Templates</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Ready-made message starters for broadcast campaigns. Copy a template and paste it when composing a new campaign.
+            </p>
+          </div>
+
+          {loadingCampaigns ? (
+            <div className="flex justify-center py-10">
+              <Spinner className="h-7 w-7" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {campaignTemplates?.map((t) => (
+                <CampaignTemplateCard key={t.id} template={t} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
