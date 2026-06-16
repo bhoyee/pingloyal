@@ -212,7 +212,7 @@ export class ReportsService {
          SUM(CASE WHEN last_purchase_at >= $2 THEN 1 ELSE 0 END) AS active_customers
        FROM customers
        WHERE tenant_id = $1 AND wa_opted_in = true`,
-      [tenantId, prevStart, prevEnd],
+      [tenantId, prevStart],
     );
     const prevTotal = Number(prevRows[0]?.total_customers ?? 0);
     const prevActive = Number(prevRows[0]?.active_customers ?? 0);

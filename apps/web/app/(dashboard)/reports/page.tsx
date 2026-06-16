@@ -297,10 +297,10 @@ export default function ReportsPage() {
             {period === 'custom' && (
               <>
                 <input type="date" max={today} value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20" />
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20 [color-scheme:light]" />
                 <span className="text-sm text-slate-400">→</span>
                 <input type="date" max={today} value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-                  className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20" />
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20 [color-scheme:light]" />
               </>
             )}
 
