@@ -37,7 +37,9 @@ const MARKETING_TYPES = new Set([
 // ── pdfmake types ─────────────────────────────────────────────────────────────
 
 interface PdfMakeLib {
-  createPdf: (docDefinition: unknown) => { getBuffer: (cb: (buf: Buffer) => void) => void };
+  createPdf: (docDefinition: unknown) => {
+    getBuffer: (cb: (buf: Buffer) => void) => void;
+  };
   vfs: Record<string, string>;
 }
 
@@ -195,7 +197,6 @@ export class ReportsService {
     );
 
     // Previous period for vsLastPeriod
-    const prevEnd = new Date(period.start);
     const prevStart = new Date(
       period.start.getTime() - period.durationDays * 24 * 3600 * 1000,
     );
@@ -540,7 +541,10 @@ export class ReportsService {
     const pdfmakeLib = require('pdfmake/build/pdfmake') as PdfMakeLib;
     // vfs_fonts exports font files at root level (no .vfs or .pdfMake wrapper)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfFonts = require('pdfmake/build/vfs_fonts') as Record<string, string>;
+    const pdfFonts = require('pdfmake/build/vfs_fonts') as Record<
+      string,
+      string
+    >;
     pdfmakeLib.vfs = pdfFonts;
 
     const [data, tenant] = await Promise.all([
@@ -608,7 +612,9 @@ export class ReportsService {
     };
 
     return new Promise<Buffer>((resolve) => {
-      pdfmakeLib.createPdf(docDefinition).getBuffer((buffer) => resolve(buffer));
+      pdfmakeLib
+        .createPdf(docDefinition)
+        .getBuffer((buffer) => resolve(buffer));
     });
   }
 
