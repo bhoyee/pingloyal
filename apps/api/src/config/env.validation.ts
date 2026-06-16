@@ -40,6 +40,7 @@ export const envValidationSchema = Joi.object({
   // ── Email ─────────────────────────────────────────────────────────────────
   RESEND_API_KEY: Joi.string().required(),
   MAIL_FROM: Joi.string().optional(),
+  SUPPORT_EMAIL: Joi.string().email().optional(),
 
   // ── App ───────────────────────────────────────────────────────────────────
   NODE_ENV: Joi.string().valid('development', 'production', 'test').required(),

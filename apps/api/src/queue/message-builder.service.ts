@@ -10,6 +10,24 @@ export interface MessageBuildResult {
   useRawMessage?: boolean;
 }
 
+function substituteVars(
+  body: string,
+  customer: Customer | null,
+  tenant: Tenant,
+  data: Record<string, string>,
+): string {
+  const firstName = customer?.fullName.split(' ')[0] ?? 'there';
+  const vars: Record<string, string> = {
+    firstName,
+    businessName: tenant.businessName,
+    pointsThreshold: tenant.pointsThreshold.toString(),
+    rewardValue: tenant.rewardValue.toString(),
+    pointsBalance: (customer?.pointsBalance ?? 0).toString(),
+    ...data,
+  };
+  return body.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`);
+}
+
 @Injectable()
 export class MessageBuilderService {
   build(
@@ -17,7 +35,15 @@ export class MessageBuilderService {
     customer: Customer | null,
     tenant: Tenant,
     data: Record<string, string>,
+    customBody?: string,
   ): MessageBuildResult {
+    if (customBody) {
+      const substituted = substituteVars(customBody, customer, tenant, data);
+      return {
+        templateName: 'pingloyal_campaign',
+        variables: [substituted],
+      };
+    }
     const firstName = customer?.fullName.split(' ')[0] ?? 'there';
 
     switch (type) {

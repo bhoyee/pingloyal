@@ -19,6 +19,7 @@ import { ProductCategory } from '../modules/tenants/entities/product-category.en
 import { CampaignsModule } from '../modules/campaigns/campaigns.module';
 import { TransactionsModule } from '../modules/transactions/transactions.module';
 import { BillingModule } from '../modules/billing/billing.module';
+import { WaTriggerTemplate } from '../modules/triggers/entities/wa-trigger-template.entity';
 import { WaMessageProcessor } from './processors/wa-message.processor';
 import { TriggerCheckProcessor } from './processors/trigger-check.processor';
 import { CampaignSendProcessor } from './processors/campaign-send.processor';
@@ -105,6 +106,7 @@ export const QUEUE_NAMES = {
       Integration,
       ProductCategory,
       User,
+      WaTriggerTemplate,
     ]),
     TenantsModule,
     WhatsappModule,

@@ -17,6 +17,7 @@ import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../../src/modules/campaigns/entities/campaign-log.entity';
 import { WaVerificationStatus } from '@pingloyal/types';
 import type { Job } from 'bullmq';
+import { WaTriggerTemplate } from '../../src/modules/triggers/entities/wa-trigger-template.entity';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,10 @@ describe('WaMessageProcessor', () => {
         },
         {
           provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: getRepositoryToken(WaTriggerTemplate),
           useValue: { findOne: jest.fn().mockResolvedValue(null) },
         },
       ],

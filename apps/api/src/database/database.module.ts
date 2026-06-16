@@ -18,6 +18,8 @@ import {
   TriggerLog,
   User,
   WalletTransaction,
+  WaTriggerTemplate,
+  TemplateRequest,
 } from './entities';
 
 const ALL_ENTITIES = [
@@ -31,6 +33,8 @@ const ALL_ENTITIES = [
   Campaign,
   CampaignLog,
   TriggerLog,
+  WaTriggerTemplate,
+  TemplateRequest,
   Integration,
   Subscription,
   WalletTransaction,
