@@ -92,6 +92,7 @@ describe('ReportsController', () => {
       computeReport: jest.fn().mockResolvedValue(MOCK_REPORT),
       generatePdf: jest.fn().mockResolvedValue(Buffer.from('pdf')),
       generateExcel: jest.fn().mockResolvedValue(Buffer.from('xlsx')),
+      getBusinessName: jest.fn().mockResolvedValue('Test Store'),
     };
 
     mockScheduleRepo = {
