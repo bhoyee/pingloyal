@@ -11,6 +11,32 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
 
+// Detects errors caused by infrastructure being unavailable (DB, Redis, etc.)
+// so callers get a 503 with a readable message instead of a raw 500.
+function isInfrastructureError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as NodeJS.ErrnoException).code ?? '';
+  if (
+    ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ECONNRESET', 'EPIPE'].includes(
+      code,
+    )
+  ) {
+    return true;
+  }
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes('econnrefused') ||
+    msg.includes('connection refused') ||
+    msg.includes('could not connect') ||
+    msg.includes('getaddrinfo') ||
+    msg.includes('connect etimedout') ||
+    msg.includes('connection lost') ||
+    msg.includes('connection terminated') ||
+    msg.includes('connection closed') ||
+    msg.includes('max retries exceeded')
+  );
+}
+
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   constructor(
@@ -38,6 +64,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           : ((body as { message?: string }).message ?? exception.message);
       errorName = exception.name;
       stack = exception.stack;
+    } else if (isInfrastructureError(exception)) {
+      statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+      message =
+        'The service is temporarily unavailable. Please try again in a moment.';
+      errorName = 'ServiceUnavailable';
+      stack = (exception as Error).stack;
     } else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       // Never leak internal error details in production
