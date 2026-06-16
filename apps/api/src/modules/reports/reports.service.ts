@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import * as pdfmake from 'pdfmake/build/pdfmake';
-import * as pdfFonts from 'pdfmake/build/vfs_fonts';
 import ExcelJS from 'exceljs';
 import type {
   ReportData,
@@ -36,14 +34,13 @@ const MARKETING_TYPES = new Set([
   'campaign_message',
 ]);
 
-// ── pdfmake initialisation ────────────────────────────────────────────────────
+// ── pdfmake types ─────────────────────────────────────────────────────────────
 
-try {
-  (pdfmake as unknown as { vfs: unknown }).vfs = (
-    pdfFonts as unknown as { vfs: unknown }
-  ).vfs;
-} catch {
-  // vfs may already be set or read-only in the test/CI environment
+interface PdfMakeLib {
+  createPdf: (docDefinition: unknown) => {
+    getBuffer: (cb: (buf: Buffer) => void) => void;
+  };
+  vfs: Record<string, string>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -200,7 +197,6 @@ export class ReportsService {
     );
 
     // Previous period for vsLastPeriod
-    const prevEnd = new Date(period.start);
     const prevStart = new Date(
       period.start.getTime() - period.durationDays * 24 * 3600 * 1000,
     );
@@ -212,7 +208,7 @@ export class ReportsService {
          SUM(CASE WHEN last_purchase_at >= $2 THEN 1 ELSE 0 END) AS active_customers
        FROM customers
        WHERE tenant_id = $1 AND wa_opted_in = true`,
-      [tenantId, prevStart, prevEnd],
+      [tenantId, prevStart],
     );
     const prevTotal = Number(prevRows[0]?.total_customers ?? 0);
     const prevActive = Number(prevRows[0]?.active_customers ?? 0);
@@ -529,9 +525,28 @@ export class ReportsService {
     };
   }
 
+  // ── getBusinessName ───────────────────────────────────────────────────────
+
+  async getBusinessName(tenantId: string): Promise<string> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    return tenant?.businessName ?? 'store';
+  }
+
   // ── generatePdf ───────────────────────────────────────────────────────────
 
   async generatePdf(tenantId: string, period: ReportPeriod): Promise<Buffer> {
+    // Use require() so we always get the real CJS default export — import *
+    // gives the namespace object which lacks createPdf in some bundler configs.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfmakeLib = require('pdfmake/build/pdfmake') as PdfMakeLib;
+    // vfs_fonts exports font files at root level (no .vfs or .pdfMake wrapper)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfFonts = require('pdfmake/build/vfs_fonts') as Record<
+      string,
+      string
+    >;
+    pdfmakeLib.vfs = pdfFonts;
+
     const [data, tenant] = await Promise.all([
       this.getReport(tenantId, period),
       this.tenantRepo.findOne({ where: { id: tenantId } }),
@@ -597,14 +612,9 @@ export class ReportsService {
     };
 
     return new Promise<Buffer>((resolve) => {
-      const gen = (
-        pdfmake as unknown as {
-          createPdf: (def: unknown) => {
-            getBuffer: (cb: (b: Buffer) => void) => void;
-          };
-        }
-      ).createPdf(docDefinition);
-      gen.getBuffer((buffer) => resolve(buffer));
+      pdfmakeLib
+        .createPdf(docDefinition)
+        .getBuffer((buffer) => resolve(buffer));
     });
   }
 

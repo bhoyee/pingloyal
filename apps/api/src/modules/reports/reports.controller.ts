@@ -128,16 +128,15 @@ export class ReportsController {
     @Res() res: Response,
   ) {
     const period = this.buildPeriod(query);
-    const buffer = await this.reportsService.generatePdf(
-      req.user.tenantId,
-      period,
-    );
+    const [buffer, businessName] = await Promise.all([
+      this.reportsService.generatePdf(req.user.tenantId, period),
+      this.reportsService.getBusinessName(req.user.tenantId),
+    ]);
+    const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const periodLabel = query.period.replace(/_/g, '-');
+    const filename = `${slug}-report-${periodLabel}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="pingloyal-report-${periodLabel}.pdf"`,
-    );
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   }
@@ -152,19 +151,15 @@ export class ReportsController {
     @Res() res: Response,
   ) {
     const period = this.buildPeriod(query);
-    const buffer = await this.reportsService.generateExcel(
-      req.user.tenantId,
-      period,
-    );
+    const [buffer, businessName] = await Promise.all([
+      this.reportsService.generateExcel(req.user.tenantId, period),
+      this.reportsService.getBusinessName(req.user.tenantId),
+    ]);
+    const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const periodLabel = query.period.replace(/_/g, '-');
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="pingloyal-report-${periodLabel}.xlsx"`,
-    );
+    const filename = `${slug}-report-${periodLabel}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   }
