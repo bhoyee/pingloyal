@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { WaTemplatesService, TEMPLATE_DEFAULTS, TEMPLATABLE_TRIGGER_TYPES } from '../../src/modules/triggers/wa-templates.service';
+import {
+  WaTemplatesService,
+  TEMPLATE_DEFAULTS,
+  TEMPLATABLE_TRIGGER_TYPES,
+} from '../../src/modules/triggers/wa-templates.service';
 import { WaTriggerTemplate } from '../../src/modules/triggers/entities/wa-trigger-template.entity';
 import { TriggerType } from '@pingloyal/types';
 
@@ -35,7 +39,9 @@ describe('WaTemplatesService', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       save: jest.fn(),
-      create: jest.fn((dto: Partial<WaTriggerTemplate>) => ({ ...dto } as WaTriggerTemplate)),
+      create: jest.fn(
+        (dto: Partial<WaTriggerTemplate>) => ({ ...dto }) as WaTriggerTemplate,
+      ),
       delete: jest.fn(),
     };
 
@@ -60,15 +66,22 @@ describe('WaTemplatesService', () => {
     });
 
     it('merges custom body when one exists', async () => {
-      const custom = makeCustom(TriggerType.BIRTHDAY, 'Happy bday {{firstName}}!');
+      const custom = makeCustom(
+        TriggerType.BIRTHDAY,
+        'Happy bday {{firstName}}!',
+      );
       repo.find.mockResolvedValue([custom]);
       const result = await service.findAll(TENANT_ID);
-      const birthday = result.find((r) => r.triggerType === TriggerType.BIRTHDAY)!;
+      const birthday = result.find(
+        (r) => r.triggerType === (TriggerType.BIRTHDAY as string),
+      )!;
       expect(birthday.isCustom).toBe(true);
       expect(birthday.customBody).toBe('Happy bday {{firstName}}!');
       expect(birthday.activeBody).toBe('Happy bday {{firstName}}!');
       // Other entries still use defaults
-      const welcome = result.find((r) => r.triggerType === TriggerType.WELCOME)!;
+      const welcome = result.find(
+        (r) => r.triggerType === (TriggerType.WELCOME as string),
+      )!;
       expect(welcome.isCustom).toBe(false);
     });
 
@@ -119,7 +132,11 @@ describe('WaTemplatesService', () => {
       repo.findOne.mockResolvedValue(existing);
       repo.update.mockResolvedValue(undefined);
       const newBody = 'New custom welcome message for {{firstName}}!';
-      const result = await service.upsert(TENANT_ID, TriggerType.WELCOME, newBody);
+      const result = await service.upsert(
+        TENANT_ID,
+        TriggerType.WELCOME,
+        newBody,
+      );
       expect(repo.update).toHaveBeenCalledWith(existing.id, { body: newBody });
       expect(repo.save).not.toHaveBeenCalled();
       expect(result.customBody).toBe(newBody);
@@ -139,8 +156,10 @@ describe('WaTemplatesService', () => {
         TriggerType.BIRTHDAY,
         'Happy birthday {{firstName}}!',
       );
-      expect(result.label).toBe(TEMPLATE_DEFAULTS[TriggerType.BIRTHDAY]!.label);
-      expect(result.variables).toEqual(TEMPLATE_DEFAULTS[TriggerType.BIRTHDAY]!.variables);
+      expect(result.label).toBe(TEMPLATE_DEFAULTS[TriggerType.BIRTHDAY].label);
+      expect(result.variables).toEqual(
+        TEMPLATE_DEFAULTS[TriggerType.BIRTHDAY].variables,
+      );
     });
   });
 
@@ -154,13 +173,15 @@ describe('WaTemplatesService', () => {
       });
       expect(result.isCustom).toBe(false);
       expect(result.customBody).toBeNull();
-      expect(result.activeBody).toBe(TEMPLATE_DEFAULTS[TriggerType.LAPSED_WINBACK]!.body);
+      expect(result.activeBody).toBe(
+        TEMPLATE_DEFAULTS[TriggerType.LAPSED_WINBACK].body,
+      );
     });
 
     it('throws NotFoundException for unknown trigger type', async () => {
-      await expect(
-        service.reset(TENANT_ID, 'bogus_type'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.reset(TENANT_ID, 'bogus_type')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -168,8 +189,8 @@ describe('WaTemplatesService', () => {
     it('has defaults for every templatable type', () => {
       for (const type of TEMPLATABLE_TRIGGER_TYPES) {
         expect(TEMPLATE_DEFAULTS[type]).toBeDefined();
-        expect(TEMPLATE_DEFAULTS[type]!.body.length).toBeGreaterThan(10);
-        expect(TEMPLATE_DEFAULTS[type]!.variables.length).toBeGreaterThan(0);
+        expect(TEMPLATE_DEFAULTS[type].body.length).toBeGreaterThan(10);
+        expect(TEMPLATE_DEFAULTS[type].variables.length).toBeGreaterThan(0);
       }
     });
   });
