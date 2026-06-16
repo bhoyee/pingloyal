@@ -277,9 +277,10 @@ export default function TemplatesPage() {
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { data: templates, isLoading } = useQuery<TemplateEntry[]>({
+  const { data: templates, isLoading, error: loadError } = useQuery<TemplateEntry[]>({
     queryKey: ['wa-templates'],
     queryFn: () => api.get<TemplateEntry[]>('/api/v1/wa-templates'),
+    retry: 1,
   });
 
   async function handleSave(triggerType: string, body: string) {
@@ -349,6 +350,13 @@ export default function TemplatesPage() {
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Spinner className="h-8 w-8" />
+          </div>
+        ) : loadError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            <p className="font-medium">Could not load templates</p>
+            <p className="mt-1 text-red-600">
+              {loadError instanceof Error ? loadError.message : 'An unexpected error occurred. Please refresh the page.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
