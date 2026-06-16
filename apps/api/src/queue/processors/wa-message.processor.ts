@@ -18,6 +18,7 @@ import { BspService } from '../../modules/whatsapp/bsp.service';
 import { WalletService } from '../../modules/billing/wallet.service';
 import { UtilityTrackingService } from '../../modules/billing/utility-tracking.service';
 import { MessageBuilderService } from '../message-builder.service';
+import { WaTemplatesService } from '../../modules/triggers/wa-templates.service';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 import { TriggerLog } from '../../modules/triggers/entities/trigger-log.entity';
 import { Campaign } from '../../modules/campaigns/entities/campaign.entity';
@@ -66,6 +67,7 @@ export class WaMessageProcessor extends WorkerHost {
     private readonly walletService: WalletService,
     private readonly utilityTrackingService: UtilityTrackingService,
     private readonly messageBuilder: MessageBuilderService,
+    private readonly waTemplatesService: WaTemplatesService,
     @InjectRepository(Customer)
     private readonly customerRepo: Repository<Customer>,
     @InjectRepository(TriggerLog)
@@ -200,8 +202,18 @@ export class WaMessageProcessor extends WorkerHost {
       walletDeducted = true;
     }
 
-    // Step 6 — Build message
-    const built = this.messageBuilder.build(type, customer, tenant, data);
+    // Step 6 — Build message (load custom template body if one exists)
+    const customTemplate = await this.waTemplatesService.findCustom(
+      tenantId,
+      type,
+    );
+    const built = this.messageBuilder.build(
+      type,
+      customer,
+      tenant,
+      data,
+      customTemplate?.body,
+    );
 
     // Raw-message types (CAMPAIGN_MESSAGE, BALANCE_BOT_REPLY) need a separate
     // BSP path not yet implemented — deferred to Prompt 28.
