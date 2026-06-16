@@ -217,7 +217,7 @@ export default function ReportsPage() {
 
   async function downloadFile(
     endpoint: string,
-    filename: string,
+    fallbackFilename: string,
     setLoading: (v: boolean) => void,
   ) {
     setDlError('');
@@ -231,6 +231,10 @@ export default function ReportsPage() {
         const msg = (await res.json().catch(() => ({})) as { message?: string }).message;
         throw new Error(msg ?? `Server error ${res.status}`);
       }
+      // Use server-provided filename (contains store name) when available
+      const disposition = res.headers.get('Content-Disposition') ?? '';
+      const match = /filename="([^"]+)"/.exec(disposition);
+      const filename = match ? match[1] : fallbackFilename;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -784,7 +788,7 @@ export default function ReportsPage() {
                     value={scheduleEmail}
                     onChange={(e) => setScheduleEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
                   />
                   <button
                     onClick={() => void handleSchedule()}

@@ -100,6 +100,7 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
+    exposedHeaders: ['Content-Disposition'],
   });
 
   // Global route prefix — exclude /admin so Bull Board is reachable without prefix
