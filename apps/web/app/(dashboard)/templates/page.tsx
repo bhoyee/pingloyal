@@ -17,7 +17,7 @@ import {
   ChevronUp,
   Copy,
   PlusCircle,
-  Send,
+  Clock,
   type LucideIcon,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -25,6 +25,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+interface TemplateRequest {
+  id: string;
+  name: string;
+  useCase: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  createdAt: string;
+}
 
 interface TemplateEntry {
   triggerType: string;
@@ -348,25 +356,40 @@ function CampaignTemplateCard({ template }: { template: CampaignTemplate }) {
 
 // ── Request New Template modal ────────────────────────────────────────────────
 
-function RequestTemplateModal({ onClose }: { onClose: () => void }) {
+function RequestTemplateModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: (req: TemplateRequest) => void;
+}) {
   const [name, setName] = useState('');
   const [useCase, setUseCase] = useState('');
-  const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = encodeURIComponent(`Template Request: ${name}`);
-    const body = encodeURIComponent(
-      `Template name: ${name}\n\nUse case / description:\n${useCase}`,
-    );
-    window.open(`mailto:support@pingloyal.com?subject=${subject}&body=${body}`, '_blank');
-    setSent(true);
+    setError('');
+    setSubmitting(true);
+    try {
+      const created = await api.post<TemplateRequest>('/api/v1/template-requests', {
+        name: name.trim(),
+        useCase: useCase.trim(),
+      });
+      onSuccess(created);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div className="flex items-center gap-2">
             <PlusCircle className="h-5 w-5 text-[#0F1E35]" />
@@ -381,14 +404,14 @@ function RequestTemplateModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {sent ? (
+        {done ? (
           <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
               <Check className="h-6 w-6 text-emerald-600" />
             </div>
-            <p className="font-semibold text-slate-900">Request sent!</p>
+            <p className="font-semibold text-slate-900">Request submitted!</p>
             <p className="text-sm text-slate-500">
-              Your email client should have opened. Our team will review your request and add the template within 2–3 business days.
+              Our team has been notified and will review your request. You can track its status in the <strong>My Requests</strong> section below.
             </p>
             <button
               type="button"
@@ -399,7 +422,7 @@ function RequestTemplateModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-6 py-5">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 Template name <span className="text-red-500">*</span>
@@ -423,30 +446,41 @@ function RequestTemplateModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setUseCase(e.target.value)}
                 required
                 rows={4}
-                placeholder="What is this template for? Who receives it, and when? Any specific wording or variables you need?"
+                placeholder="What is this template for? Who receives it, and when? Any specific wording or tone you want?"
                 className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
               />
             </div>
 
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+            )}
+
             <p className="text-xs text-slate-400">
-              Clicking Send will open your email client with the request pre-filled. Our team usually responds within 2–3 business days.
+              Your request is saved and our team is notified immediately. We usually respond within 2–3 business days.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={submitting}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={!name.trim() || !useCase.trim()}
+                disabled={submitting || !name.trim() || !useCase.trim()}
                 className="flex items-center gap-1.5 rounded-lg bg-[#0F1E35] px-4 py-2 text-sm font-medium text-white hover:bg-[#1a3050] disabled:opacity-50"
               >
-                <Send className="h-3.5 w-3.5" />
-                Send Request
+                {submitting ? (
+                  'Submitting…'
+                ) : (
+                  <>
+                    <Check className="h-3.5 w-3.5" />
+                    Submit Request
+                  </>
+                )}
               </button>
             </div>
           </form>
@@ -462,6 +496,18 @@ export default function TemplatesPage() {
   const queryClient = useQueryClient();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showRequestModal, setShowRequestModal] = useState(false);
+
+  const { data: myRequests } = useQuery<TemplateRequest[]>({
+    queryKey: ['template-requests'],
+    queryFn: () => api.get<TemplateRequest[]>('/api/v1/template-requests'),
+    retry: 1,
+  });
+
+  function handleRequestCreated(req: TemplateRequest) {
+    queryClient.setQueryData<TemplateRequest[]>(['template-requests'], (prev) =>
+      [req, ...(prev ?? [])],
+    );
+  }
 
   const { data: triggerTemplates, isLoading: loadingTriggers, error: triggerError } =
     useQuery<TemplateEntry[]>({
@@ -607,10 +653,69 @@ export default function TemplatesPage() {
             </div>
           )}
         </section>
+
+        {/* ── My Template Requests ── */}
+        {myRequests && myRequests.length > 0 && (
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold text-slate-900">My Template Requests</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Track the status of templates you've requested from the PingLoyal team.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              {myRequests.map((req, idx) => {
+                const statusStyle =
+                  req.status === 'completed'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : req.status === 'in_progress'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-slate-100 text-slate-600';
+                const statusLabel =
+                  req.status === 'completed'
+                    ? 'Completed'
+                    : req.status === 'in_progress'
+                    ? 'In Progress'
+                    : 'Pending';
+                return (
+                  <div
+                    key={req.id}
+                    className={`flex items-start justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-slate-100' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">{req.name}</p>
+                        <p className="mt-0.5 line-clamp-2 max-w-lg text-xs text-slate-500">{req.useCase}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Submitted{' '}
+                          {new Date(req.createdAt).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyle}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </div>
 
       {showRequestModal && (
-        <RequestTemplateModal onClose={() => setShowRequestModal(false)} />
+        <RequestTemplateModal
+          onClose={() => setShowRequestModal(false)}
+          onSuccess={(req) => {
+            handleRequestCreated(req);
+            setShowRequestModal(false);
+          }}
+        />
       )}
     </div>
   );

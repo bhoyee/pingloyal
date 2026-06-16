@@ -28,6 +28,7 @@ import { WalletModule } from './modules/billing/wallet.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
+import { TemplateRequestsModule } from './modules/template-requests/template-requests.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -90,6 +91,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     ReportsModule,
     IntegrationsModule,
     TriggersModule,
+    TemplateRequestsModule,
     AdminModule,
   ],
   controllers: [AppController],

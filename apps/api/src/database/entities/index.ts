@@ -11,6 +11,7 @@ export { Campaign } from '../../modules/campaigns/entities/campaign.entity';
 export { CampaignLog } from '../../modules/campaigns/entities/campaign-log.entity';
 export { TriggerLog } from '../../modules/triggers/entities/trigger-log.entity';
 export { WaTriggerTemplate } from '../../modules/triggers/entities/wa-trigger-template.entity';
+export { TemplateRequest } from '../../modules/template-requests/entities/template-request.entity';
 export { Integration } from '../../modules/integrations/entities/integration.entity';
 export { Subscription } from '../../modules/billing/entities/subscription.entity';
 export { WalletTransaction } from '../../modules/billing/entities/wallet-transaction.entity';
