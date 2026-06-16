@@ -148,13 +148,13 @@ function TriggerTemplateCard({
   return (
     <Card>
       <CardContent className="p-0">
-        <div className="flex items-start justify-between gap-4 p-5">
-          <div className="flex items-start gap-3">
+        <div className="flex items-start justify-between gap-3 p-4 sm:gap-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconColor}`}>
               <Icon className="h-[18px] w-[18px]" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-semibold text-slate-900">{entry.label}</h3>
                 {entry.isCustom && (
                   <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
@@ -219,8 +219,8 @@ function TriggerTemplateCard({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                  {entry.isCustom ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  {entry.isCustom && (
                     <button
                       type="button"
                       onClick={() => void handleReset()}
@@ -230,10 +230,8 @@ function TriggerTemplateCard({
                       <RotateCcw className="h-3.5 w-3.5" />
                       {resetting ? 'Resetting…' : 'Reset to default'}
                     </button>
-                  ) : (
-                    <span />
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-end gap-2 sm:ml-auto">
                     <button
                       type="button"
                       onClick={cancelEdit}
@@ -297,13 +295,13 @@ function CampaignTemplateCard({ template }: { template: CampaignTemplate }) {
   return (
     <Card>
       <CardContent className="p-0">
-        <div className="flex items-start justify-between gap-4 p-5">
-          <div className="flex items-start gap-3">
+        <div className="flex items-start justify-between gap-3 p-4 sm:gap-4 sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
               <Megaphone className="h-[18px] w-[18px]" />
             </div>
-            <div>
-              <h3 className="font-semibold text-slate-900">{template.name}</h3>
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold text-slate-900">{template.name}</h3>
               <p className="mt-0.5 text-xs text-slate-500">
                 Starter template — copy and paste into a campaign
               </p>
@@ -617,7 +615,7 @@ export default function TemplatesPage() {
 
         {/* ── Campaign Templates ── */}
         <section>
-          <div className="mb-3 flex items-start justify-between gap-4">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold text-slate-900">Campaign Templates</h2>
@@ -634,7 +632,7 @@ export default function TemplatesPage() {
             <button
               type="button"
               onClick={() => setShowRequestModal(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#0F1E35] bg-white px-3 py-1.5 text-sm font-medium text-[#0F1E35] hover:bg-[#0F1E35] hover:text-white transition-colors"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#0F1E35] bg-white px-3 py-2 text-sm font-medium text-[#0F1E35] hover:bg-[#0F1E35] hover:text-white transition-colors sm:w-auto sm:py-1.5"
             >
               <PlusCircle className="h-3.5 w-3.5" />
               Request New Template
@@ -680,13 +678,13 @@ export default function TemplatesPage() {
                 return (
                   <div
                     key={req.id}
-                    className={`flex items-start justify-between gap-4 px-5 py-4 ${idx > 0 ? 'border-t border-slate-100' : ''}`}
+                    className={`flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-5 ${idx > 0 ? 'border-t border-slate-100' : ''}`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
                       <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-900">{req.name}</p>
-                        <p className="mt-0.5 line-clamp-2 max-w-lg text-xs text-slate-500">{req.useCase}</p>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{req.useCase}</p>
                         <p className="mt-1 text-xs font-medium text-indigo-500">
                           Submitted{' '}
                           {new Date(req.createdAt).toLocaleDateString('en-GB', {
@@ -697,7 +695,7 @@ export default function TemplatesPage() {
                         </p>
                       </div>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusStyle}`}>
+                    <span className={`self-start shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium sm:mt-0.5 ${statusStyle}`}>
                       {statusLabel}
                     </span>
                   </div>
