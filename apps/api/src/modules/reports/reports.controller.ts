@@ -132,7 +132,10 @@ export class ReportsController {
       this.reportsService.generatePdf(req.user.tenantId, period),
       this.reportsService.getBusinessName(req.user.tenantId),
     ]);
-    const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     const periodLabel = query.period.replace(/_/g, '-');
     const filename = `${slug}-report-${periodLabel}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
@@ -155,10 +158,16 @@ export class ReportsController {
       this.reportsService.generateExcel(req.user.tenantId, period),
       this.reportsService.getBusinessName(req.user.tenantId),
     ]);
-    const slug = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     const periodLabel = query.period.replace(/_/g, '-');
     const filename = `${slug}-report-${periodLabel}.xlsx`;
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);

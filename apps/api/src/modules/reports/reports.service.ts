@@ -342,7 +342,7 @@ export class ReportsService {
     for (const [type, counts] of Object.entries(byType)) {
       const rate =
         counts.sent > 0
-          ? Math.round((counts.delivered / counts.sent) * 100)
+          ? Math.round((counts.delivered / counts.sent) * 1000) / 10
           : 0;
 
       let cost: string;
@@ -365,7 +365,7 @@ export class ReportsService {
     return {
       totalSent,
       deliveryRate:
-        totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0,
+        totalSent > 0 ? Math.round((totalDelivered / totalSent) * 1000) / 10 : 0,
       botInteractions,
       triggerBreakdown,
     };
@@ -377,7 +377,8 @@ export class ReportsService {
     tenantId: string,
     period: ReportPeriod,
   ): Promise<WalletSection> {
-    const [[totalRow], spendRows, avgTxnRows, triggerRows] = await Promise.all([
+    const [sub, [totalRow], spendRows, avgTxnRows, triggerRows] = await Promise.all([
+      this.subscriptionRepo.findOne({ where: { tenantId } }),
       this.dataSource.query<Array<{ spend: string }>>(
         `SELECT COALESCE(ABS(SUM(amount)), 0) AS spend
          FROM wallet_transactions
@@ -411,22 +412,26 @@ export class ReportsService {
       spendByType[row.type] = Number(row.amount);
     }
 
-    const marketingCount = Object.values(spendByType).reduce(
-      (a, b) => a + b,
-      0,
-    );
-    const costPerReach =
-      marketingCount > 0 ? Math.round(totalSpend / marketingCount) : 0;
+    // Cost per message is the plan's marketing rate, not a derived calculation
+    const costPerReach = Number(sub?.marketingRate ?? 130);
 
     const lapsedCount = Number(triggerRows[0]?.count ?? 0);
-    const avgTxnValue = Number(avgTxnRows[0]?.avg_amount ?? 0);
-    const estimatedRevenue = lapsedCount * avgTxnValue * 0.25;
+    const avgTxnValue = Math.round(Number(avgTxnRows[0]?.avg_amount ?? 0));
+    const estimatedRevenue = lapsedCount * avgTxnValue;
     const estimatedRoi =
       totalSpend > 0
         ? Math.round((estimatedRevenue / totalSpend) * 10) / 10
         : 0;
 
-    return { totalSpend, spendByType, costPerReach, estimatedRoi };
+    return {
+      totalSpend,
+      spendByType,
+      costPerReach,
+      estimatedRoi,
+      estimatedRevenue,
+      lapsedCustomerCount: lapsedCount,
+      avgTransactionValue: avgTxnValue,
+    };
   }
 
   // ── computeContentSection ─────────────────────────────────────────────────
@@ -438,9 +443,9 @@ export class ReportsService {
     const [campaignRows, dowRows, topCustomerRows, categoryRows] =
       await Promise.all([
         this.dataSource.query<
-          Array<{ id: string; name: string; delivery_rate: string }>
+          Array<{ id: string; name: string; delivery_rate: string; sent_count: string; sent_at: string | null }>
         >(
-          `SELECT c.id, c.name,
+          `SELECT c.id, c.name, c.sent_count, c.sent_at,
              CASE WHEN c.sent_count = 0 THEN 0
              ELSE ROUND(c.delivered_count * 100.0 / c.sent_count, 1)
              END AS delivery_rate
@@ -467,10 +472,11 @@ export class ReportsService {
             full_name: string;
             total_spend: string;
             points_balance: string;
+            purchase_count: string;
             tier_label: string | null;
           }>
         >(
-          `SELECT c.id, c.full_name, c.total_spend, c.points_balance,
+          `SELECT c.id, c.full_name, c.total_spend, c.points_balance, c.purchase_count,
                   tc.tier_label
            FROM customers c
            LEFT JOIN tier_configs tc ON c.tier_id = tc.id
@@ -494,6 +500,8 @@ export class ReportsService {
             id: campaignRows[0].id,
             name: campaignRows[0].name,
             deliveryRate: Number(campaignRows[0].delivery_rate),
+            sentCount: Number(campaignRows[0].sent_count),
+            sentAt: campaignRows[0].sent_at ?? undefined,
           }
         : null;
 
@@ -514,6 +522,7 @@ export class ReportsService {
         totalSpend: Number(r.total_spend),
         pointsBalance: Number(r.points_balance),
         tierLabel: r.tier_label,
+        visitCount: Number(r.purchase_count),
       })),
       categoryBreakdown: categoryRows.map((r) => ({
         name: r.name,

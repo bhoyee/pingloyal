@@ -53,6 +53,9 @@ export interface WalletSection {
   spendByType: Record<string, number>;
   costPerReach: number;
   estimatedRoi: number;
+  estimatedRevenue: number;
+  lapsedCustomerCount: number;
+  avgTransactionValue: number;
 }
 
 export interface ContentSection {
@@ -60,6 +63,8 @@ export interface ContentSection {
     id: string;
     name: string;
     deliveryRate: number;
+    sentCount?: number;
+    sentAt?: string;
   } | null;
   busiestDayOfWeek: Array<{ day: string; count: number }>;
   topCustomers: Array<{
@@ -68,6 +73,7 @@ export interface ContentSection {
     totalSpend: number;
     pointsBalance: number;
     tierLabel: string | null;
+    visitCount?: number;
   }>;
   categoryBreakdown: Array<{ name: string; percentage: number }>;
 }

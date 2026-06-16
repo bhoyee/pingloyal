@@ -70,6 +70,9 @@ const MOCK_REPORT = {
     spendByType: {},
     costPerReach: 40,
     estimatedRoi: 1.5,
+    estimatedRevenue: 3000,
+    lapsedCustomerCount: 5,
+    avgTransactionValue: 600,
   },
   content: {
     bestCampaign: null,
