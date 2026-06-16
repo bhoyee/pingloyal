@@ -19,6 +19,7 @@ jest.mock('@pingloyal/utils', () => ({
   PhoneNormalisationError: class extends Error {},
   encrypt: jest.fn(),
   decrypt: jest.fn(),
+  isTriggerEnabled: jest.fn(() => true),
 }));
 
 // ── Shared mocks ──────────────────────────────────────────────────────────────

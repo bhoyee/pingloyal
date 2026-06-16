@@ -5,3 +5,4 @@ export {
   maskPhone,
   PhoneNormalisationError,
 } from './phone';
+export { isTriggerEnabled } from './triggers';

@@ -3,13 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { DateTime } from 'luxon';
-import { decrypt } from '@pingloyal/utils';
+import { decrypt, isTriggerEnabled, maskPhone } from '@pingloyal/utils';
 import {
   TriggerStatus,
   TriggerType,
   WaVerificationStatus,
 } from '@pingloyal/types';
-import { maskPhone } from '@pingloyal/utils';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from '../customers/entities/customer.entity';
 import { TierConfig } from '../tenants/entities/tier-config.entity';
@@ -84,6 +83,12 @@ export class WaBotService {
         ` Reply START at any time to re-subscribe.`;
       await this.sendSessionMessage(tenant, senderPhone, stopMsg);
       await this.logBotReply(tenant.id, customer.id, TriggerStatus.SENT, null);
+      return;
+    }
+
+    if (
+      !isTriggerEnabled(tenant.enabledTriggers, TriggerType.BALANCE_BOT_REPLY)
+    ) {
       return;
     }
 

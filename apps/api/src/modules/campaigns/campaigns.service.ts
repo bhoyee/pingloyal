@@ -201,7 +201,7 @@ export class CampaignsService {
     }
     await this.campaignRepo.update(id, {
       deletedAt: new Date(),
-      deletedBy: { id: userId } as never,
+      deletedBy: { id: userId },
       deletionReason: reason ?? null,
     });
   }

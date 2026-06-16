@@ -376,7 +376,8 @@ async function main() {
         campaign: { id: vipCampaign.id },
         customer: { id: adaeze.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFBAA==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFBAA==',
         sentAt: daysAgo(7),
         deliveredAt: daysAgo(7),
       }),
@@ -385,7 +386,8 @@ async function main() {
         campaign: { id: vipCampaign.id },
         customer: { id: chidinma.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFCQQ==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFCQQ==',
         sentAt: daysAgo(7),
         deliveredAt: daysAgo(7),
       }),
@@ -396,7 +398,8 @@ async function main() {
         campaign: { id: lapsedCampaign.id },
         customer: { id: funke.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwNBUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQg==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwNBUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQg==',
         sentAt: daysAgo(3),
         deliveredAt: daysAgo(3),
       }),
@@ -416,7 +419,8 @@ async function main() {
         campaign: { id: activeCampaign.id },
         customer: { id: adaeze.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQw==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwMRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFDQw==',
         sentAt: daysAgo(1),
         deliveredAt: daysAgo(1),
       }),
@@ -425,7 +429,8 @@ async function main() {
         campaign: { id: activeCampaign.id },
         customer: { id: chidinma.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFERA==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwMhUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFERA==',
         sentAt: daysAgo(1),
         deliveredAt: daysAgo(1),
       }),
@@ -434,7 +439,8 @@ async function main() {
         campaign: { id: activeCampaign.id },
         customer: { id: tunde.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwMxUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFFRQ==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwMxUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFFRQ==',
         sentAt: daysAgo(1),
         deliveredAt: daysAgo(1),
       }),
@@ -443,7 +449,8 @@ async function main() {
         campaign: { id: activeCampaign.id },
         customer: { id: ibrahim.id },
         status: CampaignLogStatus.DELIVERED,
-        waMessageId: 'wamid.HBgNMjM0ODAzMTIzNDAwNRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFGRg==',
+        waMessageId:
+          'wamid.HBgNMjM0ODAzMTIzNDAwNRUCABIYFjNFQjBBQUFBQUFBQUFBQUFBQUFGRg==',
         sentAt: daysAgo(1),
         deliveredAt: daysAgo(1),
       }),

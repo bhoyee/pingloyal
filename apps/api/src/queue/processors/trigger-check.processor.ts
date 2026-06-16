@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Job, Queue } from 'bullmq';
 import * as Sentry from '@sentry/node';
 import { TriggerType, WaVerificationStatus } from '@pingloyal/types';
+import { isTriggerEnabled } from '@pingloyal/utils';
 import { TenantsService } from '../../modules/tenants/tenants.service';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 
@@ -65,7 +66,11 @@ export class TriggerCheckProcessor extends WorkerHost {
     const pct = Number(customer.pointsBalance) / Number(tenant.pointsThreshold);
     const now = Date.now();
 
-    if (pct >= 0.8 && pct < 1.0) {
+    if (
+      pct >= 0.8 &&
+      pct < 1.0 &&
+      isTriggerEnabled(tenant.enabledTriggers, TriggerType.THRESHOLD_NUDGE)
+    ) {
       const lastNudge = customer.nudgeSentAt
         ? customer.nudgeSentAt.getTime()
         : 0;
@@ -96,7 +101,10 @@ export class TriggerCheckProcessor extends WorkerHost {
       return;
     }
 
-    if (pct >= 1.0) {
+    if (
+      pct >= 1.0 &&
+      isTriggerEnabled(tenant.enabledTriggers, TriggerType.REWARD_UNLOCKED)
+    ) {
       const lastReward = customer.rewardSentAt
         ? customer.rewardSentAt.getTime()
         : 0;

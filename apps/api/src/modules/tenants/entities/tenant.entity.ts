@@ -91,6 +91,11 @@ export class Tenant {
   @Column({ type: 'int', default: 60 })
   lapsedDays: number;
 
+  // Per-trigger-type on/off switches (e.g. { welcome: false }). A type
+  // missing from this map is treated as enabled.
+  @Column({ type: 'jsonb', default: {} })
+  enabledTriggers: Record<string, boolean>;
+
   @Column({ type: 'varchar', length: 3, default: 'NGN' })
   currency: string;
 

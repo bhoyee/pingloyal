@@ -364,7 +364,7 @@ export default function SettingsPage() {
         </Card>
 
         {/* ── Loyalty Programme ──────────────────────────────────────────── */}
-        <Card>
+        <Card id="loyalty">
           <CardHeader>
             <CardTitle>Loyalty Programme</CardTitle>
             <CardDescription>

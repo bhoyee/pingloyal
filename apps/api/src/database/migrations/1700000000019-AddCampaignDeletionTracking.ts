@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddCampaignDeletionTracking1700000000019
-  implements MigrationInterface
-{
+export class AddCampaignDeletionTracking1700000000019 implements MigrationInterface {
   name = 'AddCampaignDeletionTracking1700000000019';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -20,9 +18,7 @@ export class AddCampaignDeletionTracking1700000000019
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS "idx_campaigns_deleted_at"`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS "idx_campaigns_deleted_at"`);
     await queryRunner.query(`
       ALTER TABLE "campaigns"
       DROP CONSTRAINT IF EXISTS "fk_campaigns_deleted_by",

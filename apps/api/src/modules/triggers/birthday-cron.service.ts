@@ -11,6 +11,7 @@ import {
   TriggerType,
   WaVerificationStatus,
 } from '@pingloyal/types';
+import { isTriggerEnabled } from '@pingloyal/utils';
 
 interface TenantRow {
   id: string;
@@ -20,6 +21,7 @@ interface TenantRow {
   businessName: string;
   pointsThreshold: number;
   rewardValue: string;
+  enabledTriggers: Record<string, boolean> | null;
 }
 
 interface CustomerRow {
@@ -103,7 +105,8 @@ export class BirthdayCronService {
                 marketing_wallet_balance AS "marketingWalletBalance",
                 business_name AS "businessName",
                 points_threshold AS "pointsThreshold",
-                reward_value AS "rewardValue"
+                reward_value AS "rewardValue",
+                enabled_triggers AS "enabledTriggers"
          FROM tenants
          WHERE subscription_status IN ($1, $2, $3)
          ORDER BY id
@@ -135,6 +138,10 @@ export class BirthdayCronService {
   }
 
   private async processTenant(tenant: TenantRow): Promise<ProcessResult> {
+    if (!isTriggerEnabled(tenant.enabledTriggers, TriggerType.BIRTHDAY)) {
+      return { queued: 0, skippedWallet: 0, skippedNotConnected: 0 };
+    }
+
     // Check A — WhatsApp connected
     if (tenant.waVerificationStatus !== WaVerificationStatus.VERIFIED) {
       return { queued: 0, skippedWallet: 0, skippedNotConnected: 1 };

@@ -4,7 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { Cron } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
 import { Queue } from 'bullmq';
-import { maskPhone } from '@pingloyal/utils';
+import { isTriggerEnabled, maskPhone } from '@pingloyal/utils';
 import { SubscriptionStatus, TriggerType } from '@pingloyal/types';
 import { Customer } from '../customers/entities/customer.entity';
 
@@ -12,6 +12,7 @@ interface TenantRow {
   id: string;
   businessName: string;
   lapsedDays: number;
+  enabledTriggers: Record<string, boolean> | null;
 }
 
 const PAGE_SIZE = 20;
@@ -44,7 +45,8 @@ export class LapsedCronService {
       const tenants: TenantRow[] = await this.dataSource.query(
         `SELECT id,
                 business_name AS "businessName",
-                lapsed_days   AS "lapsedDays"
+                lapsed_days   AS "lapsedDays",
+                enabled_triggers AS "enabledTriggers"
          FROM tenants
          WHERE subscription_status IN ($1, $2)
          ORDER BY id
@@ -77,6 +79,10 @@ export class LapsedCronService {
     now: number,
     startOfUtcDay: Date,
   ): Promise<number> {
+    if (!isTriggerEnabled(tenant.enabledTriggers, TriggerType.LAPSED_WINBACK)) {
+      return 0;
+    }
+
     const cutoffDate = new Date(now - tenant.lapsedDays * 24 * 3600 * 1000);
     const thirtyDaysAgo = new Date(now - COOLDOWN_MS);
 
