@@ -7,6 +7,7 @@ export class MailerService {
   private readonly logger = new Logger(MailerService.name);
   private readonly resend: Resend | null;
   private readonly fromAddress: string;
+  private readonly supportEmail: string;
 
   constructor(private readonly config: ConfigService) {
     const key = this.config.get<string>('RESEND_API_KEY', '');
@@ -16,6 +17,8 @@ export class MailerService {
     this.fromAddress =
       this.config.get<string>('MAIL_FROM') ??
       'PingLoyal <noreply@pingloyal.com>';
+    this.supportEmail =
+      this.config.get<string>('SUPPORT_EMAIL') ?? 'support@pingloyal.com';
   }
 
   async sendWelcomeVerification(params: {
@@ -95,7 +98,7 @@ export class MailerService {
     }
     await this.resend.emails.send({
       from: this.fromAddress,
-      to: 'support@pingloyal.com',
+      to: this.supportEmail,
       subject,
       html: this.buildTemplateRequestHtml(params),
     });
