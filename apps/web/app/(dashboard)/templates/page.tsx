@@ -602,7 +602,7 @@ export default function TemplatesPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {triggerTemplates?.map((entry) => (
                 <TriggerTemplateCard
                   key={entry.triggerType}
@@ -646,7 +646,7 @@ export default function TemplatesPage() {
               <Spinner className="h-7 w-7" />
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {campaignTemplates?.map((t) => (
                 <CampaignTemplateCard key={t.id} template={t} />
               ))}
@@ -670,7 +670,7 @@ export default function TemplatesPage() {
                     ? 'bg-emerald-100 text-emerald-700'
                     : req.status === 'in_progress'
                     ? 'bg-amber-100 text-amber-700'
-                    : 'bg-slate-100 text-slate-600';
+                    : 'bg-red-100 text-red-600';
                 const statusLabel =
                   req.status === 'completed'
                     ? 'Completed'
@@ -687,7 +687,7 @@ export default function TemplatesPage() {
                       <div>
                         <p className="text-sm font-medium text-slate-900">{req.name}</p>
                         <p className="mt-0.5 line-clamp-2 max-w-lg text-xs text-slate-500">{req.useCase}</p>
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs font-medium text-indigo-500">
                           Submitted{' '}
                           {new Date(req.createdAt).toLocaleDateString('en-GB', {
                             day: 'numeric',
