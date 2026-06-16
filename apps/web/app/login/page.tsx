@@ -47,7 +47,11 @@ export default function LoginPage() {
         setError('Incorrect email or password.');
         return;
       }
-      setError(err instanceof Error ? err.message : 'Invalid email or password');
+      if (err instanceof ApiError && (err.status === 503 || err.status === 0)) {
+        setError('Unable to reach the server right now. Please check your internet connection and try again.');
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
