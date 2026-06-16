@@ -20,6 +20,7 @@ import { Campaign } from '../../src/modules/campaigns/entities/campaign.entity';
 import { CampaignLog } from '../../src/modules/campaigns/entities/campaign-log.entity';
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
+import { WaTriggerTemplate } from '../../src/modules/triggers/entities/wa-trigger-template.entity';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,10 @@ describe('WaMessageProcessor', () => {
         },
         {
           provide: getRepositoryToken(User),
+          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+        },
+        {
+          provide: getRepositoryToken(WaTriggerTemplate),
           useValue: { findOne: jest.fn().mockResolvedValue(null) },
         },
       ],
