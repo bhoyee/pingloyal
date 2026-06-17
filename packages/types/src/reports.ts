@@ -36,6 +36,7 @@ export interface PointsSection {
   avgPointsPerCustomer: number;
   nearRewardCount: number;
   dailyIssued: Array<{ date: string; amount: number }>;
+  issuedVsLastPeriod: number | null;
 }
 
 export interface WhatsappSection {

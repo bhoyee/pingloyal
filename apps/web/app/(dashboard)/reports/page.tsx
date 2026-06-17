@@ -56,6 +56,7 @@ interface ReportData {
     nearRewardCount: number;
     avgPointsPerCustomer: number;
     dailyIssued: Array<{ date: string; amount: number }>;
+    issuedVsLastPeriod: number | null;
   };
   whatsapp: {
     totalSent: number;
@@ -186,8 +187,8 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 // ── UI primitives ──────────────────────────────────────────────────────────────
 
 function StatCard({
-  value, label, sub, accent, labelFirst,
-}: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean }) {
+  value, label, sub, accent, labelFirst, subAccent,
+}: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean; subAccent?: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       {labelFirst
@@ -195,7 +196,7 @@ function StatCard({
         : null}
       <p className={`text-2xl font-bold ${accent ?? 'text-slate-900'}`}>{value}</p>
       {!labelFirst && <p className="mt-0.5 text-sm font-medium text-slate-500">{label}</p>}
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+      {sub && <p className={`mt-0.5 text-xs ${subAccent ?? 'text-slate-400'}`}>{sub}</p>}
     </div>
   );
 }
@@ -482,16 +483,47 @@ export default function ReportsPage() {
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : report
-              ? (
-                <>
-                  <StatCard value={fmtNum(report.points.issued)} label="Points Issued" />
-                  <StatCard value={fmtNum(report.points.redeemed)} label="Points Redeemed" />
-                  <StatCard value={`${report.points.redemptionRate}%`} label="Redemption Rate"
-                    accent={report.points.redemptionRate >= 10 ? 'text-green-600' : 'text-slate-900'} />
-                  <StatCard value={fmtNum(report.points.nearRewardCount)} label="Near Reward"
-                    sub="at 80%+ of threshold" />
-                </>
-              )
+              ? (() => {
+                  const pct = report.points.issuedVsLastPeriod;
+                  const trendSub = pct != null
+                    ? `${pct >= 0 ? '↑' : '↓'} ${pct >= 0 ? '+' : ''}${pct}% vs last period`
+                    : 'points this period';
+                  const trendAccent = pct != null && pct >= 0
+                    ? 'text-green-600 font-medium'
+                    : pct != null && pct < 0
+                    ? 'text-red-500 font-medium'
+                    : 'text-slate-400';
+                  return (
+                    <>
+                      <StatCard
+                        value={fmtNum(report.points.issued)}
+                        label="Points Issued"
+                        sub={trendSub}
+                        subAccent={trendAccent}
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.redeemed)}
+                        label="Points Redeemed"
+                        sub={`${report.points.redemptionRate}% redemption rate`}
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.avgPointsPerCustomer)}
+                        label="Avg Points/Customer"
+                        sub="across active customers"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.nearRewardCount)}
+                        label="Near Reward (80%+)"
+                        sub="customers in pipeline"
+                        accent="text-amber-500"
+                        labelFirst
+                      />
+                    </>
+                  );
+                })()
               : null}
           </div>
 

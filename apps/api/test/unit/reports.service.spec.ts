@@ -58,6 +58,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
         avgPointsPerCustomer: 343,
         nearRewardCount: 8,
         dailyIssued: [],
+        issuedVsLastPeriod: 12,
       },
       whatsapp: {
         totalSent: 200,
@@ -198,6 +199,7 @@ describe('ReportsService', () => {
         avgPointsPerCustomer: 0,
         nearRewardCount: 0,
         dailyIssued: [],
+        issuedVsLastPeriod: null,
       });
     const waSpy = jest
       .spyOn(service, 'computeWhatsappSection')
@@ -256,6 +258,7 @@ describe('ReportsService', () => {
       avgPointsPerCustomer: 12,
       nearRewardCount: 1,
       dailyIssued: [],
+      issuedVsLastPeriod: 5,
     });
     jest.spyOn(service, 'computeWhatsappSection').mockResolvedValueOnce({
       totalSent: 5,
@@ -366,7 +369,8 @@ describe('ReportsService', () => {
       .mockResolvedValueOnce([
         { date: '2026-05-01', amount: '300' },
         { date: '2026-05-02', amount: '700' },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ issued: '900' }]); // prev period
 
     const result = await service.computePointsSection(
       TENANT_ID,
