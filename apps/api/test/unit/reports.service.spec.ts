@@ -41,6 +41,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
     data: {
       period: makePeriod(),
       generatedAt: new Date().toISOString(),
+      timezone: 'Africa/Lagos',
       loyalty: {
         totalCustomers: 50,
         activeCustomers: 35,
@@ -49,7 +50,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
         retentionRate: 60,
         avgVisitsPerCustomer: 2.3,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 45, activeRate: 70 },
+        vsLastPeriod: { totalCustomers: 45, activeRate: 70, avgVisitsPerCustomer: 2.1 },
       },
       points: {
         issued: 12000,
@@ -58,6 +59,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
         avgPointsPerCustomer: 343,
         nearRewardCount: 8,
         dailyIssued: [],
+        issuedVsLastPeriod: 12,
       },
       whatsapp: {
         totalSent: 200,
@@ -187,7 +189,7 @@ describe('ReportsService', () => {
         retentionRate: 40,
         avgVisitsPerCustomer: 2,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 40, activeRate: 75 },
+        vsLastPeriod: { totalCustomers: 40, activeRate: 75, avgVisitsPerCustomer: 2.0 },
       });
     const pointsSpy = jest
       .spyOn(service, 'computePointsSection')
@@ -198,6 +200,7 @@ describe('ReportsService', () => {
         avgPointsPerCustomer: 0,
         nearRewardCount: 0,
         dailyIssued: [],
+        issuedVsLastPeriod: null,
       });
     const waSpy = jest
       .spyOn(service, 'computeWhatsappSection')
@@ -247,7 +250,7 @@ describe('ReportsService', () => {
       retentionRate: 50,
       avgVisitsPerCustomer: 1.5,
       weeklyNewCustomers: [],
-      vsLastPeriod: { totalCustomers: 9, activeRate: 80 },
+      vsLastPeriod: { totalCustomers: 9, activeRate: 80, avgVisitsPerCustomer: 1.5 },
     });
     jest.spyOn(service, 'computePointsSection').mockResolvedValueOnce({
       issued: 100,
@@ -256,6 +259,7 @@ describe('ReportsService', () => {
       avgPointsPerCustomer: 12,
       nearRewardCount: 1,
       dailyIssued: [],
+      issuedVsLastPeriod: 5,
     });
     jest.spyOn(service, 'computeWhatsappSection').mockResolvedValueOnce({
       totalSent: 5,
@@ -303,7 +307,7 @@ describe('ReportsService', () => {
       ])
       .mockResolvedValueOnce([]) // weekly
       .mockResolvedValueOnce([
-        { total_customers: '90', active_customers: '55' },
+        { total_customers: '90', active_customers: '55', avg_visits: '2.1' },
       ]); // prev period
 
     const result = await service.computeLoyaltySection(TENANT_ID, makePeriod());
@@ -328,13 +332,14 @@ describe('ReportsService', () => {
       ])
       .mockResolvedValueOnce([]) // weekly
       .mockResolvedValueOnce([
-        { total_customers: '45', active_customers: '30' },
+        { total_customers: '45', active_customers: '30', avg_visits: '2.5' },
       ]); // prev
 
     const result = await service.computeLoyaltySection(TENANT_ID, makePeriod());
 
     expect(result.vsLastPeriod.totalCustomers).toBe(45);
     expect(result.vsLastPeriod.activeRate).toBe(67); // 30/45*100 = 66.6 → 67
+    expect(result.vsLastPeriod.avgVisitsPerCustomer).toBe(2.5);
   });
 
   // ── T7: no division by zero in redemptionRate ─────────────────────────────
@@ -366,7 +371,8 @@ describe('ReportsService', () => {
       .mockResolvedValueOnce([
         { date: '2026-05-01', amount: '300' },
         { date: '2026-05-02', amount: '700' },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ issued: '900' }]); // prev period
 
     const result = await service.computePointsSection(
       TENANT_ID,

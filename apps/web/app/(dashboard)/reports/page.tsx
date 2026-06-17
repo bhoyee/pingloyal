@@ -39,6 +39,7 @@ type PeriodType = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months
 interface ReportData {
   period: { type: string; start: string; end: string };
   generatedAt: string;
+  timezone: string;
   loyalty: {
     totalCustomers: number;
     activeCustomers: number;
@@ -47,7 +48,7 @@ interface ReportData {
     newCustomersThisMonth: number;
     avgVisitsPerCustomer: number;
     weeklyNewCustomers: Array<{ week: string; count: number }>;
-    vsLastPeriod: { totalCustomers: number; activeRate: number };
+    vsLastPeriod: { totalCustomers: number; activeRate: number; avgVisitsPerCustomer: number };
   };
   points: {
     issued: number;
@@ -56,6 +57,7 @@ interface ReportData {
     nearRewardCount: number;
     avgPointsPerCustomer: number;
     dailyIssued: Array<{ date: string; amount: number }>;
+    issuedVsLastPeriod: number | null;
   };
   whatsapp: {
     totalSent: number;
@@ -183,11 +185,41 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Pharmacy': '💊',
 };
 
+// ── Reporting period banner helpers ───────────────────────────────────────────
+
+function formatPeriodBound(dateStr: string, tz: string): string {
+  return new Date(dateStr).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: tz,
+  });
+}
+
+function formatGeneratedAt(generatedAt: string, tz: string): string {
+  const d = new Date(generatedAt);
+  const now = new Date();
+  const isoDay = (dt: Date) => dt.toLocaleDateString('en-CA', { timeZone: tz });
+  const timeStr = d.toLocaleTimeString('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  if (isoDay(d) === isoDay(now)) return `Today at ${timeStr}`;
+  const yesterday = new Date(now.getTime() - 86_400_000);
+  if (isoDay(d) === isoDay(yesterday)) return `Yesterday at ${timeStr}`;
+  return (
+    d.toLocaleDateString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', year: 'numeric' }) +
+    ` at ${timeStr}`
+  );
+}
+
 // ── UI primitives ──────────────────────────────────────────────────────────────
 
 function StatCard({
-  value, label, sub, accent, labelFirst,
-}: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean }) {
+  value, label, sub, accent, labelFirst, subAccent,
+}: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean; subAccent?: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       {labelFirst
@@ -195,7 +227,7 @@ function StatCard({
         : null}
       <p className={`text-2xl font-bold ${accent ?? 'text-slate-900'}`}>{value}</p>
       {!labelFirst && <p className="mt-0.5 text-sm font-medium text-slate-500">{label}</p>}
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+      {sub && <p className={`mt-0.5 text-xs ${subAccent ?? 'text-slate-400'}`}>{sub}</p>}
     </div>
   );
 }
@@ -418,54 +450,166 @@ export default function ReportsPage() {
           </div>
         )}
 
+        {/* ── Reporting period banner ── */}
+        {(isLoading || report) && (
+          <div className="rounded-xl bg-[#0F1E35] px-5 py-3">
+            {isLoading ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="animate-pulse h-4 w-64 rounded bg-slate-700" />
+                <div className="animate-pulse h-3 w-40 rounded bg-slate-700" />
+              </div>
+            ) : report ? (
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-400">
+                  Reporting period:{' '}
+                  <span className="font-semibold text-white">
+                    {formatPeriodBound(report.period.start, report.timezone ?? 'Africa/Lagos')}
+                    {' – '}
+                    {formatPeriodBound(report.period.end, report.timezone ?? 'Africa/Lagos')}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  Last updated:{' '}
+                  <span className="text-slate-300">
+                    {formatGeneratedAt(report.generatedAt, report.timezone ?? 'Africa/Lagos')}
+                  </span>
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* ── SECTION 1: Loyalty ── */}
         <section>
           <div className="mb-4">
-            <SectionHeading icon={Users} label="Loyalty Performance" />
+            <SectionHeading icon={Users} label="Loyalty Programme Performance" />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : report
-              ? (
-                <>
-                  <StatCard value={fmtNum(report.loyalty.totalCustomers)} label="Total Customers"
-                    sub={`${report.loyalty.inactiveCustomers} inactive`} />
-                  <StatCard value={fmtNum(report.loyalty.activeCustomers)} label="Active Customers"
-                    sub={report.loyalty.totalCustomers > 0 ? `${Math.round(report.loyalty.activeCustomers / report.loyalty.totalCustomers * 100)}% of total` : undefined} />
-                  <StatCard value={`${report.loyalty.retentionRate}%`} label="Retention Rate"
-                    sub="purchased 2+ times"
-                    accent={report.loyalty.retentionRate >= 50 ? 'text-green-600' : report.loyalty.retentionRate >= 25 ? 'text-amber-600' : 'text-slate-900'} />
-                  <StatCard value={fmtNum(report.loyalty.newCustomersThisMonth)} label="New This Period"
-                    sub={`avg ${report.loyalty.avgVisitsPerCustomer} visits/customer`} />
-                </>
-              )
+              ? (() => {
+                  const currentActiveRate = report.loyalty.totalCustomers > 0
+                    ? Math.round(report.loyalty.activeCustomers / report.loyalty.totalCustomers * 100)
+                    : 0;
+                  const deltaCustomers = report.loyalty.totalCustomers - report.loyalty.vsLastPeriod.totalCustomers;
+                  const deltaActiveRate = currentActiveRate - report.loyalty.vsLastPeriod.activeRate;
+                  const deltaAvgVisits = Math.round(
+                    (report.loyalty.avgVisitsPerCustomer - report.loyalty.vsLastPeriod.avgVisitsPerCustomer) * 10
+                  ) / 10;
+                  function trendLabel(delta: number, unit: string): string {
+                    const sign = delta >= 0 ? '+' : '';
+                    const arrow = delta >= 0 ? '↑' : '↓';
+                    return `${arrow} ${sign}${delta}${unit} vs last period`;
+                  }
+                  function trendClass(delta: number): string {
+                    return delta >= 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium';
+                  }
+                  return (
+                    <>
+                      <StatCard
+                        value={fmtNum(report.loyalty.totalCustomers)}
+                        label="Total Customers"
+                        sub={report.loyalty.vsLastPeriod.totalCustomers > 0
+                          ? trendLabel(deltaCustomers, '')
+                          : `${report.loyalty.inactiveCustomers} inactive`}
+                        subAccent={report.loyalty.vsLastPeriod.totalCustomers > 0 ? trendClass(deltaCustomers) : undefined}
+                        accent="text-green-600"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`${currentActiveRate}%`}
+                        label="Active Rate"
+                        sub={report.loyalty.vsLastPeriod.activeRate > 0
+                          ? trendLabel(deltaActiveRate, '%')
+                          : `${fmtNum(report.loyalty.activeCustomers)} active customers`}
+                        subAccent={report.loyalty.vsLastPeriod.activeRate > 0 ? trendClass(deltaActiveRate) : undefined}
+                        accent="text-green-600"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`${report.loyalty.retentionRate}%`}
+                        label="Retention Rate"
+                        sub="returned within 30 days"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={report.loyalty.avgVisitsPerCustomer}
+                        label="Avg Visits / Customer"
+                        sub={report.loyalty.vsLastPeriod.avgVisitsPerCustomer > 0
+                          ? trendLabel(deltaAvgVisits, '')
+                          : 'avg visits per customer'}
+                        subAccent={report.loyalty.vsLastPeriod.avgVisitsPerCustomer > 0 ? trendClass(deltaAvgVisits) : undefined}
+                        labelFirst
+                      />
+                    </>
+                  );
+                })()
               : null}
           </div>
 
           {/* Weekly new customers chart */}
           {(isLoading || report) && (
             <div className="mt-4">
-              <ChartBox title="New Customers — Week by Week" minH={220}>
+              <ChartBox title="New customers registered — week by week" minH={200}>
                 {isLoading ? (
-                  <div className="animate-pulse h-48 rounded bg-slate-100" />
-                ) : report && report.loyalty.weeklyNewCustomers.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={report.loyalty.weeklyNewCustomers} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="week" tick={{ fontSize: 11 }} tickFormatter={(v: string) => {
-                        const d = new Date(v);
-                        return `${d.getDate()}/${d.getMonth() + 1}`;
-                      }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <Tooltip
-                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                        labelFormatter={(v: unknown) => `Week of ${new Date(String(v)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                      />
-                      <Bar dataKey="count" fill="#25D366" radius={[4, 4, 0, 0]} name="New Customers" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
+                  <div className="animate-pulse h-44 rounded bg-slate-100" />
+                ) : report && report.loyalty.weeklyNewCustomers.length > 0 ? (() => {
+                  const wData = report.loyalty.weeklyNewCustomers;
+                  const maxCount = Math.max(...wData.map(w => w.count), 1);
+                  const totalNew = wData.reduce((s, w) => s + w.count, 0);
+                  const BAR_MAX_H = 110;
+                  const periodLabel = period === 'this_month' || period === 'last_month' ? 'this month' : 'this period';
+                  return (
+                    <div>
+                      {/* Bar columns */}
+                      <div className="flex items-end gap-2 sm:gap-3" style={{ height: 148 }}>
+                        {wData.map((entry, i) => {
+                          const barH = Math.max(Math.round((entry.count / maxCount) * BAR_MAX_H), 10);
+                          const weekOf = new Date(entry.week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                          return (
+                            <div
+                              key={entry.week}
+                              className="flex-1 flex flex-col items-center justify-end group"
+                              title={`Week of ${weekOf}: ${entry.count} new`}
+                            >
+                              <span className="text-sm font-bold text-slate-700 mb-1.5 tabular-nums">
+                                {entry.count}
+                              </span>
+                              <div
+                                className="w-full rounded-t-lg bg-[#25D366] group-hover:bg-[#1fb557] transition-colors duration-150"
+                                style={{ height: barH }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Axis line */}
+                      <div className="h-px bg-slate-200 mt-0" />
+
+                      {/* Week labels */}
+                      <div className="flex gap-2 sm:gap-3 mt-2">
+                        {wData.map((entry, i) => (
+                          <div key={`lbl-${i}`} className="flex-1 flex flex-col items-center gap-0.5">
+                            <span className="text-xs font-semibold text-slate-500">W{i + 1}</span>
+                            {wData.length <= 8 && (
+                              <span className="text-[10px] text-slate-400 tabular-nums">{entry.count} new</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Week-on-week growth</span>
+                        <span className="text-xs font-semibold text-slate-600 tabular-nums">
+                          Total: {fmtNum(totalNew)} new {periodLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })() : (
                   <NoData label="No new customer data for this period" />
                 )}
               </ChartBox>
@@ -482,16 +626,47 @@ export default function ReportsPage() {
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : report
-              ? (
-                <>
-                  <StatCard value={fmtNum(report.points.issued)} label="Points Issued" />
-                  <StatCard value={fmtNum(report.points.redeemed)} label="Points Redeemed" />
-                  <StatCard value={`${report.points.redemptionRate}%`} label="Redemption Rate"
-                    accent={report.points.redemptionRate >= 10 ? 'text-green-600' : 'text-slate-900'} />
-                  <StatCard value={fmtNum(report.points.nearRewardCount)} label="Near Reward"
-                    sub="at 80%+ of threshold" />
-                </>
-              )
+              ? (() => {
+                  const pct = report.points.issuedVsLastPeriod;
+                  const trendSub = pct != null
+                    ? `${pct >= 0 ? '↑' : '↓'} ${pct >= 0 ? '+' : ''}${pct}% vs last period`
+                    : 'points this period';
+                  const trendAccent = pct != null && pct >= 0
+                    ? 'text-green-600 font-medium'
+                    : pct != null && pct < 0
+                    ? 'text-red-500 font-medium'
+                    : 'text-slate-400';
+                  return (
+                    <>
+                      <StatCard
+                        value={fmtNum(report.points.issued)}
+                        label="Points Issued"
+                        sub={trendSub}
+                        subAccent={trendAccent}
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.redeemed)}
+                        label="Points Redeemed"
+                        sub={`${report.points.redemptionRate}% redemption rate`}
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.avgPointsPerCustomer)}
+                        label="Avg Points/Customer"
+                        sub="across active customers"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.points.nearRewardCount)}
+                        label="Near Reward (80%+)"
+                        sub="customers in pipeline"
+                        accent="text-amber-500"
+                        labelFirst
+                      />
+                    </>
+                  );
+                })()
               : null}
           </div>
 

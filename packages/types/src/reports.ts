@@ -8,6 +8,7 @@ export interface ReportPeriod {
 export interface ReportData {
   period: ReportPeriod;
   generatedAt: string;
+  timezone: string;
   loyalty: LoyaltySection;
   points: PointsSection;
   whatsapp: WhatsappSection;
@@ -26,6 +27,7 @@ export interface LoyaltySection {
   vsLastPeriod: {
     totalCustomers: number;
     activeRate: number;
+    avgVisitsPerCustomer: number;
   };
 }
 
@@ -36,6 +38,7 @@ export interface PointsSection {
   avgPointsPerCustomer: number;
   nearRewardCount: number;
   dailyIssued: Array<{ date: string; amount: number }>;
+  issuedVsLastPeriod: number | null;
 }
 
 export interface WhatsappSection {

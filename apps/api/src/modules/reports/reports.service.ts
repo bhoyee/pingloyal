@@ -101,7 +101,10 @@ export class ReportsService {
     tenantId: string,
     period: ReportPeriod,
   ): Promise<ReportData> {
-    const loyalty = await this.computeLoyaltySection(tenantId, period);
+    const [tenant, loyalty] = await Promise.all([
+      this.tenantRepo.findOne({ where: { id: tenantId } }),
+      this.computeLoyaltySection(tenantId, period),
+    ]);
     const [points, whatsapp, wallet, content] = await Promise.all([
       this.computePointsSection(tenantId, period, loyalty.activeCustomers),
       this.computeWhatsappSection(tenantId, period),
@@ -112,6 +115,7 @@ export class ReportsService {
     const report: ReportData = {
       period,
       generatedAt: new Date().toISOString(),
+      timezone: tenant?.timezone ?? 'Africa/Lagos',
       loyalty,
       points,
       whatsapp,
@@ -200,20 +204,29 @@ export class ReportsService {
     const prevStart = new Date(
       period.start.getTime() - period.durationDays * 24 * 3600 * 1000,
     );
+    const prevEnd = new Date(period.start.getTime() - 1);
     const prevRows = await this.dataSource.query<
-      Array<{ total_customers: string; active_customers: string }>
+      Array<{
+        total_customers: string;
+        active_customers: string;
+        avg_visits: string | null;
+      }>
     >(
       `SELECT
          COUNT(*) AS total_customers,
-         SUM(CASE WHEN last_purchase_at >= $2 THEN 1 ELSE 0 END) AS active_customers
+         SUM(CASE WHEN last_purchase_at BETWEEN $2 AND $3 THEN 1 ELSE 0 END) AS active_customers,
+         AVG(CASE WHEN last_purchase_at BETWEEN $2 AND $3 THEN purchase_count ELSE NULL END) AS avg_visits
        FROM customers
-       WHERE tenant_id = $1 AND wa_opted_in = true`,
-      [tenantId, prevStart],
+       WHERE tenant_id = $1 AND wa_opted_in = true AND created_at <= $3`,
+      [tenantId, prevStart, prevEnd],
     );
     const prevTotal = Number(prevRows[0]?.total_customers ?? 0);
     const prevActive = Number(prevRows[0]?.active_customers ?? 0);
     const prevActiveRate =
       prevTotal > 0 ? Math.round((prevActive / prevTotal) * 100) : 0;
+    const prevAvgVisits = prevRows[0]?.avg_visits
+      ? Math.round(Number(prevRows[0].avg_visits) * 10) / 10
+      : 0;
 
     return {
       totalCustomers,
@@ -233,6 +246,7 @@ export class ReportsService {
       vsLastPeriod: {
         totalCustomers: prevTotal,
         activeRate: prevActiveRate,
+        avgVisitsPerCustomer: prevAvgVisits,
       },
     };
   }
@@ -244,41 +258,62 @@ export class ReportsService {
     period: ReportPeriod,
     activeCustomers: number,
   ): Promise<PointsSection> {
-    const [[issuedRow], [redeemedRow], [nearRewardRow], dailyRows] =
-      await Promise.all([
-        this.dataSource.query<Array<{ issued: string }>>(
-          `SELECT COALESCE(SUM(delta), 0) AS issued
+    const prevStart = new Date(
+      period.start.getTime() - period.durationDays * 24 * 3600 * 1000,
+    );
+    const prevEnd = new Date(period.start.getTime() - 1);
+
+    const [
+      [issuedRow],
+      [redeemedRow],
+      [nearRewardRow],
+      dailyRows,
+      [prevIssuedRow],
+    ] = await Promise.all([
+      this.dataSource.query<Array<{ issued: string }>>(
+        `SELECT COALESCE(SUM(delta), 0) AS issued
            FROM points_ledger
            WHERE tenant_id = $1 AND delta > 0 AND created_at BETWEEN $2 AND $3`,
-          [tenantId, period.start, period.end],
-        ),
-        this.dataSource.query<Array<{ redeemed: string }>>(
-          `SELECT COALESCE(ABS(SUM(delta)), 0) AS redeemed
+        [tenantId, period.start, period.end],
+      ),
+      this.dataSource.query<Array<{ redeemed: string }>>(
+        `SELECT COALESCE(ABS(SUM(delta)), 0) AS redeemed
            FROM points_ledger
            WHERE tenant_id = $1 AND delta < 0 AND reason = 'redemption'
            AND created_at BETWEEN $2 AND $3`,
-          [tenantId, period.start, period.end],
-        ),
-        this.dataSource.query<Array<{ near_reward: string }>>(
-          `SELECT COUNT(*) AS near_reward
+        [tenantId, period.start, period.end],
+      ),
+      this.dataSource.query<Array<{ near_reward: string }>>(
+        `SELECT COUNT(*) AS near_reward
            FROM customers
            WHERE tenant_id = $1 AND wa_opted_in = true
            AND points_balance >= (
              SELECT points_threshold FROM tenants WHERE id = $1
            ) * 0.8`,
-          [tenantId],
-        ),
-        this.dataSource.query<Array<{ date: string; amount: string }>>(
-          `SELECT DATE(created_at) AS date, SUM(delta) AS amount
+        [tenantId],
+      ),
+      this.dataSource.query<Array<{ date: string; amount: string }>>(
+        `SELECT DATE(created_at) AS date, SUM(delta) AS amount
            FROM points_ledger
            WHERE tenant_id = $1 AND delta > 0 AND created_at BETWEEN $2 AND $3
            GROUP BY DATE(created_at) ORDER BY date`,
-          [tenantId, period.start, period.end],
-        ),
-      ]);
+        [tenantId, period.start, period.end],
+      ),
+      this.dataSource.query<Array<{ issued: string }>>(
+        `SELECT COALESCE(SUM(delta), 0) AS issued
+           FROM points_ledger
+           WHERE tenant_id = $1 AND delta > 0 AND created_at BETWEEN $2 AND $3`,
+        [tenantId, prevStart, prevEnd],
+      ),
+    ]);
 
     const issued = Number(issuedRow.issued);
     const redeemed = Number(redeemedRow.redeemed);
+    const prevIssued = Number(prevIssuedRow.issued);
+    const issuedVsLastPeriod =
+      prevIssued > 0
+        ? Math.round(((issued - prevIssued) / prevIssued) * 100)
+        : null;
 
     return {
       issued,
@@ -292,6 +327,7 @@ export class ReportsService {
         date: String(d.date),
         amount: Number(d.amount),
       })),
+      issuedVsLastPeriod,
     };
   }
 
@@ -365,7 +401,9 @@ export class ReportsService {
     return {
       totalSent,
       deliveryRate:
-        totalSent > 0 ? Math.round((totalDelivered / totalSent) * 1000) / 10 : 0,
+        totalSent > 0
+          ? Math.round((totalDelivered / totalSent) * 1000) / 10
+          : 0,
       botInteractions,
       triggerBreakdown,
     };
@@ -377,34 +415,35 @@ export class ReportsService {
     tenantId: string,
     period: ReportPeriod,
   ): Promise<WalletSection> {
-    const [sub, [totalRow], spendRows, avgTxnRows, triggerRows] = await Promise.all([
-      this.subscriptionRepo.findOne({ where: { tenantId } }),
-      this.dataSource.query<Array<{ spend: string }>>(
-        `SELECT COALESCE(ABS(SUM(amount)), 0) AS spend
+    const [sub, [totalRow], spendRows, avgTxnRows, triggerRows] =
+      await Promise.all([
+        this.subscriptionRepo.findOne({ where: { tenantId } }),
+        this.dataSource.query<Array<{ spend: string }>>(
+          `SELECT COALESCE(ABS(SUM(amount)), 0) AS spend
          FROM wallet_transactions
          WHERE tenant_id = $1 AND amount < 0 AND created_at BETWEEN $2 AND $3`,
-        [tenantId, period.start, period.end],
-      ),
-      this.dataSource.query<Array<{ type: string; amount: string }>>(
-        `SELECT type, ABS(SUM(amount)) AS amount
+          [tenantId, period.start, period.end],
+        ),
+        this.dataSource.query<Array<{ type: string; amount: string }>>(
+          `SELECT type, ABS(SUM(amount)) AS amount
          FROM wallet_transactions
          WHERE tenant_id = $1 AND amount < 0 AND created_at BETWEEN $2 AND $3
          GROUP BY type`,
-        [tenantId, period.start, period.end],
-      ),
-      this.dataSource.query<Array<{ avg_amount: string | null }>>(
-        `SELECT AVG(amount) AS avg_amount
+          [tenantId, period.start, period.end],
+        ),
+        this.dataSource.query<Array<{ avg_amount: string | null }>>(
+          `SELECT AVG(amount) AS avg_amount
          FROM transactions
          WHERE tenant_id = $1 AND created_at BETWEEN $2 AND $3`,
-        [tenantId, period.start, period.end],
-      ),
-      this.dataSource.query<Array<{ count: string }>>(
-        `SELECT COUNT(*) AS count FROM trigger_logs
+          [tenantId, period.start, period.end],
+        ),
+        this.dataSource.query<Array<{ count: string }>>(
+          `SELECT COUNT(*) AS count FROM trigger_logs
          WHERE tenant_id = $1 AND trigger_type = 'lapsed_winback'
          AND status IN ('sent','delivered') AND created_at BETWEEN $2 AND $3`,
-        [tenantId, period.start, period.end],
-      ),
-    ]);
+          [tenantId, period.start, period.end],
+        ),
+      ]);
 
     const totalSpend = Number(totalRow.spend);
     const spendByType: Record<string, number> = {};
@@ -443,7 +482,13 @@ export class ReportsService {
     const [campaignRows, dowRows, topCustomerRows, categoryRows] =
       await Promise.all([
         this.dataSource.query<
-          Array<{ id: string; name: string; delivery_rate: string; sent_count: string; sent_at: string | null }>
+          Array<{
+            id: string;
+            name: string;
+            delivery_rate: string;
+            sent_count: string;
+            sent_at: string | null;
+          }>
         >(
           `SELECT c.id, c.name, c.sent_count, c.sent_at,
              CASE WHEN c.sent_count = 0 THEN 0
