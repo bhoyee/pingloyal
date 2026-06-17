@@ -491,49 +491,65 @@ export default function ReportsPage() {
           {/* Weekly new customers chart */}
           {(isLoading || report) && (
             <div className="mt-4">
-              <ChartBox title="New customers registered — week by week" minH={240}>
+              <ChartBox title="New customers registered — week by week" minH={200}>
                 {isLoading ? (
-                  <div className="animate-pulse h-48 rounded bg-slate-100" />
-                ) : report && report.loyalty.weeklyNewCustomers.length > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart
-                        data={report.loyalty.weeklyNewCustomers}
-                        margin={{ top: 5, right: 20, left: 0, bottom: 32 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis
-                          dataKey="week"
-                          height={52}
-                          tick={(props: { x: number; y: number; index: number }) => {
-                            const { x, y, index } = props;
-                            const entry = report.loyalty.weeklyNewCustomers[index];
-                            return (
-                              <g transform={`translate(${x},${y})`}>
-                                <text dy={14} textAnchor="middle" fill="#64748b" fontSize={11} fontWeight={500}>
-                                  W{index + 1}
-                                </text>
-                                <text dy={28} textAnchor="middle" fill="#94a3b8" fontSize={10}>
-                                  {entry ? `${entry.count} new` : ''}
-                                </text>
-                              </g>
-                            );
-                          }}
-                        />
-                        <YAxis hide />
-                        <Tooltip
-                          contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                          labelFormatter={(v: unknown) => `Week of ${new Date(String(v)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                        />
-                        <Bar dataKey="count" fill="#25D366" radius={[4, 4, 0, 0]} maxBarSize={80} name="New Customers" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <p className="mt-1 text-right text-xs font-medium text-slate-500">
-                      Total: {fmtNum(report.loyalty.weeklyNewCustomers.reduce((s, w) => s + w.count, 0))} new{' '}
-                      {period === 'this_month' || period === 'last_month' ? 'this month' : 'this period'}
-                    </p>
-                  </>
-                ) : (
+                  <div className="animate-pulse h-44 rounded bg-slate-100" />
+                ) : report && report.loyalty.weeklyNewCustomers.length > 0 ? (() => {
+                  const wData = report.loyalty.weeklyNewCustomers;
+                  const maxCount = Math.max(...wData.map(w => w.count), 1);
+                  const totalNew = wData.reduce((s, w) => s + w.count, 0);
+                  const BAR_MAX_H = 110;
+                  const periodLabel = period === 'this_month' || period === 'last_month' ? 'this month' : 'this period';
+                  return (
+                    <div>
+                      {/* Bar columns */}
+                      <div className="flex items-end gap-2 sm:gap-3" style={{ height: 148 }}>
+                        {wData.map((entry, i) => {
+                          const barH = Math.max(Math.round((entry.count / maxCount) * BAR_MAX_H), 10);
+                          const weekOf = new Date(entry.week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                          return (
+                            <div
+                              key={entry.week}
+                              className="flex-1 flex flex-col items-center justify-end group"
+                              title={`Week of ${weekOf}: ${entry.count} new`}
+                            >
+                              <span className="text-sm font-bold text-slate-700 mb-1.5 tabular-nums">
+                                {entry.count}
+                              </span>
+                              <div
+                                className="w-full rounded-t-lg bg-[#25D366] group-hover:bg-[#1fb557] transition-colors duration-150"
+                                style={{ height: barH }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Axis line */}
+                      <div className="h-px bg-slate-200 mt-0" />
+
+                      {/* Week labels */}
+                      <div className="flex gap-2 sm:gap-3 mt-2">
+                        {wData.map((entry, i) => (
+                          <div key={`lbl-${i}`} className="flex-1 flex flex-col items-center gap-0.5">
+                            <span className="text-xs font-semibold text-slate-500">W{i + 1}</span>
+                            {wData.length <= 8 && (
+                              <span className="text-[10px] text-slate-400 tabular-nums">{entry.count} new</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Week-on-week growth</span>
+                        <span className="text-xs font-semibold text-slate-600 tabular-nums">
+                          Total: {fmtNum(totalNew)} new {periodLabel}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })() : (
                   <NoData label="No new customer data for this period" />
                 )}
               </ChartBox>
