@@ -41,6 +41,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
     data: {
       period: makePeriod(),
       generatedAt: new Date().toISOString(),
+      timezone: 'Africa/Lagos',
       loyalty: {
         totalCustomers: 50,
         activeCustomers: 35,

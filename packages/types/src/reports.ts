@@ -8,6 +8,7 @@ export interface ReportPeriod {
 export interface ReportData {
   period: ReportPeriod;
   generatedAt: string;
+  timezone: string;
   loyalty: LoyaltySection;
   points: PointsSection;
   whatsapp: WhatsappSection;

@@ -39,6 +39,7 @@ type PeriodType = 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months
 interface ReportData {
   period: { type: string; start: string; end: string };
   generatedAt: string;
+  timezone: string;
   loyalty: {
     totalCustomers: number;
     activeCustomers: number;
@@ -183,6 +184,36 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Snacks': '🍿',
   'Pharmacy': '💊',
 };
+
+// ── Reporting period banner helpers ───────────────────────────────────────────
+
+function formatPeriodBound(dateStr: string, tz: string): string {
+  return new Date(dateStr).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: tz,
+  });
+}
+
+function formatGeneratedAt(generatedAt: string, tz: string): string {
+  const d = new Date(generatedAt);
+  const now = new Date();
+  const isoDay = (dt: Date) => dt.toLocaleDateString('en-CA', { timeZone: tz });
+  const timeStr = d.toLocaleTimeString('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  if (isoDay(d) === isoDay(now)) return `Today at ${timeStr}`;
+  const yesterday = new Date(now.getTime() - 86_400_000);
+  if (isoDay(d) === isoDay(yesterday)) return `Yesterday at ${timeStr}`;
+  return (
+    d.toLocaleDateString('en-GB', { timeZone: tz, day: 'numeric', month: 'short', year: 'numeric' }) +
+    ` at ${timeStr}`
+  );
+}
 
 // ── UI primitives ──────────────────────────────────────────────────────────────
 
@@ -416,6 +447,35 @@ export default function ReportsPage() {
                 {reportError instanceof Error ? reportError.message : 'Unexpected error — please try refreshing.'}
               </p>
             </div>
+          </div>
+        )}
+
+        {/* ── Reporting period banner ── */}
+        {(isLoading || report) && (
+          <div className="rounded-xl bg-[#0F1E35] px-5 py-3">
+            {isLoading ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="animate-pulse h-4 w-64 rounded bg-slate-700" />
+                <div className="animate-pulse h-3 w-40 rounded bg-slate-700" />
+              </div>
+            ) : report ? (
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-400">
+                  Reporting period:{' '}
+                  <span className="font-semibold text-white">
+                    {formatPeriodBound(report.period.start, report.timezone ?? 'Africa/Lagos')}
+                    {' – '}
+                    {formatPeriodBound(report.period.end, report.timezone ?? 'Africa/Lagos')}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  Last updated:{' '}
+                  <span className="text-slate-300">
+                    {formatGeneratedAt(report.generatedAt, report.timezone ?? 'Africa/Lagos')}
+                  </span>
+                </p>
+              </div>
+            ) : null}
           </div>
         )}
 

@@ -101,7 +101,10 @@ export class ReportsService {
     tenantId: string,
     period: ReportPeriod,
   ): Promise<ReportData> {
-    const loyalty = await this.computeLoyaltySection(tenantId, period);
+    const [tenant, loyalty] = await Promise.all([
+      this.tenantRepo.findOne({ where: { id: tenantId } }),
+      this.computeLoyaltySection(tenantId, period),
+    ]);
     const [points, whatsapp, wallet, content] = await Promise.all([
       this.computePointsSection(tenantId, period, loyalty.activeCustomers),
       this.computeWhatsappSection(tenantId, period),
@@ -112,6 +115,7 @@ export class ReportsService {
     const report: ReportData = {
       period,
       generatedAt: new Date().toISOString(),
+      timezone: tenant?.timezone ?? 'Africa/Lagos',
       loyalty,
       points,
       whatsapp,
