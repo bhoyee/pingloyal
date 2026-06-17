@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 /**
  * Additive demo-data seed for "Jadefy Store" — customers + per-customer transactions.
  *
@@ -48,32 +48,127 @@ const TENANT_SLUG = 'jadefy-store';
 // ── Name pools ────────────────────────────────────────────────────────────────
 
 const FEMALE_FIRST = [
-  'Adaora', 'Chinyere', 'Ngozi', 'Amaka', 'Chioma', 'Uchenna', 'Blessing',
-  'Ifunanya', 'Kemi', 'Titi', 'Yetunde', 'Folake', 'Bunmi', 'Shade', 'Ife',
-  'Chiamaka', 'Patience', 'Ronke', 'Sola', 'Ifeoma', 'Uzoma', 'Nike',
-  'Tobi', 'Lola', 'Kachi', 'Funmi', 'Bisi', 'Wunmi', 'Tola', 'Jumoke',
-  'Nkechi', 'Ebele', 'Oluchi', 'Aisha', 'Fatima', 'Zainab', 'Halima',
+  'Adaora',
+  'Chinyere',
+  'Ngozi',
+  'Amaka',
+  'Chioma',
+  'Uchenna',
+  'Blessing',
+  'Ifunanya',
+  'Kemi',
+  'Titi',
+  'Yetunde',
+  'Folake',
+  'Bunmi',
+  'Shade',
+  'Ife',
+  'Chiamaka',
+  'Patience',
+  'Ronke',
+  'Sola',
+  'Ifeoma',
+  'Uzoma',
+  'Nike',
+  'Tobi',
+  'Lola',
+  'Kachi',
+  'Funmi',
+  'Bisi',
+  'Wunmi',
+  'Tola',
+  'Jumoke',
+  'Nkechi',
+  'Ebele',
+  'Oluchi',
+  'Aisha',
+  'Fatima',
+  'Zainab',
+  'Halima',
 ];
 const MALE_FIRST = [
-  'Emeka', 'Nnamdi', 'Tobechukwu', 'Chukwudi', 'Bayo', 'Seun', 'Femi',
-  'Wale', 'Abdullahi', 'Musa', 'Tunde', 'Bola', 'Gbenga', 'Rotimi', 'Dayo',
-  'Chike', 'Ekene', 'Obinna', 'Dele', 'Kunle', 'Uche', 'Ike', 'Jide',
-  'Tunji', 'Remi', 'Lanre', 'Deji', 'Ola', 'Idris', 'Kabir', 'Yahaya',
-  'Ahmed', 'Hassan', 'Haruna', 'Aliyu', 'Danjuma', 'Yakubu', 'Sani',
+  'Emeka',
+  'Nnamdi',
+  'Tobechukwu',
+  'Chukwudi',
+  'Bayo',
+  'Seun',
+  'Femi',
+  'Wale',
+  'Abdullahi',
+  'Musa',
+  'Tunde',
+  'Bola',
+  'Gbenga',
+  'Rotimi',
+  'Dayo',
+  'Chike',
+  'Ekene',
+  'Obinna',
+  'Dele',
+  'Kunle',
+  'Uche',
+  'Ike',
+  'Jide',
+  'Tunji',
+  'Remi',
+  'Lanre',
+  'Deji',
+  'Ola',
+  'Idris',
+  'Kabir',
+  'Yahaya',
+  'Ahmed',
+  'Hassan',
+  'Haruna',
+  'Aliyu',
+  'Danjuma',
+  'Yakubu',
+  'Sani',
 ];
 const LAST_NAMES = [
-  'Okafor', 'Nwosu', 'Eze', 'Okeke', 'Adeyemi', 'Bakare', 'Afolabi',
-  'Olawale', 'Suleiman', 'Ibrahim', 'Bello', 'Garba', 'Lawal', 'Adesanya',
-  'Badmus', 'Oyewole', 'Aminu', 'Aliyu', 'Ndukwe', 'Adeola', 'Fasanya',
-  'Ogbonna', 'Ezeh', 'Aneke', 'Chukwu', 'Dike', 'Obi', 'Onuoha',
-  'Mustapha', 'Kawu', 'Bello', 'Yusuf', 'Salisu', 'Makarfi',
+  'Okafor',
+  'Nwosu',
+  'Eze',
+  'Okeke',
+  'Adeyemi',
+  'Bakare',
+  'Afolabi',
+  'Olawale',
+  'Suleiman',
+  'Ibrahim',
+  'Bello',
+  'Garba',
+  'Lawal',
+  'Adesanya',
+  'Badmus',
+  'Oyewole',
+  'Aminu',
+  'Aliyu',
+  'Ndukwe',
+  'Adeola',
+  'Fasanya',
+  'Ogbonna',
+  'Ezeh',
+  'Aneke',
+  'Chukwu',
+  'Dike',
+  'Obi',
+  'Onuoha',
+  'Mustapha',
+  'Kawu',
+  'Bello',
+  'Yusuf',
+  'Salisu',
+  'Makarfi',
 ];
 
 let nameIdx = 0;
 function nextName(): string {
   const allFirst = [...FEMALE_FIRST, ...MALE_FIRST];
   const first = allFirst[nameIdx % allFirst.length];
-  const last = LAST_NAMES[Math.floor(nameIdx / allFirst.length) % LAST_NAMES.length];
+  const last =
+    LAST_NAMES[Math.floor(nameIdx / allFirst.length) % LAST_NAMES.length];
   nameIdx++;
   return `${first} ${last}`;
 }
@@ -103,7 +198,7 @@ function addDays(d: Date, n: number): Date {
 function pickTier(tiers: TierConfig[]): TierConfig {
   const r = Math.random();
   if (r < 0.62) return tiers.find((t) => t.tierName === 'standard') ?? tiers[0];
-  if (r < 0.90) return tiers.find((t) => t.tierName === 'mid') ?? tiers[0];
+  if (r < 0.9) return tiers.find((t) => t.tierName === 'mid') ?? tiers[0];
   return tiers.find((t) => t.tierName === 'vip') ?? tiers[0];
 }
 
@@ -146,7 +241,11 @@ function buildCustomer(
     const txn2Date = addDays(createdAt, secondTxnOffset);
     const txn2Amount = baseAmount + Math.floor(Math.random() * 4000);
     const txn2Points = Math.floor(txn2Amount / 1000);
-    transactions.push({ date: txn2Date, amount: txn2Amount, points: txn2Points });
+    transactions.push({
+      date: txn2Date,
+      amount: txn2Amount,
+      points: txn2Points,
+    });
     totalSpend += txn2Amount;
     totalPoints += txn2Points;
     lastPurchaseAt = txn2Date;
@@ -176,14 +275,26 @@ async function main() {
   await SeedDataSource.initialize();
 
   await SeedDataSource.transaction(async (manager) => {
-    const tenant = await manager.findOne(Tenant, { where: { slug: TENANT_SLUG } });
-    if (!tenant) throw new Error(`Tenant "${TENANT_SLUG}" not found — run seed-jadefy.ts first.`);
-    console.log(`[seed:customers] Tenant: ${tenant.id} (${tenant.businessName})`);
+    const tenant = await manager.findOne(Tenant, {
+      where: { slug: TENANT_SLUG },
+    });
+    if (!tenant)
+      throw new Error(
+        `Tenant "${TENANT_SLUG}" not found — run seed-jadefy.ts first.`,
+      );
+    console.log(
+      `[seed:customers] Tenant: ${tenant.id} (${tenant.businessName})`,
+    );
 
-    const tiers = await manager.find(TierConfig, { where: { tenantId: tenant.id } });
-    if (tiers.length === 0) throw new Error('No tier configs found — run seed-jadefy.ts first.');
+    const tiers = await manager.find(TierConfig, {
+      where: { tenantId: tenant.id },
+    });
+    if (tiers.length === 0)
+      throw new Error('No tier configs found — run seed-jadefy.ts first.');
 
-    const categories = await manager.find(ProductCategory, { where: { tenantId: tenant.id } });
+    const categories = await manager.find(ProductCategory, {
+      where: { tenantId: tenant.id },
+    });
     const foodCat = categories.find((c) => c.slug === 'food') ?? categories[0];
 
     // ── Idempotent cleanup ──────────────────────────────────────────────────
@@ -195,7 +306,9 @@ async function main() {
       `DELETE FROM customers WHERE tenant_id = $1 AND phone_e164 LIKE '+234901%'`,
       [tenant.id],
     );
-    console.log(`[seed:customers] Removed ${String(delCust[1] ?? 0)} old customers, ${String(delTxn[1] ?? 0)} old transactions`);
+    console.log(
+      `[seed:customers] Removed ${String(delCust[1] ?? 0)} old customers, ${String(delTxn[1] ?? 0)} old transactions`,
+    );
 
     // ── Build customer specs ────────────────────────────────────────────────
     const specs: CustSpec[] = [];
@@ -236,7 +349,9 @@ async function main() {
     for (let i = 0; i < 10; i++) {
       const ago = 26 - Math.floor(i * 0.9);
       const secondOffset = ago >= 22 ? 7 : null; // only early-W4 gets 2nd May txn
-      specs.push(buildCustomer(daysAgo(ago), secondOffset, pickTier(tiers), 5800));
+      specs.push(
+        buildCustomer(daysAgo(ago), secondOffset, pickTier(tiers), 5800),
+      );
     }
 
     // June W1 (daysAgo 16-10) — 8 customers, 2nd txn +5
@@ -249,13 +364,17 @@ async function main() {
     for (let i = 0; i < 8; i++) {
       const ago = 9 - Math.floor(i * 0.75);
       const secondOffset = ago >= 4 ? 3 : null;
-      specs.push(buildCustomer(daysAgo(ago), secondOffset, pickTier(tiers), 6500));
+      specs.push(
+        buildCustomer(daysAgo(ago), secondOffset, pickTier(tiers), 6500),
+      );
     }
 
     // June W3: last few days (daysAgo 2-0) — 4 customers, no 2nd txn yet
     for (let i = 0; i < 4; i++) {
       const ago = 2 - i;
-      specs.push(buildCustomer(daysAgo(Math.max(0, ago)), null, pickTier(tiers), 5000));
+      specs.push(
+        buildCustomer(daysAgo(Math.max(0, ago)), null, pickTier(tiers), 5000),
+      );
     }
 
     console.log(`[seed:customers] Building ${specs.length} customer specs`);
@@ -331,21 +450,27 @@ async function main() {
     // Summary
     const totalTxns = specs.reduce((s, c) => s + c.transactions.length, 0);
     const repeatBuyers = specs.filter((c) => c.transactions.length >= 2).length;
-    const mayCustomers = specs.filter(
-      (c) => {
-        const m = c.createdAt.getMonth();
-        return m === 4; // May = 4 (0-indexed)
-      }
-    ).length;
+    const mayCustomers = specs.filter((c) => {
+      const m = c.createdAt.getMonth();
+      return m === 4; // May = 4 (0-indexed)
+    }).length;
 
-    console.log(`[seed:customers] Inserted ${custInserted} customers, ${totalTxns} transactions`);
+    console.log(
+      `[seed:customers] Inserted ${custInserted} customers, ${totalTxns} transactions`,
+    );
     console.log(`[seed:customers] May customers: ${mayCustomers}`);
-    console.log(`[seed:customers] Customers with 2+ transactions: ${repeatBuyers}`);
-    console.log(`[seed:customers] Phone range: +2349011000001 – +234901${phoneSeq - 1}`);
+    console.log(
+      `[seed:customers] Customers with 2+ transactions: ${repeatBuyers}`,
+    );
+    console.log(
+      `[seed:customers] Phone range: +2349011000001 – +234901${phoneSeq - 1}`,
+    );
   });
 
   await SeedDataSource.destroy();
-  console.log('[seed:customers] Done — remember to run clear-jadefy-snapshots.ts next.');
+  console.log(
+    '[seed:customers] Done — remember to run clear-jadefy-snapshots.ts next.',
+  );
 }
 
 main().catch((err: unknown) => {
