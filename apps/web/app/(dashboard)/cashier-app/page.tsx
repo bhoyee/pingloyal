@@ -72,21 +72,32 @@ export default function CashierAppPage() {
   }, [loadCashiers]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const origin = window.location.origin;
-      api.get<{ slug: string }>('/api/v1/tenants/me').then((t) => {
-        setCashierUrl(`${origin}/cashier/login?t=${t.slug}`);
-      }).catch(() => {
+    api
+      .get<{ slug: string }>('/api/v1/tenants/me')
+      .then((t) => {
+        setCashierUrl(`${window.location.origin}/cashier/login?t=${t.slug}`);
+      })
+      .catch(() => {
         setCashierUrl(`${window.location.origin}/cashier/login`);
       });
-    }
   }, []);
 
-  function handleCopy() {
-    void navigator.clipboard.writeText(cashierUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  async function handleCopy() {
+    if (!cashierUrl) return;
+    try {
+      await navigator.clipboard.writeText(cashierUrl);
+    } catch {
+      // Fallback for HTTP or restricted browser contexts
+      const ta = document.createElement('textarea');
+      ta.value = cashierUrl;
+      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   // ── Create ────────────────────────────────────────────────────────────────────
@@ -151,134 +162,155 @@ export default function CashierAppPage() {
       setCashiers((prev) => prev.filter((c) => c.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch {
-      /* swallow — user stays in list if delete fails */
+      /* swallow */
     } finally {
       setDeleteLoading(false);
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-      {/* Page header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0DC56A]/10">
-          <Monitor size={20} className="text-[#0DC56A]" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Cashier App</h1>
-          <p className="text-sm text-slate-500">Manage cashier logins and access your point-of-sale link</p>
-        </div>
-      </div>
-
-      {/* Cashier App URL card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700 mb-1">Your Cashier App URL</h2>
-        <p className="text-xs text-slate-500 mb-4">
-          Share this link with cashiers so they can log in on any device.
-        </p>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 font-mono text-sm text-slate-700 overflow-hidden text-ellipsis whitespace-nowrap">
-            {cashierUrl || 'Loading…'}
+    <div className="min-h-screen bg-slate-50">
+      {/* Page header — matches other dashboard pages */}
+      <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0DC56A]/10">
+              <Monitor size={18} className="text-[#0DC56A]" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">Cashier App</h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Manage cashier logins and your point-of-sale link
+              </p>
+            </div>
           </div>
           <button
             type="button"
-            onClick={handleCopy}
-            disabled={!cashierUrl}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40"
-          >
-            {copied ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-      </div>
-
-      {/* Cashier accounts section */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Cashier Accounts</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Staff who can log in to process transactions</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => { setShowCreate(true); setCreateError(null); }}
-            className="flex items-center gap-1.5 rounded-xl bg-[#0DC56A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] transition-colors"
+            onClick={() => {
+              setShowCreate(true);
+              setCreateError(null);
+            }}
+            className="flex items-center gap-1.5 self-start rounded-lg bg-[#0DC56A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] transition-colors sm:self-auto"
           >
             <Plus size={15} />
             Add Cashier
           </button>
         </div>
+      </div>
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-2 border-[#0DC56A] border-t-transparent rounded-full animate-spin" />
+      {/* Content */}
+      <div className="space-y-6 px-4 py-6 sm:px-6">
+        {/* Cashier App URL card */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-800 mb-0.5">Your Cashier App URL</h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Share this link with your cashiers — they use it to log in and process transactions on any device.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex-1 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+              <p className="truncate font-mono text-sm text-slate-700">
+                {cashierUrl || 'Loading…'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              disabled={!cashierUrl}
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40"
+            >
+              {copied ? (
+                <Check size={14} className="text-green-600" />
+              ) : (
+                <Copy size={14} />
+              )}
+              {copied ? 'Copied!' : 'Copy link'}
+            </button>
           </div>
-        ) : error ? (
-          <div className="py-12 text-center text-sm text-red-600">{error}</div>
-        ) : cashiers.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="text-sm text-slate-500">No cashier accounts yet.</p>
-            <p className="text-xs text-slate-400 mt-1">Click "Add Cashier" to create the first one.</p>
+        </div>
+
+        {/* Cashier accounts table */}
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-100 px-5 py-4">
+            <h2 className="text-sm font-semibold text-slate-900">Cashier Accounts</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Staff who can log in and process loyalty transactions
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <th className="px-6 py-3 text-left">Name</th>
-                  <th className="px-6 py-3 text-left">Email</th>
-                  <th className="px-6 py-3 text-left">Status</th>
-                  <th className="px-6 py-3 text-left">Created</th>
-                  <th className="px-6 py-3 text-left">Last Login</th>
-                  <th className="px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {cashiers.map((cashier) => (
-                  <tr key={cashier.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{cashier.fullName}</td>
-                    <td className="px-6 py-4 text-slate-600">{cashier.email}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          cashier.isActive
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {cashier.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-500">{formatDate(cashier.createdAt)}</td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {cashier.lastLoginAt ? formatDate(cashier.lastLoginAt) : 'Never'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(cashier)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                          aria-label={`Edit ${cashier.fullName}`}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(cashier)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                          aria-label={`Delete ${cashier.fullName}`}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0DC56A] border-t-transparent" />
+            </div>
+          ) : error ? (
+            <div className="py-12 text-center text-sm text-red-600">{error}</div>
+          ) : cashiers.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <Monitor size={22} className="text-slate-400" />
+              </div>
+              <p className="text-sm font-medium text-slate-600">No cashier accounts yet</p>
+              <p className="mt-1 text-xs text-slate-400">Click "Add Cashier" to create the first one.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    <th className="px-5 py-3 text-left">Name</th>
+                    <th className="px-5 py-3 text-left">Email</th>
+                    <th className="px-5 py-3 text-left">Status</th>
+                    <th className="px-5 py-3 text-left">Created</th>
+                    <th className="px-5 py-3 text-left">Last Login</th>
+                    <th className="px-5 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {cashiers.map((cashier) => (
+                    <tr key={cashier.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3.5 font-medium text-slate-900">{cashier.fullName}</td>
+                      <td className="px-5 py-3.5 text-slate-500">{cashier.email}</td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                            cashier.isActive
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {cashier.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-500">{formatDate(cashier.createdAt)}</td>
+                      <td className="px-5 py-3.5 text-slate-500">
+                        {cashier.lastLoginAt ? formatDate(cashier.lastLoginAt) : '—'}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEdit(cashier)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                            aria-label={`Edit ${cashier.fullName}`}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(cashier)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            aria-label={`Delete ${cashier.fullName}`}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Create modal ─────────────────────────────────────────────────────── */}
@@ -291,7 +323,7 @@ export default function CashierAppPage() {
                 required
                 value={createForm.fullName}
                 onChange={(e) => setCreateForm((f) => ({ ...f, fullName: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
                 placeholder="e.g. Amara Osei"
               />
             </Field>
@@ -301,7 +333,7 @@ export default function CashierAppPage() {
                 required
                 value={createForm.email}
                 onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
                 placeholder="cashier@example.com"
               />
             </Field>
@@ -312,23 +344,23 @@ export default function CashierAppPage() {
                 minLength={8}
                 value={createForm.password}
                 onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
                 placeholder="Min. 8 characters"
               />
             </Field>
             {createError && <p className="text-sm text-red-600">{createError}</p>}
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={createLoading}
-                className="rounded-xl bg-[#0DC56A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] disabled:opacity-50"
+                className="rounded-lg bg-[#0DC56A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] disabled:opacity-50"
               >
                 {createLoading ? 'Creating…' : 'Create Cashier'}
               </button>
@@ -347,7 +379,7 @@ export default function CashierAppPage() {
                 required
                 value={editForm.fullName}
                 onChange={(e) => setEditForm((f) => ({ ...f, fullName: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
               />
             </Field>
             <Field label="Email address">
@@ -356,31 +388,31 @@ export default function CashierAppPage() {
                 required
                 value={editForm.email}
                 onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
+                className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0DC56A]"
               />
             </Field>
-            <label className="flex items-center gap-3 cursor-pointer select-none">
+            <label className="flex cursor-pointer select-none items-center gap-3">
               <input
                 type="checkbox"
                 checked={editForm.isActive}
                 onChange={(e) => setEditForm((f) => ({ ...f, isActive: e.target.checked }))}
-                className="h-4 w-4 rounded border-slate-300 text-[#0DC56A] focus:ring-[#0DC56A]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0DC56A] accent-[#0DC56A]"
               />
-              <span className="text-sm font-medium text-slate-700">Active (can log in)</span>
+              <span className="text-sm font-medium text-slate-700">Active — can log in to cashier app</span>
             </label>
             {editError && <p className="text-sm text-red-600">{editError}</p>}
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setEditTarget(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={editLoading}
-                className="rounded-xl bg-[#0DC56A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] disabled:opacity-50"
+                className="rounded-lg bg-[#0DC56A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#0aad5b] disabled:opacity-50"
               >
                 {editLoading ? 'Saving…' : 'Save Changes'}
               </button>
@@ -389,7 +421,7 @@ export default function CashierAppPage() {
         </Modal>
       )}
 
-      {/* ── Delete confirm modal ─────────────────────────────────────────────── */}
+      {/* ── Delete confirm ───────────────────────────────────────────────────── */}
       {deleteTarget && (
         <Modal title="Remove Cashier" onClose={() => setDeleteTarget(null)}>
           <p className="text-sm text-slate-600 mb-6">
@@ -401,7 +433,7 @@ export default function CashierAppPage() {
             <button
               type="button"
               onClick={() => setDeleteTarget(null)}
-              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -409,7 +441,7 @@ export default function CashierAppPage() {
               type="button"
               onClick={() => void handleDelete()}
               disabled={deleteLoading}
-              className="rounded-xl bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
             >
               {deleteLoading ? 'Removing…' : 'Remove'}
             </button>
@@ -442,7 +474,7 @@ function Modal({
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="Close"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
         <div className="px-6 py-5">{children}</div>
@@ -454,7 +486,7 @@ function Modal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+      <label className="mb-1.5 block text-sm font-medium text-slate-700">{label}</label>
       {children}
     </div>
   );
