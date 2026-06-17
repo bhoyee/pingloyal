@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import 'reflect-metadata';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
@@ -21,9 +22,12 @@ async function main() {
   const result = await ds.query(
     `DELETE FROM report_snapshots
      WHERE tenant_id = (SELECT id FROM tenants WHERE slug = 'jadefy-store')`,
-  ) as unknown[];
+  );
   console.log('Deleted snapshots. Result:', JSON.stringify(result));
   await ds.destroy();
 }
 
-main().catch((e: unknown) => { console.error(String(e)); process.exit(1); });
+main().catch((e: unknown) => {
+  console.error(String(e));
+  process.exit(1);
+});
