@@ -26,6 +26,7 @@ export interface LoyaltySection {
   vsLastPeriod: {
     totalCustomers: number;
     activeRate: number;
+    avgVisitsPerCustomer: number;
   };
 }
 

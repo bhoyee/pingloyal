@@ -200,20 +200,29 @@ export class ReportsService {
     const prevStart = new Date(
       period.start.getTime() - period.durationDays * 24 * 3600 * 1000,
     );
+    const prevEnd = new Date(period.start.getTime() - 1);
     const prevRows = await this.dataSource.query<
-      Array<{ total_customers: string; active_customers: string }>
+      Array<{
+        total_customers: string;
+        active_customers: string;
+        avg_visits: string | null;
+      }>
     >(
       `SELECT
          COUNT(*) AS total_customers,
-         SUM(CASE WHEN last_purchase_at >= $2 THEN 1 ELSE 0 END) AS active_customers
+         SUM(CASE WHEN last_purchase_at BETWEEN $2 AND $3 THEN 1 ELSE 0 END) AS active_customers,
+         AVG(CASE WHEN last_purchase_at BETWEEN $2 AND $3 THEN purchase_count ELSE NULL END) AS avg_visits
        FROM customers
-       WHERE tenant_id = $1 AND wa_opted_in = true`,
-      [tenantId, prevStart],
+       WHERE tenant_id = $1 AND wa_opted_in = true AND created_at <= $3`,
+      [tenantId, prevStart, prevEnd],
     );
     const prevTotal = Number(prevRows[0]?.total_customers ?? 0);
     const prevActive = Number(prevRows[0]?.active_customers ?? 0);
     const prevActiveRate =
       prevTotal > 0 ? Math.round((prevActive / prevTotal) * 100) : 0;
+    const prevAvgVisits = prevRows[0]?.avg_visits
+      ? Math.round(Number(prevRows[0].avg_visits) * 10) / 10
+      : 0;
 
     return {
       totalCustomers,
@@ -233,6 +242,7 @@ export class ReportsService {
       vsLastPeriod: {
         totalCustomers: prevTotal,
         activeRate: prevActiveRate,
+        avgVisitsPerCustomer: prevAvgVisits,
       },
     };
   }

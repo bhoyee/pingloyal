@@ -47,7 +47,7 @@ interface ReportData {
     newCustomersThisMonth: number;
     avgVisitsPerCustomer: number;
     weeklyNewCustomers: Array<{ week: string; count: number }>;
-    vsLastPeriod: { totalCustomers: number; activeRate: number };
+    vsLastPeriod: { totalCustomers: number; activeRate: number; avgVisitsPerCustomer: number };
   };
   points: {
     issued: number;
@@ -422,50 +422,117 @@ export default function ReportsPage() {
         {/* ── SECTION 1: Loyalty ── */}
         <section>
           <div className="mb-4">
-            <SectionHeading icon={Users} label="Loyalty Performance" />
+            <SectionHeading icon={Users} label="Loyalty Programme Performance" />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : report
-              ? (
-                <>
-                  <StatCard value={fmtNum(report.loyalty.totalCustomers)} label="Total Customers"
-                    sub={`${report.loyalty.inactiveCustomers} inactive`} />
-                  <StatCard value={fmtNum(report.loyalty.activeCustomers)} label="Active Customers"
-                    sub={report.loyalty.totalCustomers > 0 ? `${Math.round(report.loyalty.activeCustomers / report.loyalty.totalCustomers * 100)}% of total` : undefined} />
-                  <StatCard value={`${report.loyalty.retentionRate}%`} label="Retention Rate"
-                    sub="purchased 2+ times"
-                    accent={report.loyalty.retentionRate >= 50 ? 'text-green-600' : report.loyalty.retentionRate >= 25 ? 'text-amber-600' : 'text-slate-900'} />
-                  <StatCard value={fmtNum(report.loyalty.newCustomersThisMonth)} label="New This Period"
-                    sub={`avg ${report.loyalty.avgVisitsPerCustomer} visits/customer`} />
-                </>
-              )
+              ? (() => {
+                  const currentActiveRate = report.loyalty.totalCustomers > 0
+                    ? Math.round(report.loyalty.activeCustomers / report.loyalty.totalCustomers * 100)
+                    : 0;
+                  const deltaCustomers = report.loyalty.totalCustomers - report.loyalty.vsLastPeriod.totalCustomers;
+                  const deltaActiveRate = currentActiveRate - report.loyalty.vsLastPeriod.activeRate;
+                  const deltaAvgVisits = Math.round(
+                    (report.loyalty.avgVisitsPerCustomer - report.loyalty.vsLastPeriod.avgVisitsPerCustomer) * 10
+                  ) / 10;
+                  function trendLabel(delta: number, unit: string): string {
+                    const sign = delta >= 0 ? '+' : '';
+                    const arrow = delta >= 0 ? '↑' : '↓';
+                    return `${arrow} ${sign}${delta}${unit} vs last period`;
+                  }
+                  function trendClass(delta: number): string {
+                    return delta >= 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium';
+                  }
+                  return (
+                    <>
+                      <StatCard
+                        value={fmtNum(report.loyalty.totalCustomers)}
+                        label="Total Customers"
+                        sub={report.loyalty.vsLastPeriod.totalCustomers > 0
+                          ? trendLabel(deltaCustomers, '')
+                          : `${report.loyalty.inactiveCustomers} inactive`}
+                        subAccent={report.loyalty.vsLastPeriod.totalCustomers > 0 ? trendClass(deltaCustomers) : undefined}
+                        accent="text-green-600"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`${currentActiveRate}%`}
+                        label="Active Rate"
+                        sub={report.loyalty.vsLastPeriod.activeRate > 0
+                          ? trendLabel(deltaActiveRate, '%')
+                          : `${fmtNum(report.loyalty.activeCustomers)} active customers`}
+                        subAccent={report.loyalty.vsLastPeriod.activeRate > 0 ? trendClass(deltaActiveRate) : undefined}
+                        accent="text-green-600"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`${report.loyalty.retentionRate}%`}
+                        label="Retention Rate"
+                        sub="returned within 30 days"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={report.loyalty.avgVisitsPerCustomer}
+                        label="Avg Visits / Customer"
+                        sub={report.loyalty.vsLastPeriod.avgVisitsPerCustomer > 0
+                          ? trendLabel(deltaAvgVisits, '')
+                          : 'avg visits per customer'}
+                        subAccent={report.loyalty.vsLastPeriod.avgVisitsPerCustomer > 0 ? trendClass(deltaAvgVisits) : undefined}
+                        labelFirst
+                      />
+                    </>
+                  );
+                })()
               : null}
           </div>
 
           {/* Weekly new customers chart */}
           {(isLoading || report) && (
             <div className="mt-4">
-              <ChartBox title="New Customers — Week by Week" minH={220}>
+              <ChartBox title="New customers registered — week by week" minH={240}>
                 {isLoading ? (
                   <div className="animate-pulse h-48 rounded bg-slate-100" />
                 ) : report && report.loyalty.weeklyNewCustomers.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={report.loyalty.weeklyNewCustomers} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="week" tick={{ fontSize: 11 }} tickFormatter={(v: string) => {
-                        const d = new Date(v);
-                        return `${d.getDate()}/${d.getMonth() + 1}`;
-                      }} />
-                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <Tooltip
-                        contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                        labelFormatter={(v: unknown) => `Week of ${new Date(String(v)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
-                      />
-                      <Bar dataKey="count" fill="#25D366" radius={[4, 4, 0, 0]} name="New Customers" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart
+                        data={report.loyalty.weeklyNewCustomers}
+                        margin={{ top: 5, right: 20, left: 0, bottom: 32 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis
+                          dataKey="week"
+                          height={52}
+                          tick={(props: { x: number; y: number; index: number }) => {
+                            const { x, y, index } = props;
+                            const entry = report.loyalty.weeklyNewCustomers[index];
+                            return (
+                              <g transform={`translate(${x},${y})`}>
+                                <text dy={14} textAnchor="middle" fill="#64748b" fontSize={11} fontWeight={500}>
+                                  W{index + 1}
+                                </text>
+                                <text dy={28} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+                                  {entry ? `${entry.count} new` : ''}
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
+                        <YAxis hide />
+                        <Tooltip
+                          contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                          labelFormatter={(v: unknown) => `Week of ${new Date(String(v)).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`}
+                        />
+                        <Bar dataKey="count" fill="#25D366" radius={[4, 4, 0, 0]} maxBarSize={80} name="New Customers" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <p className="mt-1 text-right text-xs font-medium text-slate-500">
+                      Total: {fmtNum(report.loyalty.weeklyNewCustomers.reduce((s, w) => s + w.count, 0))} new{' '}
+                      {period === 'this_month' || period === 'last_month' ? 'this month' : 'this period'}
+                    </p>
+                  </>
                 ) : (
                   <NoData label="No new customer data for this period" />
                 )}

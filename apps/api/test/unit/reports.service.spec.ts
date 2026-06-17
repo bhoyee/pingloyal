@@ -49,7 +49,7 @@ function makeSnapshot(computedAt: Date = new Date()) {
         retentionRate: 60,
         avgVisitsPerCustomer: 2.3,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 45, activeRate: 70 },
+        vsLastPeriod: { totalCustomers: 45, activeRate: 70, avgVisitsPerCustomer: 2.1 },
       },
       points: {
         issued: 12000,
@@ -188,7 +188,7 @@ describe('ReportsService', () => {
         retentionRate: 40,
         avgVisitsPerCustomer: 2,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 40, activeRate: 75 },
+        vsLastPeriod: { totalCustomers: 40, activeRate: 75, avgVisitsPerCustomer: 2.0 },
       });
     const pointsSpy = jest
       .spyOn(service, 'computePointsSection')
@@ -249,7 +249,7 @@ describe('ReportsService', () => {
       retentionRate: 50,
       avgVisitsPerCustomer: 1.5,
       weeklyNewCustomers: [],
-      vsLastPeriod: { totalCustomers: 9, activeRate: 80 },
+      vsLastPeriod: { totalCustomers: 9, activeRate: 80, avgVisitsPerCustomer: 1.5 },
     });
     jest.spyOn(service, 'computePointsSection').mockResolvedValueOnce({
       issued: 100,
@@ -306,7 +306,7 @@ describe('ReportsService', () => {
       ])
       .mockResolvedValueOnce([]) // weekly
       .mockResolvedValueOnce([
-        { total_customers: '90', active_customers: '55' },
+        { total_customers: '90', active_customers: '55', avg_visits: '2.1' },
       ]); // prev period
 
     const result = await service.computeLoyaltySection(TENANT_ID, makePeriod());
@@ -331,13 +331,14 @@ describe('ReportsService', () => {
       ])
       .mockResolvedValueOnce([]) // weekly
       .mockResolvedValueOnce([
-        { total_customers: '45', active_customers: '30' },
+        { total_customers: '45', active_customers: '30', avg_visits: '2.5' },
       ]); // prev
 
     const result = await service.computeLoyaltySection(TENANT_ID, makePeriod());
 
     expect(result.vsLastPeriod.totalCustomers).toBe(45);
     expect(result.vsLastPeriod.activeRate).toBe(67); // 30/45*100 = 66.6 → 67
+    expect(result.vsLastPeriod.avgVisitsPerCustomer).toBe(2.5);
   });
 
   // ── T7: no division by zero in redemptionRate ─────────────────────────────
