@@ -50,6 +50,7 @@ export class UsersService {
       hashedPassword,
       role: UserRole.CASHIER,
       isActive: true,
+      emailVerifiedAt: new Date(),
     });
     const saved = await this.userRepo.save(user);
     return {
