@@ -380,6 +380,12 @@ export class TenantsService {
       whatsapp: this.toWhatsappStatus(tenant),
     };
   }
+
+  async getPublicInfo(slug: string): Promise<{ businessName: string; logoUrl: string | null }> {
+    const tenant = await this.tenantRepo.findOne({ where: { slug } });
+    if (!tenant) throw new NotFoundException('Store not found');
+    return { businessName: tenant.businessName, logoUrl: tenant.logoUrl };
+  }
 }
 
 // ── Response shapes ──────────────────────────────────────────────────────────

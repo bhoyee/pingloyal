@@ -50,7 +50,7 @@ const AUTOMATION: NavItem[] = [
 ];
 
 const NATIVE_MODE: NavItem[] = [
-  { href: '/cashier', icon: Monitor, label: 'Cashier App', external: true },
+  { href: '/cashier-app', icon: Monitor, label: 'Cashier App' },
   { href: '/qr-registration', icon: QrCode, label: 'QR Registration' },
 ];
 
