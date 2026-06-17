@@ -70,6 +70,9 @@ function makeSnapshot(computedAt: Date = new Date()) {
         spendByType: {},
         costPerReach: 25,
         estimatedRoi: 1.2,
+        estimatedRevenue: 6000,
+        lapsedCustomerCount: 10,
+        avgTransactionValue: 600,
       },
       content: {
         bestCampaign: null,
@@ -211,6 +214,9 @@ describe('ReportsService', () => {
         spendByType: {},
         costPerReach: 0,
         estimatedRoi: 0,
+        estimatedRevenue: 0,
+        lapsedCustomerCount: 0,
+        avgTransactionValue: 0,
       });
     const contentSpy = jest
       .spyOn(service, 'computeContentSection')
@@ -262,6 +268,9 @@ describe('ReportsService', () => {
       spendByType: {},
       costPerReach: 100,
       estimatedRoi: 0,
+      estimatedRevenue: 0,
+      lapsedCustomerCount: 0,
+      avgTransactionValue: 0,
     });
     jest.spyOn(service, 'computeContentSection').mockResolvedValueOnce({
       bestCampaign: null,

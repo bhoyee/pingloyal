@@ -11,11 +11,11 @@ import {
   PieChart,
   Pie,
   Cell,
+  Label,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import {
@@ -68,11 +68,14 @@ interface ReportData {
     spendByType: Record<string, number>;
     costPerReach: number;
     estimatedRoi: number;
+    estimatedRevenue: number;
+    lapsedCustomerCount: number;
+    avgTransactionValue: number;
   };
   content: {
-    bestCampaign: { id: string; name: string; deliveryRate: number } | null;
+    bestCampaign: { id: string; name: string; deliveryRate: number; sentCount?: number; sentAt?: string } | null;
     busiestDayOfWeek: Array<{ day: string; count: number }>;
-    topCustomers: Array<{ id: string; fullName: string; totalSpend: number; pointsBalance: number; tierLabel: string | null }>;
+    topCustomers: Array<{ id: string; fullName: string; totalSpend: number; pointsBalance: number; tierLabel: string | null; visitCount?: number }>;
     categoryBreakdown: Array<{ name: string; percentage: number }>;
   };
 }
@@ -86,10 +89,17 @@ interface ReportSchedule {
 // ── Colour tokens ──────────────────────────────────────────────────────────────
 
 const SPEND_COLOURS: Record<string, string> = {
-  debit_birthday: '#3b82f6',
-  debit_lapsed: '#ef4444',
   debit_campaign: '#f59e0b',
+  debit_lapsed: '#3b82f6',
+  debit_birthday: '#25D366',
   debit_utility_overage: '#9ca3af',
+};
+
+const SPEND_LABELS: Record<string, string> = {
+  debit_campaign: 'Campaign broadcasts',
+  debit_lapsed: 'Lapsed win-backs',
+  debit_birthday: 'Birthday messages',
+  debit_utility_overage: 'Utility overage',
 };
 const PALETTE = ['#25D366', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -103,15 +113,88 @@ function fmtNum(n: number) {
   return n.toLocaleString();
 }
 
+function fmtSpend(n: number): string {
+  if (n >= 1_000_000) return `₦${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `₦${Math.round(n / 1_000)}k`;
+  return `₦${Math.round(n)}`;
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function prevDayName(dayName: string): string {
+  const idx = DAYS.findIndex((d) => d.toLowerCase() === dayName.toLowerCase().trim());
+  if (idx < 0) return dayName;
+  return DAYS[(idx + 6) % 7];
+}
+
+function formatSentAt(sentAt: string): string {
+  const d = new Date(sentAt);
+  return (
+    d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }) +
+    ', ' +
+    d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  );
+}
+
+const TRIGGER_LABELS: Record<string, string> = {
+  purchase_confirmation: 'Purchase Confirmation',
+  welcome: 'Welcome Message',
+  reward_unlocked: 'Reward Unlocked',
+  threshold_nudge: '80% Threshold Nudge',
+  birthday: 'Birthday Message',
+  lapsed_winback: 'Lapsed Win-back',
+  campaign_message: 'Campaign Broadcasts',
+  balance_bot_reply: 'Bot Replies',
+  wallet_low_balance: 'Wallet Low Alert',
+  wallet_zero: 'Wallet Empty Alert',
+};
+
+type TriggerCategory = 'Utility' | 'Marketing' | 'Service';
+
+const TRIGGER_CATEGORY: Record<string, TriggerCategory> = {
+  welcome: 'Utility',
+  purchase_confirmation: 'Utility',
+  threshold_nudge: 'Utility',
+  reward_unlocked: 'Utility',
+  birthday: 'Marketing',
+  lapsed_winback: 'Marketing',
+  campaign_message: 'Marketing',
+  balance_bot_reply: 'Service',
+  wallet_low_balance: 'Service',
+  wallet_zero: 'Service',
+};
+
+const TRIGGER_SORT_ORDER = [
+  'purchase_confirmation', 'welcome', 'reward_unlocked', 'threshold_nudge',
+  'birthday', 'lapsed_winback', 'campaign_message',
+  'balance_bot_reply', 'wallet_low_balance', 'wallet_zero',
+];
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Food & Groceries': '🍎',
+  'Groceries': '🛒',
+  'Beverages': '🥤',
+  'Baby Products': '🧸',
+  'Household': '🏠',
+  'Clothing': '👕',
+  'Electronics': '📱',
+  'Health & Beauty': '💄',
+  'Snacks': '🍿',
+  'Pharmacy': '💊',
+};
+
 // ── UI primitives ──────────────────────────────────────────────────────────────
 
 function StatCard({
-  value, label, sub, accent,
-}: { value: string | number; label: string; sub?: string; accent?: string }) {
+  value, label, sub, accent, labelFirst,
+}: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {labelFirst
+        ? <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        : null}
       <p className={`text-2xl font-bold ${accent ?? 'text-slate-900'}`}>{value}</p>
-      <p className="mt-0.5 text-sm font-medium text-slate-500">{label}</p>
+      {!labelFirst && <p className="mt-0.5 text-sm font-medium text-slate-500">{label}</p>}
       {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
     </div>
   );
@@ -448,28 +531,52 @@ export default function ReportsPage() {
         {/* ── SECTION 3: WhatsApp ── */}
         <section>
           <div className="mb-4">
-            <SectionHeading icon={MessageSquare} label="WhatsApp Performance" />
+            <SectionHeading icon={MessageSquare} label="WhatsApp Message Performance" />
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
               : report
-              ? (
-                <>
-                  <StatCard value={fmtNum(report.whatsapp.totalSent)} label="Messages Sent" />
-                  <StatCard value={`${report.whatsapp.deliveryRate}%`} label="Delivery Rate"
-                    accent={report.whatsapp.deliveryRate >= 90 ? 'text-green-600' : report.whatsapp.deliveryRate >= 70 ? 'text-amber-600' : 'text-red-600'} />
-                  <StatCard value={fmtNum(report.whatsapp.botInteractions)} label="Bot Interactions" sub="free balance checks" />
-                  <StatCard value={Object.keys(report.whatsapp.triggerBreakdown).length} label="Active Trigger Types" />
-                </>
-              )
+              ? (() => {
+                  const marketingMsgCount = ['birthday', 'lapsed_winback', 'campaign_message']
+                    .reduce((s, t) => s + (report.whatsapp.triggerBreakdown[t]?.sent ?? 0), 0);
+                  return (
+                    <>
+                      <StatCard
+                        value={fmtNum(report.whatsapp.totalSent)}
+                        label="Total Messages Sent"
+                        sub="Utility + Marketing"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`${report.whatsapp.deliveryRate}%`}
+                        label="Overall Delivery Rate"
+                        sub="↑ vs 78% industry avg"
+                        accent={report.whatsapp.deliveryRate >= 90 ? 'text-green-600' : report.whatsapp.deliveryRate >= 70 ? 'text-amber-600' : 'text-red-600'}
+                        labelFirst
+                      />
+                      <StatCard
+                        value={fmtNum(report.whatsapp.botInteractions)}
+                        label="Bot Balance Checks"
+                        sub="free Service messages"
+                        labelFirst
+                      />
+                      <StatCard
+                        value={`₦${fmtNum(report.wallet.totalSpend)}`}
+                        label="Marketing Wallet Spent"
+                        sub={`${fmtNum(marketingMsgCount)} Marketing messages`}
+                        labelFirst
+                      />
+                    </>
+                  );
+                })()
               : null}
           </div>
 
           {(isLoading || report) && (
             <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white">
               <div className="border-b border-slate-100 px-5 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Trigger Breakdown</p>
+                <p className="text-sm font-semibold text-slate-700">Trigger breakdown</p>
               </div>
               {isLoading ? (
                 <div className="animate-pulse space-y-3 p-5">
@@ -479,10 +586,11 @@ export default function ReportsPage() {
                 </div>
               ) : report && Object.keys(report.whatsapp.triggerBreakdown).length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-sm">
+                  <table className="w-full min-w-[640px] text-sm">
                     <thead>
-                      <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        <th className="px-5 py-3">Trigger Type</th>
+                      <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <th className="px-5 py-3">Trigger</th>
+                        <th className="px-5 py-3">Type</th>
                         <th className="px-5 py-3">Sent</th>
                         <th className="px-5 py-3">Delivered</th>
                         <th className="px-5 py-3">Rate</th>
@@ -490,19 +598,47 @@ export default function ReportsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {Object.entries(report.whatsapp.triggerBreakdown).map(([type, stats]) => (
-                        <tr key={type} className="hover:bg-slate-50/60">
-                          <td className="px-5 py-3 font-medium text-slate-700">{toLabel(type)}</td>
-                          <td className="px-5 py-3 text-slate-600">{fmtNum(stats.sent)}</td>
-                          <td className="px-5 py-3 text-slate-600">{fmtNum(stats.delivered)}</td>
-                          <td className={`px-5 py-3 font-semibold ${stats.rate >= 90 ? 'text-green-600' : stats.rate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
-                            {stats.rate}%
-                          </td>
-                          <td className={`px-5 py-3 text-xs ${stats.cost === 'Plan included' ? 'text-slate-400' : 'font-medium text-amber-700'}`}>
-                            {stats.cost}
-                          </td>
-                        </tr>
-                      ))}
+                      {Object.entries(report.whatsapp.triggerBreakdown)
+                        .sort(([a], [b]) => {
+                          const ai = TRIGGER_SORT_ORDER.indexOf(a);
+                          const bi = TRIGGER_SORT_ORDER.indexOf(b);
+                          return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+                        })
+                        .map(([type, stats]) => {
+                          const category: TriggerCategory = TRIGGER_CATEGORY[type] ?? 'Utility';
+                          const badgeClass =
+                            category === 'Marketing'
+                              ? 'bg-amber-50 text-amber-600'
+                              : category === 'Service'
+                              ? 'bg-green-50 text-green-600'
+                              : 'bg-blue-50 text-blue-600';
+                          const costClass =
+                            stats.cost === 'Plan included'
+                              ? 'text-slate-400'
+                              : stats.cost === 'Free'
+                              ? 'text-green-600 font-medium'
+                              : 'font-medium text-amber-700';
+                          return (
+                            <tr key={type} className="hover:bg-slate-50/60">
+                              <td className="px-5 py-3 font-medium text-slate-700">
+                                {TRIGGER_LABELS[type] ?? toLabel(type)}
+                              </td>
+                              <td className="px-5 py-3">
+                                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${badgeClass}`}>
+                                  {category}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-slate-600">{fmtNum(stats.sent)}</td>
+                              <td className="px-5 py-3 text-slate-600">{fmtNum(stats.delivered)}</td>
+                              <td className={`px-5 py-3 font-semibold ${stats.rate >= 90 ? 'text-green-600' : stats.rate >= 70 ? 'text-amber-600' : 'text-red-600'}`}>
+                                {stats.rate}%
+                              </td>
+                              <td className={`px-5 py-3 text-xs ${costClass}`}>
+                                {stats.cost}
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
@@ -516,70 +652,129 @@ export default function ReportsPage() {
         {/* ── SECTION 4: Wallet ── */}
         <section>
           <div className="mb-4">
-            <SectionHeading icon={Wallet} label="Wallet & Spend" />
+            <SectionHeading icon={Wallet} label="Marketing Wallet & Spend Summary" />
           </div>
+
+          {/* Three stat cards */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
             {isLoading
               ? Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
               : report
               ? (
                 <>
-                  <StatCard value={`₦${fmtNum(report.wallet.totalSpend)}`} label="Total Marketing Spend" />
-                  <StatCard value={`₦${fmtNum(report.wallet.costPerReach)}`} label="Cost per Reach" />
                   <StatCard
-                    value={`${report.wallet.estimatedRoi}×`}
-                    label="Estimated ROI"
-                    sub="return on marketing spend"
-                    accent={report.wallet.estimatedRoi > 3 ? 'text-green-600' : report.wallet.estimatedRoi >= 1 ? 'text-amber-600' : 'text-red-600'}
+                    value={`₦${fmtNum(report.wallet.totalSpend)}`}
+                    label="Total Marketing Spend"
+                    sub="Birthday + Lapsed + Campaigns"
+                    labelFirst
+                  />
+                  <StatCard
+                    value={`₦${fmtNum(report.wallet.costPerReach)}/msg`}
+                    label="Cost Per Marketing Message"
+                    sub="your current plan rate"
+                    labelFirst
+                  />
+                  <StatCard
+                    value={`₦${fmtNum(report.wallet.estimatedRevenue)}`}
+                    label="Est. Revenue from Win-backs"
+                    sub={`${fmtNum(report.wallet.lapsedCustomerCount)} customers × avg ₦${fmtNum(report.wallet.avgTransactionValue)}`}
+                    accent="text-green-600"
+                    labelFirst
                   />
                 </>
               )
               : null}
           </div>
 
+          {/* Marketing spend breakdown card */}
           {(isLoading || report) && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <ChartBox title="Spend by Transaction Type" minH={240}>
-                  {isLoading ? (
-                    <div className="animate-pulse h-52 rounded bg-slate-100" />
-                  ) : report && Object.keys(report.wallet.spendByType).length > 0 ? (
-                    <ResponsiveContainer width="100%" height={240}>
-                      <PieChart>
-                        <Pie
-                          data={Object.entries(report.wallet.spendByType).map(([name, value]) => ({ name: toLabel(name), value }))}
-                          cx="50%" cy="50%" innerRadius={60} outerRadius={95} dataKey="value"
-                          label={({ name, percent }: { name?: string; percent?: number }) =>
-                            `${name ?? ''} ${Math.round((percent ?? 0) * 100)}%`}
-                          labelLine={false}
-                        >
-                          {Object.keys(report.wallet.spendByType).map((type, i) => (
-                            <Cell key={type} fill={SPEND_COLOURS[type] ?? PALETTE[i % PALETTE.length]} />
-                          ))}
-                        </Pie>
-                        <Legend formatter={(v: unknown) => <span style={{ fontSize: 12 }}>{String(v)}</span>} />
-                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                          formatter={(v: unknown) => [`₦${fmtNum(Number(v))}`, 'Spend']} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <NoData label="No wallet spend this period" />
-                  )}
-                </ChartBox>
-              </div>
-              <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-center">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estimated ROI</p>
-                {report ? (
-                  <>
-                    <p className={`mt-3 text-5xl font-bold ${report.wallet.estimatedRoi > 3 ? 'text-green-600' : report.wallet.estimatedRoi >= 1 ? 'text-amber-600' : 'text-red-500'}`}>
-                      {report.wallet.estimatedRoi}×
-                    </p>
-                    <p className="mt-2 text-xs text-slate-400">on ₦{fmtNum(report.wallet.totalSpend)} spend</p>
-                  </>
-                ) : isLoading ? (
-                  <div className="animate-pulse mt-3 h-12 w-20 rounded bg-slate-200" />
-                ) : null}
-              </div>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5">
+              <p className="mb-4 text-sm font-semibold text-slate-700">Marketing spend breakdown</p>
+              {isLoading ? (
+                <div className="animate-pulse h-52 rounded bg-slate-100" />
+              ) : report && Object.keys(report.wallet.spendByType).length > 0 ? (() => {
+                const spendEntries = Object.entries(report.wallet.spendByType)
+                  .sort((a, b) => b[1] - a[1]);
+                const total = report.wallet.totalSpend || 1;
+                return (
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+
+                    {/* Donut chart with center label */}
+                    <div className="shrink-0 lg:w-44">
+                      <ResponsiveContainer width="100%" height={160}>
+                        <PieChart>
+                          <Pie
+                            data={spendEntries.map(([type, value]) => ({
+                              name: SPEND_LABELS[type] ?? toLabel(type),
+                              value,
+                              type,
+                            }))}
+                            cx="50%" cy="50%"
+                            innerRadius={46} outerRadius={68}
+                            dataKey="value"
+                            startAngle={90} endAngle={-270}
+                          >
+                            <Label
+                              content={({ viewBox }) => {
+                                const vb = viewBox as { cx?: number; cy?: number };
+                                const cx = vb.cx ?? 0;
+                                const cy = vb.cy ?? 0;
+                                return (
+                                  <text textAnchor="middle" dominantBaseline="middle">
+                                    <tspan x={cx} y={cy - 7} fontSize="13" fontWeight="700" fill="#1e293b">
+                                      {fmtSpend(report.wallet.totalSpend)}
+                                    </tspan>
+                                    <tspan x={cx} y={cy + 9} fontSize="10" fill="#94a3b8">total</tspan>
+                                  </text>
+                                );
+                              }}
+                            />
+                            {spendEntries.map(([type], i) => (
+                              <Cell key={type} fill={SPEND_COLOURS[type] ?? PALETTE[i % PALETTE.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                            formatter={(v: unknown) => [`₦${fmtNum(Number(v))}`, '']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Breakdown list */}
+                    <div className="flex-1 space-y-3">
+                      {spendEntries.map(([type, amount], i) => (
+                        <div key={type} className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: SPEND_COLOURS[type] ?? PALETTE[i % PALETTE.length] }}
+                            />
+                            <span className="truncate text-sm text-slate-600">
+                              {SPEND_LABELS[type] ?? toLabel(type)}
+                            </span>
+                          </div>
+                          <span className="shrink-0 text-sm font-semibold text-slate-700 tabular-nums">
+                            ₦{fmtNum(amount)} ({Math.round((amount / total) * 100)}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* ROI card */}
+                    <div className="shrink-0 rounded-xl bg-green-50 px-6 py-5 text-center lg:w-52">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-green-700">ROI on Marketing spend</p>
+                      <p className="mt-2 text-4xl font-bold text-green-600">{report.wallet.estimatedRoi}×</p>
+                      <p className="mt-1 text-xs text-green-600">
+                        {fmtSpend(report.wallet.estimatedRevenue)} return on {fmtSpend(report.wallet.totalSpend)} spend
+                      </p>
+                    </div>
+
+                  </div>
+                );
+              })() : (
+                <NoData label="No wallet spend this period" />
+              )}
             </div>
           )}
         </section>
@@ -596,111 +791,148 @@ export default function ReportsPage() {
             </div>
           ) : report ? (
             <div className="grid gap-4 lg:grid-cols-2">
-              {/* Left column */}
+
+              {/* ── Left column ── */}
               <div className="space-y-4">
+
                 {/* Best campaign */}
-                <div className="rounded-xl border border-slate-200 bg-white p-5">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Best Campaign</p>
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="border-b border-slate-100 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Best Campaign This Period</p>
+                  </div>
                   {report.content.bestCampaign ? (
-                    <div className="mt-2">
-                      <p className="font-semibold text-slate-800">{report.content.bestCampaign.name}</p>
-                      <div className="mt-2 flex items-end gap-2">
-                        <span className="text-4xl font-bold text-green-600">{report.content.bestCampaign.deliveryRate}%</span>
-                        <span className="mb-1 text-sm text-slate-400">delivery rate</span>
+                    <div className="p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-xl">🛍️</div>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-800">{report.content.bestCampaign.name}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Sent to {fmtNum(report.content.bestCampaign.sentCount ?? 0)} customers
+                            {report.content.bestCampaign.sentAt
+                              ? ` · ${formatSentAt(report.content.bestCampaign.sentAt)}`
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-green-50 p-4 text-center">
+                          <p className="text-3xl font-bold text-green-600">{report.content.bestCampaign.deliveryRate}%</p>
+                          <p className="mt-1 text-xs font-medium text-green-700">Delivery rate</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 p-4 text-center">
+                          <p className="text-3xl font-bold text-slate-700">{fmtNum(report.content.bestCampaign.sentCount ?? 0)}</p>
+                          <p className="mt-1 text-xs font-medium text-slate-500">Recipients</p>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <p className="mt-3 text-sm text-slate-400">No campaigns sent this period</p>
+                    <p className="px-5 py-8 text-center text-sm text-slate-400">No campaigns sent this period</p>
                   )}
                 </div>
 
                 {/* Busiest day */}
-                <ChartBox title="Busiest Day of Week" minH={180}>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Busiest Day of Week</p>
+                  <p className="mb-3 mt-0.5 text-xs text-slate-400">Based on selected period</p>
                   {report.content.busiestDayOfWeek.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={180}>
-                      <BarChart data={report.content.busiestDayOfWeek} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                        <YAxis hide />
-                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                        <Bar dataKey="count" radius={[4, 4, 0, 0]} name="Transactions">
-                          {(() => {
-                            const maxCount = Math.max(...report.content.busiestDayOfWeek.map((d) => d.count));
-                            return report.content.busiestDayOfWeek.map((entry, i) => (
-                              <Cell key={i} fill={entry.count === maxCount ? '#25D366' : '#e2e8f0'} />
-                            ));
-                          })()}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <BarChart data={report.content.busiestDayOfWeek} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                          <YAxis hide />
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                          <Bar dataKey="count" radius={[4, 4, 0, 0]} name="Transactions">
+                            {(() => {
+                              const maxCount = Math.max(...report.content.busiestDayOfWeek.map((d) => d.count));
+                              return report.content.busiestDayOfWeek.map((entry, i) => (
+                                <Cell key={i} fill={entry.count === maxCount ? '#25D366' : '#e2e8f0'} />
+                              ));
+                            })()}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                      {(() => {
+                        const peak = report.content.busiestDayOfWeek.reduce((a, b) => a.count > b.count ? a : b);
+                        return (
+                          <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
+                            💡 {peak.day.trim()} is your peak day — consider scheduling campaigns {prevDayName(peak.day)} evening
+                          </p>
+                        );
+                      })()}
+                    </>
                   ) : (
                     <NoData label="No transaction data this period" />
                   )}
-                </ChartBox>
+                </div>
 
-                {/* Category breakdown */}
-                {report.content.categoryBreakdown.length > 0 && (
-                  <div className="rounded-xl border border-slate-200 bg-white p-5">
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Category Breakdown</p>
+              </div>
+
+              {/* ── Right column ── */}
+              <div className="space-y-4">
+
+                {/* Top 5 customers */}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                  <div className="border-b border-slate-100 px-5 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top 5 Customers by Spend</p>
+                  </div>
+                  {report.content.topCustomers.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {report.content.topCustomers.map((c, i) => (
+                        <div key={c.id} className="flex items-center gap-2.5 px-5 py-2.5">
+                          <span className="w-5 shrink-0 text-center text-sm font-bold text-slate-300">{i + 1}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-slate-800">{c.fullName}</p>
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              {c.visitCount ?? 0} visits · {fmtNum(c.pointsBalance)} pts
+                            </p>
+                          </div>
+                          {c.tierLabel && (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              /vip/i.test(c.tierLabel)
+                                ? 'bg-yellow-50 text-yellow-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {/vip/i.test(c.tierLabel) ? '👑' : '⭐'} {c.tierLabel}
+                            </span>
+                          )}
+                          <span className="shrink-0 font-bold tabular-nums text-slate-800">{fmtSpend(c.totalSpend)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-5 py-8 text-center text-sm text-slate-400">No customer spend data yet</div>
+                  )}
+                </div>
+
+                {/* Category breakdown — always render */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Top Category by Purchase Volume</p>
+                  {report.content.categoryBreakdown.length > 0 ? (
                     <div className="space-y-3">
                       {report.content.categoryBreakdown.map((cat, i) => (
-                        <div key={cat.name}>
-                          <div className="mb-1 flex justify-between text-xs">
-                            <span className="font-medium text-slate-700">{cat.name}</span>
-                            <span className="text-slate-500">{cat.percentage}%</span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${cat.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }}
-                            />
+                        <div key={cat.name} className="flex items-center gap-3">
+                          <span className="shrink-0 text-base">{CATEGORY_EMOJIS[cat.name] ?? '📦'}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex justify-between text-xs">
+                              <span className="truncate font-medium text-slate-700">{cat.name}</span>
+                              <span className="ml-2 shrink-0 font-semibold text-slate-600">{cat.percentage}%</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${cat.percentage}%`, backgroundColor: PALETTE[i % PALETTE.length] }}
+                              />
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right column — top customers */}
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="border-b border-slate-100 px-5 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top Customers by Spend</p>
+                  ) : (
+                    <p className="text-center text-sm text-slate-400">No category data for this period</p>
+                  )}
                 </div>
-                {report.content.topCustomers.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[400px] text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 text-left text-xs text-slate-400">
-                          <th className="px-5 py-3">Rank</th>
-                          <th className="px-5 py-3">Name</th>
-                          <th className="px-5 py-3">Spend</th>
-                          <th className="px-5 py-3">Points</th>
-                          <th className="px-5 py-3">Tier</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {report.content.topCustomers.map((c, i) => (
-                          <tr key={c.id} className="hover:bg-slate-50/60">
-                            <td className="px-5 py-3 text-base">{i === 0 ? '👑' : `#${i + 1}`}</td>
-                            <td className="px-5 py-3 font-medium text-slate-800">{c.fullName}</td>
-                            <td className="px-5 py-3 text-slate-600">₦{fmtNum(c.totalSpend)}</td>
-                            <td className="px-5 py-3 text-slate-600">⭐ {fmtNum(c.pointsBalance)}</td>
-                            <td className="px-5 py-3">
-                              {c.tierLabel ? (
-                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{c.tierLabel}</span>
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="px-5 py-8 text-center text-sm text-slate-400">No customer spend data yet</div>
-                )}
+
               </div>
             </div>
           ) : null}
