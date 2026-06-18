@@ -14,13 +14,30 @@ export interface PendingTransaction {
   retryCount: number;
 }
 
+export interface CachedCustomer {
+  id: string;
+  fullName: string;
+  phoneE164: string;
+  pointsBalance: number;
+  tierId: string | null;
+  tier: string | null;
+  lastPurchaseAt: string | null;
+  purchaseCount: number;
+  progressPercent: number;
+}
+
 class CashierDB extends Dexie {
   pendingTransactions!: Table<PendingTransaction>;
+  cachedCustomers!: Table<CachedCustomer, string>;
 
   constructor() {
     super('pingloyal_cashier');
     this.version(1).stores({
       pendingTransactions: '++id, status, createdAt, idempotencyKey',
+    });
+    this.version(2).stores({
+      pendingTransactions: '++id, status, createdAt, idempotencyKey',
+      cachedCustomers: 'id, phoneE164',
     });
   }
 }
@@ -64,4 +81,22 @@ export async function markSyncing(id: number): Promise<void> {
 
 export async function getAll(): Promise<PendingTransaction[]> {
   return db.pendingTransactions.toArray();
+}
+
+// ── Customer cache ─────────────────────────────────────────────────────────────
+
+export async function upsertCustomerCache(
+  customers: CachedCustomer[],
+): Promise<void> {
+  await db.cachedCustomers.bulkPut(customers);
+}
+
+export async function lookupCustomerByPhone(
+  phoneE164: string,
+): Promise<CachedCustomer | undefined> {
+  return db.cachedCustomers.where('phoneE164').equals(phoneE164).first();
+}
+
+export async function getCachedCustomerCount(): Promise<number> {
+  return db.cachedCustomers.count();
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { CashierProvider, useCashier } from '../context/cashier-context';
@@ -38,51 +38,25 @@ function CashierGuard({ children }: { children: React.ReactNode }) {
 }
 
 function OnlineIndicator() {
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
+  const { isOnline } = useCashier();
 
   return (
     <span
       className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-        online ? 'bg-[#0DC56A] text-white' : 'bg-red-500 text-white'
+        isOnline ? 'bg-[#0DC56A] text-white' : 'bg-red-500 text-white'
       }`}
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-white' : 'bg-white'} animate-pulse`}
-      />
-      {online ? 'Online' : 'Offline'}
+      <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+      {isOnline ? 'Online' : 'Offline'}
     </span>
   );
 }
 
 function SyncBar() {
-  const { refreshOfflineCount, offlineQueueCount } = useCashier();
+  const { refreshOfflineCount, offlineQueueCount, isOnline: online, syncCustomers } = useCashier();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [syncCounts, setSyncCounts] = useState({ synced: 0, failed: 0 });
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
+  const prevOnlineRef = useRef<boolean | null>(null);
 
   const runSync = useCallback(async () => {
     const pendingCount = await getPendingCount();
@@ -93,12 +67,18 @@ function SyncBar() {
     setSyncStatus(result.failed > 0 ? 'partial' : 'complete');
     if (result.failed === 0) setTimeout(() => setSyncStatus('idle'), 3000);
     refreshOfflineCount();
-  }, [refreshOfflineCount]);
+    // Refresh customer cache AFTER transactions are posted so points are up to date
+    await syncCustomers();
+  }, [refreshOfflineCount, syncCustomers]);
 
+  // Trigger sync whenever isOnline flips from false → true (server came back)
   useEffect(() => {
-    window.addEventListener('online', () => void runSync());
-    return () => window.removeEventListener('online', () => void runSync());
-  }, [runSync]);
+    const wasOffline = prevOnlineRef.current === false;
+    prevOnlineRef.current = online;
+    if (online && wasOffline) {
+      void runSync();
+    }
+  }, [online, runSync]);
 
   const pending = offlineQueueCount;
 
@@ -157,12 +137,18 @@ function BottomNav() {
     pathname === '/cashier/transaction' ||
     pathname === '/cashier/confirmation';
 
-  const registerHref = tenantSlug
-    ? `/register/${tenantSlug}`
-    : '#';
+  const registerHref = tenantSlug ? `/register/${tenantSlug}` : '#';
+
+  function handleLogout() {
+    localStorage.removeItem('cashier_token');
+    const loginUrl = tenantSlug
+      ? `/cashier/login?t=${tenantSlug}`
+      : '/cashier/login';
+    window.location.href = loginUrl;
+  }
 
   return (
-    <nav className="border-t border-gray-200 bg-white grid grid-cols-2">
+    <nav className="border-t border-gray-200 bg-white grid grid-cols-3">
       <Link
         href="/cashier"
         className={`flex flex-col items-center gap-1 py-3 text-[11px] font-semibold transition-colors ${
@@ -173,7 +159,7 @@ function BottomNav() {
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
-        Customer Lookup
+        Lookup
       </Link>
       <a
         href={registerHref}
@@ -187,8 +173,20 @@ function BottomNav() {
           <line x1="19" y1="8" x2="19" y2="14" />
           <line x1="22" y1="11" x2="16" y2="11" />
         </svg>
-        New Registration
+        Register
       </a>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="flex flex-col items-center gap-1 py-3 text-[11px] font-semibold text-gray-400 hover:text-red-500 transition-colors"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        Log Out
+      </button>
     </nav>
   );
 }

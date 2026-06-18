@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { cashierApi, ApiError, type CustomerLookupResult } from '@/lib/api';
+import { lookupCustomerByPhone } from '@/lib/offline-queue';
 import { useCashier } from '../context/cashier-context';
 
 type LookupState =
@@ -60,7 +61,16 @@ export default function CashierPage() {
       if (err instanceof ApiError && err.status === 404) {
         setState({ status: 'not_found' });
       } else {
-        setState({ status: 'error', message: 'Could not reach server — check connection' });
+        // Offline or network error — search the local IndexedDB customer cache
+        const cached = await lookupCustomerByPhone(phone);
+        if (cached) {
+          setState({
+            status: 'found',
+            customer: { ...cached, _fromCache: true } as CustomerLookupResult,
+          });
+        } else {
+          setState({ status: 'error', message: 'offline-no-match' });
+        }
       }
     }
   }, []);
@@ -169,8 +179,12 @@ export default function CashierPage() {
         )}
 
         {state.status === 'error' && (
-          <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-4 text-sm text-red-700 text-center">
-            {state.message}
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-4 text-center space-y-2">
+            <p className="text-2xl">📵</p>
+            <p className="text-sm font-semibold text-amber-800">No signal — customer not found locally</p>
+            <p className="text-xs text-amber-600 leading-relaxed">
+              The customer list syncs automatically when online. Once connected, reopen the app and it will download all customers so every lookup works offline.
+            </p>
           </div>
         )}
 
@@ -207,8 +221,17 @@ function CustomerCard({
   const spendRemaining = pointsRemaining * earnRate;
   const progressPercent = Math.min(100, customer.progressPercent);
 
+  const fromCache = (customer as CustomerLookupResult & { _fromCache?: boolean })._fromCache;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* Offline cache notice */}
+      {fromCache && (
+        <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center gap-2">
+          <span className="text-xs">📵</span>
+          <p className="text-xs text-amber-700 font-medium">Offline — showing cached data. Points may have changed.</p>
+        </div>
+      )}
       {/* Name + tier */}
       <div className="px-5 pt-5 pb-4 flex items-start justify-between">
         <div>

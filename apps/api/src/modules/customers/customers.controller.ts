@@ -118,6 +118,12 @@ export class CustomersController {
     return this.customersService.lookup(user.tenantId, phone);
   }
 
+  @Get('sync')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  forCashierSync(@CurrentUser() user: RequestUser) {
+    return this.customersService.forCashierSync(user.tenantId);
+  }
+
   @Get(':id')
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   findOne(
