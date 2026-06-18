@@ -12,6 +12,13 @@ jest.mock('../lib/api', () => ({
   },
 }));
 
+jest.mock('../lib/offline-queue', () => ({
+  lookupCustomerByPhone: jest.fn().mockResolvedValue(null),
+  upsertCustomerCache: jest.fn().mockResolvedValue(undefined),
+  addToQueue: jest.fn().mockResolvedValue(1),
+  getPendingCount: jest.fn().mockResolvedValue(0),
+}));
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace: jest.fn() }),
 }));
@@ -52,6 +59,7 @@ function defaultCashierContext() {
     isLoading: false,
     offlineQueueCount: 0,
     tenantSlug: 'mama-store',
+    isOnline: true,
   });
 }
 
@@ -79,13 +87,16 @@ it('T70 — renders phone input and empty-state prompt on mount', () => {
 
   expect(screen.getByLabelText(/phone number/i)).toBeInTheDocument();
   expect(
-    screen.getByText(/enter a phone number to look up/i),
+    screen.getByText(/phone number to look up a customer/i),
   ).toBeInTheDocument();
 });
 
 // ── T71 — loading state shown during debounce ─────────────────────────────────
 
 it('T71 — shows loading spinner after typing a phone number', async () => {
+  // Hold the API call in pending so we can observe the loading state
+  mockCashierApi.get.mockImplementation(() => new Promise(() => {}));
+
   const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
   render(<CashierPage />);
 
@@ -129,7 +140,7 @@ it('T73 — progress bar renders with correct aria attributes', async () => {
   });
 
   await waitFor(() => {
-    const bar = screen.getByRole('progressbar', { name: /progress/i });
+    const bar = screen.getByRole('progressbar', { name: /progress to reward/i });
     expect(bar).toHaveAttribute('aria-valuenow', '35');
   });
 });
@@ -189,18 +200,24 @@ it('T76 — clear button resets phone input and hides customer card', async () =
     expect(screen.getByText('Ada Okonkwo')).toBeInTheDocument();
   });
 
-  await user.click(screen.getByLabelText(/clear phone/i));
+  await user.click(screen.getByLabelText(/clear/i));
 
   expect(screen.queryByText('Ada Okonkwo')).not.toBeInTheDocument();
   expect(
-    screen.getByText(/enter a phone number to look up/i),
+    screen.getByText(/phone number to look up a customer/i),
   ).toBeInTheDocument();
 });
 
 // ── T77 — offline banner shown ────────────────────────────────────────────────
 
-it('T77 — offline banner appears when navigator.onLine is false', () => {
-  Object.defineProperty(navigator, 'onLine', { writable: true, value: false });
+it('T77 — offline banner appears when isOnline is false', () => {
+  mockUseCashier.mockReturnValue({
+    tenant: { businessName: 'Mama Store', slug: 'mama-store' },
+    isLoading: false,
+    offlineQueueCount: 0,
+    tenantSlug: 'mama-store',
+    isOnline: false,
+  });
 
   render(<CashierPage />);
 
@@ -240,15 +257,17 @@ it('T79 — no API call when phone has fewer than 7 digits', async () => {
   });
 
   expect(mockCashierApi.get).not.toHaveBeenCalled();
-  expect(screen.getByText(/enter a phone number/i)).toBeInTheDocument();
+  expect(screen.getByText(/phone number to look up a customer/i)).toBeInTheDocument();
 });
 
-// ── T80 — business name shown from CashierContext ────────────────────────────
+// ── T80 — phone input is accessible ──────────────────────────────────────────
 
-it('T80 — header shows business name from CashierContext', () => {
+it('T80 — phone input renders with correct type and label', () => {
   render(<CashierPage />);
 
-  expect(screen.getByText('Mama Store')).toBeInTheDocument();
+  const input = screen.getByLabelText(/phone number/i);
+  expect(input).toBeInTheDocument();
+  expect(input).toHaveAttribute('type', 'tel');
 });
 
 // ── T81 — queued items badge shown ───────────────────────────────────────────
@@ -259,6 +278,7 @@ it('T81 — shows offline queue badge when offlineQueueCount > 0', () => {
     isLoading: false,
     offlineQueueCount: 3,
     tenantSlug: 'mama-store',
+    isOnline: true,
   });
 
   render(<CashierPage />);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,11 @@ function makeCategories() {
   ];
 }
 
+function wrapper({ children }: { children: React.ReactNode }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockApi.get.mockImplementation((path: string) => {
@@ -82,7 +88,7 @@ beforeEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 it('renders business profile, loyalty, tiers, categories and whatsapp sections', async () => {
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByDisplayValue('FreshMart')).toBeInTheDocument();
@@ -107,7 +113,7 @@ it('renders business profile, loyalty, tiers, categories and whatsapp sections',
 
 it('saves business profile via PATCH /tenants/settings', async () => {
   mockApi.patch.mockResolvedValue(makeTenant({ businessName: 'Fresh Mart NG' }));
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByDisplayValue('FreshMart')).toBeInTheDocument();
@@ -131,7 +137,7 @@ it('saves business profile via PATCH /tenants/settings', async () => {
 
 it('saves loyalty settings via PATCH /tenants/settings', async () => {
   mockApi.patch.mockResolvedValue(makeTenant());
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByText('Save loyalty settings')).toBeInTheDocument();
@@ -154,7 +160,7 @@ it('saves loyalty settings via PATCH /tenants/settings', async () => {
 
 it('saves loyalty tiers via PUT /tenants/tier-config', async () => {
   mockApi.put.mockResolvedValue(makeTiers());
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByText('Save loyalty tiers')).toBeInTheDocument();
@@ -177,7 +183,7 @@ it('saves loyalty tiers via PUT /tenants/tier-config', async () => {
 });
 
 it('shows validation error and disables save when VIP min overlaps Mid max', async () => {
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByDisplayValue('400000')).toBeInTheDocument();
@@ -196,7 +202,7 @@ it('shows validation error and disables save when VIP min overlaps Mid max', asy
 
 it('adds a new product category via POST /tenants/categories', async () => {
   mockApi.post.mockResolvedValue({ id: 'c3', name: 'Bakery', slug: 'bakery' });
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByText('Beverages')).toBeInTheDocument();
@@ -221,7 +227,7 @@ it('falls back to default tiers when tier-config is empty', async () => {
     return Promise.resolve(null);
   });
 
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByDisplayValue('VIP Member')).toBeInTheDocument();
@@ -251,7 +257,7 @@ it('shows WhatsApp not-connected message when whatsapp.isConnected is false', as
     return Promise.resolve(null);
   });
 
-  render(<SettingsPage />);
+  render(<SettingsPage />, { wrapper });
 
   await waitFor(() => {
     expect(screen.getByText(/WhatsApp is not yet connected/)).toBeInTheDocument();
