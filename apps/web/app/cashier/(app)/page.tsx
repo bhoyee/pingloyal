@@ -138,7 +138,7 @@ export default function CashierPage() {
             value={formatPhone(phoneInput)}
             onChange={handlePhoneChange}
             placeholder="Enter phone number…"
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-10 text-base focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-10 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           />
           {phoneInput && (
             <button
