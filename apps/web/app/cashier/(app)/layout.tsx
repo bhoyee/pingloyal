@@ -204,7 +204,7 @@ function CashierShell({ children }: { children: React.ReactNode }) {
 
   return (
     /* Outer: centres the app on desktop, fills screen on mobile */
-    <div className="min-h-screen bg-gray-100 flex items-start justify-center sm:py-6">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center sm:py-6">
       <div className="w-full sm:max-w-sm sm:rounded-3xl sm:shadow-2xl overflow-hidden flex flex-col min-h-screen sm:min-h-0 sm:h-auto bg-white">
 
         {/* Header bar */}
@@ -228,9 +228,12 @@ function CashierShell({ children }: { children: React.ReactNode }) {
                 <rect x="2" y="3" width="20" height="14" rx="2" />
                 <path d="M8 21h8M12 17v4" />
               </svg>
-              <span className="text-white font-semibold text-sm">
-                {tenant?.businessName ? `${tenant.businessName} Cashier` : 'Cashier App'}
-              </span>
+              <div>
+                <p className="text-white font-bold text-sm leading-tight">
+                  {tenant?.businessName ?? 'Loading…'}
+                </p>
+                <p className="text-white/50 text-[10px] leading-tight">Cashier App</p>
+              </div>
             </div>
           </div>
           <OnlineIndicator />
