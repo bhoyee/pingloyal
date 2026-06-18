@@ -91,7 +91,10 @@ function CashierGuard({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('cashier_token');
     if (!token || isTokenExpired(token)) {
       localStorage.removeItem('cashier_token');
-      router.replace('/cashier/login');
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('t');
+      const loginUrl = slug ? `/cashier/login?t=${slug}` : '/cashier/login';
+      router.replace(loginUrl);
     }
   }, [router]);
 

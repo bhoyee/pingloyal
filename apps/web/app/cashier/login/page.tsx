@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ApiError } from '../../../lib/api';
 
 interface LoginResponse {
-  access_token: string;
+  accessToken: string;
 }
 
 interface StoreInfo {
@@ -70,7 +70,7 @@ export default function CashierLoginPage() {
       }
 
       const data = (await res.json()) as LoginResponse;
-      localStorage.setItem('cashier_token', data.access_token);
+      localStorage.setItem('cashier_token', data.accessToken);
       const destination = slug ? `/cashier?t=${slug}` : '/cashier';
       router.replace(destination);
     } catch (err) {
