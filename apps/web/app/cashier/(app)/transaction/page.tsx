@@ -208,7 +208,7 @@ export default function TransactionPage() {
         if (err.status === 400) {
           setAmountError(err.message);
         } else if (err.status === 401) {
-          router.replace('/cashier/login');
+          router.replace(tenant?.slug ? `/cashier/login?t=${tenant.slug}` : '/cashier/login');
         } else if (err.status === 404) {
           setAmountError('Customer not found — please search again');
           setTimeout(() => router.replace('/cashier'), 2000);

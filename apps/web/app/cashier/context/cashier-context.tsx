@@ -70,6 +70,7 @@ export function CashierProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await cashierApi.get<TenantMe>('/tenants/me');
       setTenant(data);
+      localStorage.setItem('cashier_tenant_slug', data.slug);
     } catch {
       // expired/invalid token — CashierGuard will redirect
     } finally {

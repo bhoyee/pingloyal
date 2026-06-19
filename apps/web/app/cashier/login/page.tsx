@@ -26,7 +26,10 @@ export default function CashierLoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const t = params.get('t');
-    if (t) setSlug(t);
+    if (t) {
+      setSlug(t);
+      localStorage.setItem('cashier_tenant_slug', t);
+    }
   }, []);
 
   useEffect(() => {

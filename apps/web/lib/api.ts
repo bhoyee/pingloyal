@@ -319,6 +319,14 @@ function getCashierToken(): string | null {
   return localStorage.getItem('cashier_token');
 }
 
+// Cashier login is store-specific (?t=<slug> shows that store's branding).
+// We persist the slug separately from the token so an expired/missing
+// session still redirects back to the right store, not the bare login page.
+function cashierLoginUrl(): string {
+  const slug = typeof window === 'undefined' ? null : localStorage.getItem('cashier_tenant_slug');
+  return slug ? `/cashier/login?t=${slug}` : '/cashier/login';
+}
+
 async function cashierRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -326,7 +334,7 @@ async function cashierRequest<T>(
   const token = getCashierToken();
 
   if (!token) {
-    window.location.href = '/cashier/login';
+    window.location.href = cashierLoginUrl();
     throw new ApiError('No auth token', 401);
   }
 
@@ -350,7 +358,7 @@ async function cashierRequest<T>(
 
   if (res.status === 401) {
     localStorage.removeItem('cashier_token');
-    window.location.href = '/cashier/login';
+    window.location.href = cashierLoginUrl();
     throw new ApiError('Session expired', 401);
   }
 
