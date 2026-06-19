@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Info, Upload } from 'lucide-react';
+import { Info, Upload, UserPlus } from 'lucide-react';
 import { api, ApiError, type Category, type TenantMe, type TierConfig } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,18 @@ const WA_STATUS_STYLES: Record<string, string> = {
   failed: 'bg-red-100 text-red-700',
 };
 
+interface CashierUser {
+  id: string;
+  fullName: string;
+  isActive: boolean;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -82,6 +95,7 @@ export default function SettingsPage() {
   const [tenant, setTenant] = useState<TenantMe | null>(null);
   const [tiers, setTiers] = useState<TierConfig[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [cashiers, setCashiers] = useState<CashierUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -119,6 +133,13 @@ export default function SettingsPage() {
   const standardMax = midMin > 0 ? midMin - 1 : 0;
   const tierOverlap = vipMin <= midMax;
 
+  const teamMembers = [
+    ...(tenant?.ownerName
+      ? [{ id: 'owner', name: tenant.ownerName, role: 'Owner', isActive: true }]
+      : []),
+    ...cashiers.map((c) => ({ id: c.id, name: c.fullName, role: 'Cashier', isActive: c.isActive })),
+  ];
+
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -135,6 +156,9 @@ export default function SettingsPage() {
         tiersForm.reset(tiersToFormValues(t));
       }),
       api.get<Category[]>('/api/v1/tenants/categories').then(setCategories),
+      api
+        .get<CashierUser[]>('/api/v1/users/cashiers')
+        .then((c) => setCashiers(Array.isArray(c) ? c : [])),
     ])
       .catch(() => null)
       .finally(() => setLoading(false));
@@ -250,15 +274,13 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-xl font-bold text-slate-900">Settings</h1>
-          <p className="text-sm text-slate-500">
-            Manage your business profile, loyalty programme, and customer tiers.
-          </p>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900">Settings</h1>
+        <p className="text-sm text-slate-500">
+          Manage your business profile, loyalty programme, and customer tiers.
+        </p>
       </div>
 
-      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+      <div className="grid grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-2">
         {/* ── Business Profile ───────────────────────────────────────────── */}
         <Card>
           <CardHeader>
@@ -607,27 +629,58 @@ export default function SettingsPage() {
               The WhatsApp Business number used to message your customers.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-xs font-semibold capitalize',
-                  WA_STATUS_STYLES[tenant?.whatsapp.verificationStatus ?? ''] ??
-                    'bg-slate-100 text-slate-500',
-                )}
-              >
-                {tenant?.whatsapp.verificationStatus.replace(/_/g, ' ')}
-              </span>
-              {tenant?.whatsapp.displayName && (
-                <span className="text-sm font-medium text-slate-900">
-                  {tenant.whatsapp.displayName}
-                </span>
-              )}
-            </div>
-            {tenant?.whatsapp.phoneNumber && (
-              <p className="text-sm text-slate-500">{tenant.whatsapp.phoneNumber}</p>
-            )}
-            {!tenant?.whatsapp.isConnected && (
+          <CardContent className="space-y-4">
+            {tenant?.whatsapp.isConnected ? (
+              <>
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                    <span className="text-sm font-medium text-emerald-800">
+                      Connected
+                      {tenant.whatsapp.phoneNumber && ` · ${tenant.whatsapp.phoneNumber}`}
+                    </span>
+                  </div>
+                  <a
+                    href="/onboarding?step=4"
+                    className="shrink-0 text-sm font-semibold text-slate-600 hover:text-slate-900"
+                  >
+                    Reconnect
+                  </a>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'rounded-full px-2.5 py-1 text-xs font-semibold capitalize',
+                      WA_STATUS_STYLES[tenant.whatsapp.verificationStatus] ??
+                        'bg-slate-100 text-slate-500',
+                    )}
+                  >
+                    {tenant.whatsapp.verificationStatus.replace(/_/g, ' ')}
+                  </span>
+                  {tenant.whatsapp.displayName && (
+                    <span className="text-sm font-medium text-slate-900">
+                      {tenant.whatsapp.displayName}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Business Category</Label>
+                    <Input
+                      value={tenant.whatsapp.category ?? '—'}
+                      disabled
+                      className="bg-slate-50 text-slate-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">BSP Provider</Label>
+                    <Input value="Gupshup" disabled className="bg-slate-50 text-slate-500" />
+                  </div>
+                </div>
+              </>
+            ) : (
               <div className="space-y-2">
                 <p className="text-sm text-slate-500">
                   WhatsApp is not yet connected. Connect your WhatsApp Business
@@ -641,6 +694,52 @@ export default function SettingsPage() {
                 </a>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* ── Team Accounts ───────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Team Accounts</CardTitle>
+            <CardDescription>
+              People who can log in to your dashboard and cashier app.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              {teamMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center gap-3 rounded-xl bg-emerald-50/70 px-3 py-2.5"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0DC56A]/15 text-xs font-bold text-[#0DC56A]">
+                    {initials(member.name)}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{member.name}</p>
+                    <p className="text-xs text-slate-500">{member.role}</p>
+                  </div>
+                  <span
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                      member.isActive
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-100 text-slate-500',
+                    )}
+                  >
+                    {member.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/cashier-app"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0DC56A] px-3.5 py-2 text-sm font-semibold text-[#0DC56A] transition-colors hover:bg-[#0DC56A]/5"
+            >
+              <UserPlus className="h-4 w-4" />
+              Invite Cashier
+            </Link>
           </CardContent>
         </Card>
       </div>
