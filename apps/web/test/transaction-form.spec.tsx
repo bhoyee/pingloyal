@@ -84,6 +84,7 @@ function defaultContext(earnRate = 100) {
     offlineQueueCount: 0,
     tenantSlug: 'mama-store',
     refreshOfflineCount: jest.fn(),
+    isOnline: true,
   });
 }
 
@@ -221,7 +222,15 @@ it('T90 — same idempotency key used on API attempt and offline fallback', asyn
 // ── T91 — offline: saves to queue with status=pending ────────────────────────
 
 it('T91 — saves to offline queue with status=pending when device is offline', async () => {
-  Object.defineProperty(navigator, 'onLine', { writable: true, value: false });
+  // Simulate offline by setting isOnline: false in context (server-aware check)
+  mockUseCashier.mockReturnValue({
+    tenant: makeTenant(),
+    isLoading: false,
+    offlineQueueCount: 0,
+    tenantSlug: 'mama-store',
+    refreshOfflineCount: jest.fn(),
+    isOnline: false,
+  });
 
   render(<TransactionPage />);
   fireEvent.change(getAmountInput(), { target: { value: '5000' } });

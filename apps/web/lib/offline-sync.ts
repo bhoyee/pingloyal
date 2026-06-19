@@ -36,12 +36,14 @@ export class OfflineSyncService {
         try {
           await markSyncing(tx.id!);
 
-          await apiClient.post('/transactions', {
+          const syncBody: Record<string, unknown> = {
             customerId: tx.customerId,
             amount: tx.amount,
-            categoryId: tx.categoryId,
             idempotencyKey: tx.idempotencyKey,
-          });
+          };
+          if (tx.categoryId != null) syncBody.categoryId = tx.categoryId;
+
+          await apiClient.post('/transactions', syncBody);
 
           await markSynced(tx.id!);
           synced++;

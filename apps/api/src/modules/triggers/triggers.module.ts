@@ -13,8 +13,17 @@ import { WaTemplatesService } from './wa-templates.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tenant, WaTriggerTemplate]), RedisModule],
-  controllers: [TriggerLogsController, TriggersController, WaTemplatesController],
-  providers: [BirthdayCronService, LapsedCronService, TriggersService, WaTemplatesService],
+  controllers: [
+    TriggerLogsController,
+    TriggersController,
+    WaTemplatesController,
+  ],
+  providers: [
+    BirthdayCronService,
+    LapsedCronService,
+    TriggersService,
+    WaTemplatesService,
+  ],
   exports: [BirthdayCronService, LapsedCronService, WaTemplatesService],
 })
 export class TriggersModule {}

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Put,
@@ -17,6 +18,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import 'multer';
 import { UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
+import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -27,6 +29,12 @@ import { TenantsService } from './tenants.service';
 @Controller('tenants')
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
+
+  @Public()
+  @Get('public/:slug')
+  getPublicInfo(@Param('slug') slug: string) {
+    return this.tenantsService.getPublicInfo(slug);
+  }
 
   @Get('me')
   @SkipSubscriptionCheck()

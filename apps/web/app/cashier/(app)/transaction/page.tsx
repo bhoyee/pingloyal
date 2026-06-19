@@ -32,6 +32,16 @@ function categoryIcon(slug: string): string {
   return CATEGORY_ICONS[slug] ?? '🛍️';
 }
 
+function randomUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 function currencySymbol(currency: string): string {
   return currency === 'GBP' ? '£' : '₦';
 }
@@ -46,11 +56,16 @@ function sanitiseAmount(raw: string): string {
   return v;
 }
 
+function normaliseAmountForSubmit(value: string): string {
+  // Strip trailing dot ("500." → "500") so the DTO regex ^\d+(\.\d{1,2})?$ passes
+  return value.replace(/\.$/, '');
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TransactionPage() {
   const router = useRouter();
-  const { tenant, refreshOfflineCount } = useCashier();
+  const { tenant, refreshOfflineCount, isOnline } = useCashier();
 
   const [customer, setCustomer] = useState<CustomerLookupResult | null>(null);
   const [amount, setAmount] = useState('');
@@ -64,7 +79,7 @@ export default function TransactionPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   // Generated once on mount — same key reused on retry to prevent double-charge
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const idempotencyKey = useRef(randomUUID());
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Load customer from sessionStorage ────────────────────────────────────────
@@ -151,25 +166,27 @@ export default function TransactionPage() {
 
     const categoryId =
       selectedCategoryId === 'other' ? null : selectedCategoryId;
+    const normalisedAmount = normaliseAmountForSubmit(amount);
+    const selectedCat = categories.find((c) => c.id === selectedCategoryId);
 
-    // ── Offline flow (device is offline) ─────────────────────────────────────
-    if (!navigator.onLine) {
-      await saveOffline(customer, amount, categoryId);
+    // Use context isOnline (server-aware) not navigator.onLine (device-only)
+    if (!isOnline) {
+      await saveOffline(customer, normalisedAmount, categoryId, selectedCat?.name ?? null);
       return;
     }
 
     // ── Online flow ───────────────────────────────────────────────────────────
     setSubmitting(true);
     try {
-      const result = await cashierApi.post<TransactionResult>('/transactions', {
+      const body: Record<string, unknown> = {
         customerId: customer.id,
-        amount,
-        categoryId,
+        amount: normalisedAmount,
         idempotencyKey: idempotencyKey.current,
-        notes: null,
-      });
+      };
+      if (categoryId != null) body.categoryId = categoryId;
 
-      // Store confirmation data for the next screen
+      const result = await cashierApi.post<TransactionResult>('/transactions', body);
+
       const confirmData = {
         transactionId: result.id,
         customerName: result.customer.fullName,
@@ -179,19 +196,16 @@ export default function TransactionPage() {
         threshold: tenant.pointsThreshold,
         tier: result.customer.tier,
         waVerificationStatus: tenant.whatsapp?.verificationStatus ?? '',
+        amount: normalisedAmount,
+        categoryName: selectedCat?.name ?? null,
+        currency: tenant.currency ?? 'NGN',
+        queued: false,
       };
-      sessionStorage.setItem(
-        'cashier_last_transaction',
-        JSON.stringify(confirmData),
-      );
+      sessionStorage.setItem('cashier_last_transaction', JSON.stringify(confirmData));
       router.replace('/cashier/confirmation');
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 0) {
-          // Network error — fall through to offline save
-          setToast('Network error — saving offline');
-          await saveOffline(customer, amount, categoryId);
-        } else if (err.status === 400) {
+        if (err.status === 400) {
           setAmountError(err.message);
         } else if (err.status === 401) {
           router.replace('/cashier/login');
@@ -199,11 +213,11 @@ export default function TransactionPage() {
           setAmountError('Customer not found — please search again');
           setTimeout(() => router.replace('/cashier'), 2000);
         } else {
-          setToast('Server error — transaction saved offline for retry');
-          await saveOffline(customer, amount, categoryId);
+          // 0 = network error, 5xx = server/proxy error — treat as offline
+          await saveOffline(customer, normalisedAmount, categoryId, selectedCat?.name ?? null);
         }
       } else {
-        await saveOffline(customer, amount, categoryId);
+        await saveOffline(customer, normalisedAmount, categoryId, selectedCat?.name ?? null);
       }
     } finally {
       setSubmitting(false);
@@ -214,6 +228,7 @@ export default function TransactionPage() {
     cust: CustomerLookupResult,
     amt: string,
     catId: string | null,
+    catName: string | null,
   ) {
     await addToQueue({
       tenantId: tenant?.id ?? '',
@@ -227,8 +242,26 @@ export default function TransactionPage() {
       retryCount: 0,
     });
     refreshOfflineCount();
-    setToast('Saved offline — will sync when connected');
-    setTimeout(() => router.replace('/cashier'), 1500);
+
+    // Show offline confirmation screen (same route, queued:true flag)
+    const earnRate = tenant?.pointsEarnRate ?? 100;
+    const estimatedPoints = Math.floor(parseFloat(amt) / earnRate);
+    const confirmData = {
+      transactionId: idempotencyKey.current,
+      customerName: cust.fullName,
+      pointsEarned: estimatedPoints,
+      newBalance: cust.pointsBalance + estimatedPoints,
+      progressPercent: cust.progressPercent,
+      threshold: tenant?.pointsThreshold ?? 1000,
+      tier: cust.tier,
+      waVerificationStatus: '',
+      amount: amt,
+      categoryName: catName,
+      currency: tenant?.currency ?? 'NGN',
+      queued: true,
+    };
+    sessionStorage.setItem('cashier_last_transaction', JSON.stringify(confirmData));
+    router.replace('/cashier/confirmation');
   }
 
   // ── Derived display values ────────────────────────────────────────────────────
@@ -363,6 +396,16 @@ export default function TransactionPage() {
           </div>
         </div>
       </div>
+
+      {/* Full-screen processing overlay */}
+      {submitting && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl px-10 py-8 flex flex-col items-center gap-4 shadow-xl">
+            <div className="w-12 h-12 border-4 border-[#0DC56A] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-semibold text-gray-700">Adding points…</p>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

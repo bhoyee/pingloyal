@@ -25,6 +25,7 @@ jest.mock('recharts', () => {
     BarChart: MockChart, Bar: () => null, AreaChart: MockChart, Area: () => null,
     PieChart: MockChart, Pie: () => null, Cell: () => null,
     XAxis: () => null, YAxis: () => null, Tooltip: () => null,
+    CartesianGrid: () => null, Label: () => null,
     Legend: () => null, ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   };
 });
@@ -52,19 +53,24 @@ function makeReport() {
   return {
     period: { type: 'this_month', start: '2026-05-01', end: '2026-05-31' },
     generatedAt: new Date().toISOString(),
+    timezone: 'Africa/Lagos',
     loyalty: {
       totalCustomers: 120,
       activeCustomers: 85,
+      inactiveCustomers: 35,
       retentionRate: 42,
       newCustomersThisMonth: 12,
+      avgVisitsPerCustomer: 2.3,
       weeklyNewCustomers: [{ week: '2026-05-01', count: 5 }, { week: '2026-05-08', count: 7 }],
-      vsLastPeriod: { totalCustomers: 108, activeRate: 70 },
+      vsLastPeriod: { totalCustomers: 108, activeRate: 70, avgVisitsPerCustomer: 2.1 },
     },
     points: {
       issued: 15000,
       redeemed: 1200,
       redemptionRate: 8,
       nearRewardCount: 9,
+      avgPointsPerCustomer: 120,
+      issuedVsLastPeriod: 12,
       dailyIssued: [{ date: '2026-05-01', amount: 500 }],
     },
     whatsapp: {
@@ -81,12 +87,15 @@ function makeReport() {
       spendByType: { debit_birthday: 6500, debit_campaign: 2000 },
       costPerReach: 123,
       estimatedRoi: 4.2,
+      estimatedRevenue: 400000,
+      lapsedCustomerCount: 15,
+      avgTransactionValue: 25000,
     },
     content: {
-      bestCampaign: { id: 'c1', name: 'May Flash Sale', deliveryRate: 97.5 },
+      bestCampaign: { id: 'c1', name: 'May Flash Sale', deliveryRate: 97.5, sentCount: 80, sentAt: '2026-05-10T09:00:00.000Z' },
       busiestDayOfWeek: [{ day: 'Monday', count: 45 }, { day: 'Friday', count: 62 }],
       topCustomers: [
-        { id: 'u1', fullName: 'Amara Okafor', totalSpend: 180000, pointsBalance: 850, tierLabel: 'VIP' },
+        { id: 'u1', fullName: 'Amara Okafor', totalSpend: 180000, pointsBalance: 850, tierLabel: 'VIP', visitCount: 12 },
       ],
       categoryBreakdown: [{ name: 'Groceries', percentage: 65 }, { name: 'Beverages', percentage: 35 }],
     },
@@ -149,7 +158,7 @@ it('T4 — refresh button calls POST /reports/refresh', async () => {
   mockApi.post.mockResolvedValue(makeReport());
 
   render(<ReportsPage />, { wrapper });
-  await waitFor(() => screen.getByTestId('refresh-btn'));
+  await waitFor(() => expect(screen.getByTestId('refresh-btn')).not.toBeDisabled());
 
   fireEvent.click(screen.getByTestId('refresh-btn'));
   await waitFor(() =>
@@ -178,7 +187,7 @@ it('T5 — loyalty stat cards show correct values', async () => {
   const cards = screen.getAllByTestId('stat-card');
   const texts = cards.map((c) => c.textContent ?? '');
   expect(texts.some((t) => t.includes('120'))).toBe(true); // totalCustomers
-  expect(texts.some((t) => t.includes('85'))).toBe(true);  // activeCustomers
+  expect(texts.some((t) => t.includes('71'))).toBe(true);  // active rate: Math.round(85/120*100)
   expect(texts.some((t) => t.includes('42%'))).toBe(true); // retentionRate
 });
 
@@ -214,7 +223,7 @@ it('T7 — PDF download button triggers fetch to reports/pdf', async () => {
   });
 
   render(<ReportsPage />, { wrapper });
-  await waitFor(() => screen.getByTestId('pdf-download-btn'));
+  await waitFor(() => expect(screen.getByTestId('pdf-download-btn')).not.toBeDisabled());
 
   fireEvent.click(screen.getByTestId('pdf-download-btn'));
 

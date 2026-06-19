@@ -20,7 +20,7 @@ import {
   TransactionsService,
   type ListTransactionsQuery,
 } from './transactions.service';
-import type { CreateTransactionDto } from './dto/create-transaction.dto';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @Controller()
 export class TransactionsController {

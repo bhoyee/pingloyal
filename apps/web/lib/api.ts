@@ -357,7 +357,11 @@ async function cashierRequest<T>(
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const msg =
-      typeof body.message === 'string' ? body.message : `HTTP ${res.status}`;
+      typeof body.message === 'string'
+        ? body.message
+        : Array.isArray(body.message)
+          ? (body.message as string[]).join('; ')
+          : `HTTP ${res.status}`;
     throw new ApiError(msg, res.status);
   }
 

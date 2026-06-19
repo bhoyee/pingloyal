@@ -221,7 +221,7 @@ function StatCard({
   value, label, sub, accent, labelFirst, subAccent,
 }: { value: string | number; label: string; sub?: string; accent?: string; labelFirst?: boolean; subAccent?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div data-testid="stat-card" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       {labelFirst
         ? <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         : null}
@@ -234,7 +234,7 @@ function StatCard({
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div data-testid="skeleton-card" className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 h-7 w-20 rounded bg-slate-200" />
       <div className="h-4 w-32 rounded bg-slate-100" />
     </div>
@@ -402,6 +402,7 @@ export default function ReportsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <select
+              data-testid="period-select"
               value={period}
               onChange={(e) => setPeriod(e.target.value as PeriodType)}
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20"
@@ -424,6 +425,7 @@ export default function ReportsPage() {
             )}
 
             <button
+              data-testid="refresh-btn"
               onClick={() => void handleRefresh()}
               disabled={refreshing || isLoading}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
@@ -480,7 +482,7 @@ export default function ReportsPage() {
         )}
 
         {/* ── SECTION 1: Loyalty ── */}
-        <section>
+        <section data-testid="loyalty-section">
           <div className="mb-4">
             <SectionHeading icon={Users} label="Loyalty Programme Performance" />
           </div>
@@ -618,7 +620,7 @@ export default function ReportsPage() {
         </section>
 
         {/* ── SECTION 2: Points ── */}
-        <section>
+        <section data-testid="points-section">
           <div className="mb-4">
             <SectionHeading icon={TrendingUp} label="Points & Rewards" />
           </div>
@@ -704,7 +706,7 @@ export default function ReportsPage() {
         </section>
 
         {/* ── SECTION 3: WhatsApp ── */}
-        <section>
+        <section data-testid="whatsapp-section">
           <div className="mb-4">
             <SectionHeading icon={MessageSquare} label="WhatsApp Message Performance" />
           </div>
@@ -761,7 +763,7 @@ export default function ReportsPage() {
                 </div>
               ) : report && Object.keys(report.whatsapp.triggerBreakdown).length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm">
+                  <table data-testid="trigger-table" className="w-full min-w-[640px] text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                         <th className="px-5 py-3">Trigger</th>
@@ -825,7 +827,7 @@ export default function ReportsPage() {
         </section>
 
         {/* ── SECTION 4: Wallet ── */}
-        <section>
+        <section data-testid="wallet-section">
           <div className="mb-4">
             <SectionHeading icon={Wallet} label="Marketing Wallet & Spend Summary" />
           </div>
@@ -955,7 +957,7 @@ export default function ReportsPage() {
         </section>
 
         {/* ── SECTION 5: Insights ── */}
-        <section>
+        <section data-testid="content-section">
           <div className="mb-4">
             <SectionHeading icon={TrendingUp} label="Top Content & Insights" />
           </div>
@@ -1114,7 +1116,7 @@ export default function ReportsPage() {
         </section>
 
         {/* ── SECTION 6: Export ── */}
-        <section>
+        <section data-testid="export-section">
           <div className="mb-4">
             <SectionHeading icon={Download} label="Export & Share" />
           </div>
@@ -1135,6 +1137,7 @@ export default function ReportsPage() {
               <p className="font-semibold text-slate-800">PDF Report</p>
               <p className="mt-1 text-xs text-slate-400">Full loyalty summary formatted for sharing or printing</p>
               <button
+                data-testid="pdf-download-btn"
                 onClick={() => void downloadFile('reports/pdf', `pingloyal-report-${period}.pdf`, setDlPdf)}
                 disabled={dlPdf || isLoading}
                 className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0F1E35] py-2.5 text-sm font-medium text-white hover:bg-[#1a3050] disabled:opacity-50 transition-colors"
@@ -1179,6 +1182,7 @@ export default function ReportsPage() {
                     Sending to <span className="font-semibold text-slate-700">{schedule.email}</span> monthly
                   </p>
                   <button
+                    data-testid="cancel-schedule-btn"
                     onClick={() => void handleCancelSchedule()}
                     className="mt-3 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
                   >

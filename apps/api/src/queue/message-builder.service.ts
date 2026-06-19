@@ -25,7 +25,10 @@ function substituteVars(
     pointsBalance: (customer?.pointsBalance ?? 0).toString(),
     ...data,
   };
-  return body.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? `{{${key}}}`);
+  return body.replace(
+    /\{\{(\w+)\}\}/g,
+    (_, key: string) => vars[key] ?? `{{${key}}}`,
+  );
 }
 
 @Injectable()

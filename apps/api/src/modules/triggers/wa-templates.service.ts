@@ -101,7 +101,7 @@ export class WaTemplatesService {
     const customMap = new Map(customs.map((c) => [c.triggerType, c]));
 
     return TEMPLATABLE_TRIGGER_TYPES.map((type) => {
-      const defaults = TEMPLATE_DEFAULTS[type]!;
+      const defaults = TEMPLATE_DEFAULTS[type];
       const custom = customMap.get(type) ?? null;
       return {
         triggerType: type,
@@ -128,7 +128,9 @@ export class WaTemplatesService {
     triggerType: string,
     body: string,
   ): Promise<TemplateEntry> {
-    if (!(TEMPLATABLE_TRIGGER_TYPES as readonly string[]).includes(triggerType)) {
+    if (
+      !(TEMPLATABLE_TRIGGER_TYPES as readonly string[]).includes(triggerType)
+    ) {
       throw new BadRequestException(
         `Unknown or non-editable trigger type: ${triggerType}`,
       );
@@ -141,12 +143,10 @@ export class WaTemplatesService {
     if (existing) {
       await this.repo.update(existing.id, { body });
     } else {
-      await this.repo.save(
-        this.repo.create({ tenantId, triggerType, body }),
-      );
+      await this.repo.save(this.repo.create({ tenantId, triggerType, body }));
     }
 
-    const defaults = TEMPLATE_DEFAULTS[triggerType]!;
+    const defaults = TEMPLATE_DEFAULTS[triggerType];
     return {
       triggerType,
       label: defaults.label,
@@ -160,13 +160,15 @@ export class WaTemplatesService {
   }
 
   async reset(tenantId: string, triggerType: string): Promise<TemplateEntry> {
-    if (!(TEMPLATABLE_TRIGGER_TYPES as readonly string[]).includes(triggerType)) {
+    if (
+      !(TEMPLATABLE_TRIGGER_TYPES as readonly string[]).includes(triggerType)
+    ) {
       throw new NotFoundException(`Unknown trigger type: ${triggerType}`);
     }
 
     await this.repo.delete({ tenantId, triggerType });
 
-    const defaults = TEMPLATE_DEFAULTS[triggerType]!;
+    const defaults = TEMPLATE_DEFAULTS[triggerType];
     return {
       triggerType,
       label: defaults.label,

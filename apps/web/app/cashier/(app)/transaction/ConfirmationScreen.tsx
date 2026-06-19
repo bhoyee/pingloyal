@@ -12,9 +12,13 @@ export interface ConfirmationData {
   threshold: number;
   tier: string | null;
   waVerificationStatus: string;
+  amount: string;
+  categoryName: string | null;
+  currency: string;
+  queued: boolean;
 }
 
-const DISMISS_MS = 3000;
+const DISMISS_SECS = 8;
 
 export default function ConfirmationScreen({
   data,
@@ -22,8 +26,11 @@ export default function ConfirmationScreen({
   data: ConfirmationData;
 }) {
   const router = useRouter();
-  const [progress, setProgress] = useState(100);
+  const [secsLeft, setSecsLeft] = useState(DISMISS_SECS);
   const dismissed = useRef(false);
+
+  const symbol = data.currency === 'GBP' ? '£' : '₦';
+  const queued = data.queued;
 
   function dismiss() {
     if (dismissed.current) return;
@@ -33,95 +40,114 @@ export default function ConfirmationScreen({
     router.replace('/cashier');
   }
 
-  // Auto-dismiss after DISMISS_MS
+  // Countdown ticker — pure decrement only, no side effects in updater
   useEffect(() => {
-    const timer = setTimeout(() => dismiss(), DISMISS_MS);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Progress bar depleting from 100→0
-  useEffect(() => {
-    const start = Date.now();
     const id = setInterval(() => {
-      const elapsed = Date.now() - start;
-      const remaining = Math.max(0, (1 - elapsed / DISMISS_MS) * 100);
-      setProgress(remaining);
-      if (remaining === 0) clearInterval(id);
-    }, 50);
+      setSecsLeft((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
+  // Navigate when countdown hits zero
+  useEffect(() => {
+    if (secsLeft === 0) dismiss();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secsLeft]);
+
+  const subtitle = [
+    data.customerName,
+    data.categoryName,
+    data.amount ? `${symbol}${parseFloat(data.amount).toLocaleString()}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const bgClass = queued
+    ? 'bg-gradient-to-b from-[#4a3800] to-[#2a2000]'
+    : 'bg-gradient-to-b from-[#1a5c28] to-[#0a3318]';
+
   return (
-    <div
-      onClick={() => dismiss()}
-      className="min-h-screen bg-gradient-to-b from-green-500 to-green-700 flex flex-col items-center justify-center px-6 text-white cursor-pointer select-none"
-      aria-label="Confirmation screen — tap to dismiss"
-    >
-      {/* Animated checkmark */}
+    <div className={`min-h-screen ${bgClass} flex flex-col items-center justify-center px-5 py-8 text-white select-none`}>
+
+      {/* Icon */}
       <div
-        className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6"
+        className="w-24 h-24 rounded-full bg-white/10 flex items-center justify-center mb-5"
         style={{ animation: 'pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275) both' }}
       >
-        <svg
-          viewBox="0 0 52 52"
-          className="w-12 h-12 stroke-white"
-          fill="none"
-          strokeWidth={4}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 27l9 9 16-18" />
-        </svg>
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${queued ? 'bg-amber-500' : 'bg-[#0DC56A]'}`}>
+          {queued ? (
+            <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="white" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v10l4 2" /><circle cx="12" cy="12" r="10" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 52 52" className="w-8 h-8" fill="none" stroke="white" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 27l10 10 18-20" />
+            </svg>
+          )}
+        </div>
       </div>
 
-      <h1 className="text-2xl font-bold mb-1">Points Added!</h1>
-      <p className="text-white/80 text-sm mb-8">{data.customerName}</p>
-
-      {/* Points earned */}
-      <p
-        className="font-bold text-white leading-none mb-2"
-        style={{ fontSize: 64 }}
-      >
-        +{data.pointsEarned.toLocaleString()} pts
+      <p className="text-lg font-semibold text-white/90 mb-1">
+        {queued ? 'Transaction Queued' : 'Points Added!'}
       </p>
 
-      {/* New balance */}
-      <p className="text-white/80 text-lg mb-8">
-        {data.newBalance.toLocaleString()} pts total
+      {/* Points number */}
+      <p className={`font-black leading-none mb-2 ${queued ? 'text-amber-400' : 'text-[#0DC56A]'}`} style={{ fontSize: 72 }}>
+        +{data.pointsEarned.toLocaleString()}
       </p>
 
-      {/* Progress bar */}
-      <div className="w-full max-w-xs mb-2">
-        <div className="flex justify-between text-xs text-white/70 mb-1">
-          <span>{data.newBalance.toLocaleString()} pts</span>
-          <span>{data.threshold.toLocaleString()} pts</span>
+      {/* Customer · Category · Amount */}
+      <p className="text-sm text-white/60 mb-6 text-center">{subtitle}</p>
+
+      {/* Balance card */}
+      <div className="w-full max-w-xs bg-black/20 rounded-2xl px-5 py-4 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-white/70">{queued ? 'Est. new balance:' : 'New balance:'}</span>
+          <span className="text-base font-bold text-white">
+            {data.newBalance.toLocaleString()} pts
+          </span>
         </div>
-        <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-white/10 rounded-full overflow-hidden mb-2">
           <div
-            className="h-full bg-white rounded-full"
+            className={`h-full rounded-full transition-all ${queued ? 'bg-amber-400' : 'bg-[#0DC56A]'}`}
             style={{ width: `${data.progressPercent}%` }}
           />
         </div>
-        <p className="text-xs text-white/70 text-center mt-1">
-          {data.progressPercent}% to next reward
+        <p className="text-xs text-white/50 text-center">
+          {data.progressPercent}% to {symbol}{data.threshold.toLocaleString()} reward
         </p>
       </div>
 
-      {/* WhatsApp status — only when verified */}
-      {data.waVerificationStatus === 'verified' && (
-        <p className="text-sm text-white/90 mt-4">
-          💬 WhatsApp message queued ✓
-        </p>
-      )}
+      {/* Offline notice or WhatsApp nudge */}
+      {queued ? (
+        <div className="w-full max-w-xs bg-black/20 rounded-2xl px-5 py-3 mb-6 flex items-center gap-2">
+          <span className="text-base">📵</span>
+          <span className="text-sm text-amber-300 font-medium">
+            Saved offline — points will sync when signal returns
+          </span>
+        </div>
+      ) : data.waVerificationStatus === 'verified' ? (
+        <div className="w-full max-w-xs bg-black/20 rounded-2xl px-5 py-3 mb-6 flex items-center gap-2">
+          <span className="text-base">💬</span>
+          <span className="text-sm text-[#0DC56A] font-medium">
+            WhatsApp nudge sent automatically ✓
+          </span>
+        </div>
+      ) : <div className="mb-6" />}
 
-      {/* Auto-dismiss progress bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-1 bg-white/20">
-        <div
-          className="h-full bg-white/60 transition-none"
-          style={{ width: `${progress}%` }}
-        />
-      </div>
+      {/* Countdown */}
+      <p className="text-xs text-white/40 mb-5">
+        Auto-returning in {secsLeft} second{secsLeft !== 1 ? 's' : ''}…
+      </p>
+
+      {/* Button */}
+      <button
+        type="button"
+        onClick={() => dismiss()}
+        className="w-full max-w-xs bg-white/10 hover:bg-white/20 active:bg-white/30 border border-white/30 text-white font-bold text-base py-3.5 rounded-2xl transition-colors"
+      >
+        New Customer
+      </button>
 
       <style>{`
         @keyframes pop-in {

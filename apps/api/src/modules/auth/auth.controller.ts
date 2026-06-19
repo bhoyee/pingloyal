@@ -47,10 +47,10 @@ export class AuthController {
 
   @Public()
   @UseGuards(LoginThrottleGuard)
-  @Throttle({ login: { ttl: 15 * 60 * 1000, limit: 5 } })
+  @Throttle({ login: { ttl: 15 * 60 * 1000, limit: 15 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Login — 5 attempts per 15 min per IP' })
+  @ApiOperation({ summary: 'Login — 15 attempts per 15 min per IP' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }

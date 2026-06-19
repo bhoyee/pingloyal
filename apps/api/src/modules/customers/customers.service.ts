@@ -219,6 +219,37 @@ export class CustomersService {
     });
   }
 
+  async forCashierSync(
+    tenantId: string,
+  ): Promise<CustomerLookupResult[]> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const threshold = tenant?.pointsThreshold ?? 1000;
+
+    const customers = await this.customerRepo.find({
+      where: { tenantId, isActive: true },
+      relations: ['tier'],
+      select: [
+        'id', 'fullName', 'phoneE164', 'pointsBalance',
+        'tierId', 'lastPurchaseAt', 'purchaseCount',
+      ],
+    });
+
+    return customers.map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+      phoneE164: c.phoneE164,
+      pointsBalance: c.pointsBalance,
+      tierId: c.tierId,
+      tier: c.tier?.tierLabel ?? null,
+      lastPurchaseAt: c.lastPurchaseAt?.toISOString() ?? null,
+      purchaseCount: c.purchaseCount,
+      progressPercent: Math.min(
+        100,
+        Math.round((c.pointsBalance / threshold) * 100),
+      ),
+    }));
+  }
+
   async lookup(
     tenantId: string,
     rawPhone: string,

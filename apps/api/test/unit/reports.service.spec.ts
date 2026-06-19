@@ -50,7 +50,11 @@ function makeSnapshot(computedAt: Date = new Date()) {
         retentionRate: 60,
         avgVisitsPerCustomer: 2.3,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 45, activeRate: 70, avgVisitsPerCustomer: 2.1 },
+        vsLastPeriod: {
+          totalCustomers: 45,
+          activeRate: 70,
+          avgVisitsPerCustomer: 2.1,
+        },
       },
       points: {
         issued: 12000,
@@ -189,7 +193,11 @@ describe('ReportsService', () => {
         retentionRate: 40,
         avgVisitsPerCustomer: 2,
         weeklyNewCustomers: [],
-        vsLastPeriod: { totalCustomers: 40, activeRate: 75, avgVisitsPerCustomer: 2.0 },
+        vsLastPeriod: {
+          totalCustomers: 40,
+          activeRate: 75,
+          avgVisitsPerCustomer: 2.0,
+        },
       });
     const pointsSpy = jest
       .spyOn(service, 'computePointsSection')
@@ -250,7 +258,11 @@ describe('ReportsService', () => {
       retentionRate: 50,
       avgVisitsPerCustomer: 1.5,
       weeklyNewCustomers: [],
-      vsLastPeriod: { totalCustomers: 9, activeRate: 80, avgVisitsPerCustomer: 1.5 },
+      vsLastPeriod: {
+        totalCustomers: 9,
+        activeRate: 80,
+        avgVisitsPerCustomer: 1.5,
+      },
     });
     jest.spyOn(service, 'computePointsSection').mockResolvedValueOnce({
       issued: 100,

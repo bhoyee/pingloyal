@@ -655,10 +655,15 @@ export class AuthService {
       'base64',
     ).toString('utf8');
 
+    const accessTokenTtl =
+      user.role === UserRole.CASHIER
+        ? this.configService.get<string>('JWT_CASHIER_EXPIRES_IN', '24h')
+        : this.configService.get<string>('JWT_EXPIRES_IN', '15m');
+
     const accessToken = this.jwtService.sign(accessPayload, {
       algorithm: 'RS256',
       privateKey,
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+      expiresIn: accessTokenTtl,
     } as Parameters<typeof this.jwtService.sign>[1]);
 
     const refreshToken = this.jwtService.sign(
