@@ -6,7 +6,9 @@ import { MailerService } from '../../src/common/mailer/mailer.service';
 
 const TENANT_ID = 'tenant-1';
 
-function makeRequest(overrides: Partial<TemplateRequest> = {}): TemplateRequest {
+function makeRequest(
+  overrides: Partial<TemplateRequest> = {},
+): TemplateRequest {
   return {
     id: 'req-1',
     tenantId: TENANT_ID,
@@ -59,10 +61,15 @@ describe('TemplateRequestsService', () => {
       const req = makeRequest();
       mockRepo.create.mockReturnValue(req);
       mockRepo.save.mockResolvedValue(req);
-      mockMailer.sendTemplateRequestNotification.mockRejectedValueOnce(new Error('email down'));
+      mockMailer.sendTemplateRequestNotification.mockRejectedValueOnce(
+        new Error('email down'),
+      );
       const svc = await buildService();
       await expect(
-        svc.create(TENANT_ID, 'My Store', { name: 'Birthday Promo', useCase: 'test' }),
+        svc.create(TENANT_ID, 'My Store', {
+          name: 'Birthday Promo',
+          useCase: 'test',
+        }),
       ).resolves.toEqual(req);
     });
   });

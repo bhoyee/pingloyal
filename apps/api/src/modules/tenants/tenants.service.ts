@@ -385,7 +385,9 @@ export class TenantsService {
     };
   }
 
-  async getPublicInfo(slug: string): Promise<{ businessName: string; logoUrl: string | null }> {
+  async getPublicInfo(
+    slug: string,
+  ): Promise<{ businessName: string; logoUrl: string | null }> {
     const tenant = await this.tenantRepo.findOne({ where: { slug } });
     if (!tenant) throw new NotFoundException('Store not found');
     return { businessName: tenant.businessName, logoUrl: tenant.logoUrl };

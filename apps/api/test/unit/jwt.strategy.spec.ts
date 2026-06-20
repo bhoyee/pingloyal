@@ -1,11 +1,14 @@
-import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtStrategy } from '../../src/modules/auth/strategies/jwt.strategy';
 import { UserRole, PlanTier } from '@pingloyal/types';
 import type { JwtPayload } from '@pingloyal/types';
 
-const DUMMY_PUBLIC_KEY_B64 = Buffer.from('dummy-key-for-test').toString(
-  'base64',
-);
+const DUMMY_PUBLIC_KEY_B64 =
+  Buffer.from('dummy-key-for-test').toString('base64');
 
 function makeConfig() {
   return { getOrThrow: jest.fn().mockReturnValue(DUMMY_PUBLIC_KEY_B64) };
@@ -26,10 +29,7 @@ describe('JwtStrategy.validate', () => {
 
   beforeEach(() => {
     mockUserRepo = { findOne: jest.fn() };
-    strategy = new JwtStrategy(
-      makeConfig() as never,
-      mockUserRepo as never,
-    );
+    strategy = new JwtStrategy(makeConfig() as never, mockUserRepo as never);
   });
 
   it('T1 — active user, tenant not pending deletion: returns RequestUser', async () => {

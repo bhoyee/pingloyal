@@ -10,6 +10,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { Observable } from 'rxjs';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
+const HTTP_STATUS_GONE: number = HttpStatus.GONE;
+
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   constructor(private reflector: Reflector) {
@@ -34,7 +36,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // Account-deletion signal from JwtStrategy.validate() — must surface as
     // 410 Gone (not a generic 401) so the frontend redirects to the landing
     // page instead of bouncing back to a login screen for a deleted account.
-    if (err instanceof HttpException && err.getStatus() === HttpStatus.GONE) {
+    if (err instanceof HttpException && err.getStatus() === HTTP_STATUS_GONE) {
       throw err;
     }
     if (err || !user) {

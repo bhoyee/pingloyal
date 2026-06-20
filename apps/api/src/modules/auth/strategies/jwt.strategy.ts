@@ -58,10 +58,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Deletion was requested — every active session must be force-logged-out
     // immediately, not just blocked on next login.
     if (user.tenant.deletionRequestedAt) {
-      throw new HttpException(
-        'This account has been deleted',
-        HttpStatus.GONE,
-      );
+      throw new HttpException('This account has been deleted', HttpStatus.GONE);
     }
 
     return {

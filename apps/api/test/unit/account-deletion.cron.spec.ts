@@ -2,23 +2,27 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { AccountDeletionCronService } from '../../src/modules/tenants/account-deletion.cron';
 
+type TenantDue = { id: string; business_name: string };
+
 describe('AccountDeletionCronService', () => {
   let service: AccountDeletionCronService;
-  let mockQuery: jest.Mock;
+  let mockQuery: jest.Mock<Promise<TenantDue[]>, [string]>;
   let mockTransaction: jest.Mock;
-  let mockManagerQuery: jest.Mock;
+  let mockManagerQuery: jest.Mock<Promise<void>, [string, string[]]>;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    mockManagerQuery = jest.fn().mockResolvedValue(undefined);
+    mockManagerQuery = jest
+      .fn<Promise<void>, [string, string[]]>()
+      .mockResolvedValue(undefined);
     mockTransaction = jest
       .fn()
       .mockImplementation(
         async (cb: (manager: { query: jest.Mock }) => Promise<void>) =>
           cb({ query: mockManagerQuery }),
       );
-    mockQuery = jest.fn().mockResolvedValue([]);
+    mockQuery = jest.fn<Promise<TenantDue[]>, [string]>().mockResolvedValue([]);
 
     const mockDataSource = {
       query: mockQuery,
@@ -51,7 +55,7 @@ describe('AccountDeletionCronService', () => {
     await service.purgeScheduledDeletions();
 
     expect(mockTransaction).toHaveBeenCalledTimes(1);
-    const calls = mockManagerQuery.mock.calls.map((c) => c[0] as string);
+    const calls = mockManagerQuery.mock.calls.map((c) => c[0]);
     expect(calls[0]).toContain('points_ledger');
     expect(calls[1]).toContain('transactions');
     expect(calls[2]).toContain('campaign_logs');
@@ -92,7 +96,7 @@ describe('AccountDeletionCronService', () => {
   it('T5 — query filters on deletion_requested_at and deletion_scheduled_at', async () => {
     await service.purgeScheduledDeletions();
 
-    const sql = mockQuery.mock.calls[0]![0] as string;
+    const sql = mockQuery.mock.calls[0][0];
     expect(sql).toContain('deletion_requested_at IS NOT NULL');
     expect(sql).toContain('deletion_scheduled_at <= NOW()');
   });

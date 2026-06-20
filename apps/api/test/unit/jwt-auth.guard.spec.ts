@@ -1,4 +1,8 @@
-import { HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../src/common/guards/jwt-auth.guard';
 
 describe('JwtAuthGuard.handleRequest', () => {
@@ -14,9 +18,7 @@ describe('JwtAuthGuard.handleRequest', () => {
       HttpStatus.GONE,
     );
 
-    expect(() => guard.handleRequest(deletedErr, false)).toThrow(
-      HttpException,
-    );
+    expect(() => guard.handleRequest(deletedErr, false)).toThrow(HttpException);
     try {
       guard.handleRequest(deletedErr, false);
     } catch (e) {
