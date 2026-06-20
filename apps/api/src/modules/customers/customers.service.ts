@@ -219,9 +219,7 @@ export class CustomersService {
     });
   }
 
-  async forCashierSync(
-    tenantId: string,
-  ): Promise<CustomerLookupResult[]> {
+  async forCashierSync(tenantId: string): Promise<CustomerLookupResult[]> {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     const threshold = tenant?.pointsThreshold ?? 1000;
 
@@ -229,8 +227,13 @@ export class CustomersService {
       where: { tenantId, isActive: true },
       relations: ['tier'],
       select: [
-        'id', 'fullName', 'phoneE164', 'pointsBalance',
-        'tierId', 'lastPurchaseAt', 'purchaseCount',
+        'id',
+        'fullName',
+        'phoneE164',
+        'pointsBalance',
+        'tierId',
+        'lastPurchaseAt',
+        'purchaseCount',
       ],
     });
 

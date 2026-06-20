@@ -102,7 +102,11 @@ async function main() {
         planTier: PlanTier.GROWTH,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
         trialEndsAt: trialEnd,
-        waVerificationStatus: WaVerificationStatus.VERIFIED,
+        // BSP/Gupshup integration is intentionally skipped for this demo
+        // tenant — no waPhoneNumber/gupshupAppId is set, so this must stay
+        // PENDING (not VERIFIED) or the Settings page shows "Connected"
+        // with no real connection behind it.
+        waVerificationStatus: WaVerificationStatus.PENDING,
         marketingWalletBalance: 25000,
         pointsEarnRate: 1,
         pointsThreshold: 1000,

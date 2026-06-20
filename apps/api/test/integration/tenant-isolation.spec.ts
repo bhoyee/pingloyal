@@ -100,7 +100,7 @@ describe('Tenant Isolation', () => {
 
   // ─── GROUP 1: Auth isolation ────────────────────────────────────────────────
   describe('Group 1 — Auth isolation', () => {
-    it('two tenants can register with the same email address', async () => {
+    it('a second tenant cannot register with an email already in use', async () => {
       const sharedEmail = `shared-${Date.now()}@isolation.test`;
 
       const regA = await request(
@@ -122,37 +122,28 @@ describe('Tenant Isolation', () => {
         .send({
           businessName: 'Same Email Store Beta',
           fullName: 'Owner Beta',
-          email: sharedEmail,
+          email: sharedEmail.toUpperCase(),
           password: 'StrongPass123!',
           country: 'NG',
         });
 
       expect(regA.status).toBe(201);
-      expect(regB.status).toBe(201);
+      expect(regB.status).toBe(409);
 
       // Registration now requires email verification before returning
-      // tenant/user details, so look the created records up directly.
+      // tenant/user details, so look the created record up directly.
       type RegisterBody = { requiresVerification: boolean; email: string };
       const bodyA = regA.body as RegisterBody;
-      const bodyB = regB.body as RegisterBody;
       expect(bodyA.requiresVerification).toBe(true);
-      expect(bodyB.requiresVerification).toBe(true);
 
       const userRepo = dataSource.getRepository(User);
       const users = await userRepo.find({ where: { email: sharedEmail } });
-      expect(users).toHaveLength(2);
-      const [userA, userB] = users;
-
-      // Different tenants — different tenant IDs
-      expect(userA.tenantId).not.toBe(userB.tenantId);
-      // Different users — different user IDs
-      expect(userA.id).not.toBe(userB.id);
-      // Both have the same email but different tenant scopes
+      expect(users).toHaveLength(1);
+      const [userA] = users;
       expect(userA.email).toBe(sharedEmail);
-      expect(userB.email).toBe(sharedEmail);
 
       // Track for cleanup
-      createdTenantIds.push(userA.tenantId, userB.tenantId);
+      createdTenantIds.push(userA.tenantId);
     });
 
     it("Tenant B's JWT tenantId is B's tenant — cannot masquerade as Tenant A", () => {

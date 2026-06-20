@@ -93,6 +93,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError('Session expired', 401);
   }
 
+  // 410 Gone — the account was deleted. Force logout, but to the marketing
+  // landing page, not the login screen (there's nothing left to log into).
+  if (res.status === 410) {
+    localStorage.removeItem('access_token');
+    window.location.href = '/';
+    throw new ApiError('This account has been deleted', 410);
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, unknown>;
     const msg = typeof body.message === 'string' ? body.message : `HTTP ${res.status}`;
@@ -319,6 +327,14 @@ function getCashierToken(): string | null {
   return localStorage.getItem('cashier_token');
 }
 
+// Cashier login is store-specific (?t=<slug> shows that store's branding).
+// We persist the slug separately from the token so an expired/missing
+// session still redirects back to the right store, not the bare login page.
+function cashierLoginUrl(): string {
+  const slug = typeof window === 'undefined' ? null : localStorage.getItem('cashier_tenant_slug');
+  return slug ? `/cashier/login?t=${slug}` : '/cashier/login';
+}
+
 async function cashierRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -326,7 +342,7 @@ async function cashierRequest<T>(
   const token = getCashierToken();
 
   if (!token) {
-    window.location.href = '/cashier/login';
+    window.location.href = cashierLoginUrl();
     throw new ApiError('No auth token', 401);
   }
 
@@ -350,8 +366,16 @@ async function cashierRequest<T>(
 
   if (res.status === 401) {
     localStorage.removeItem('cashier_token');
-    window.location.href = '/cashier/login';
+    window.location.href = cashierLoginUrl();
     throw new ApiError('Session expired', 401);
+  }
+
+  // 410 Gone — the store's account was deleted. Force logout to the
+  // marketing landing page, not the store's login screen.
+  if (res.status === 410) {
+    localStorage.removeItem('cashier_token');
+    window.location.href = '/';
+    throw new ApiError('This account has been deleted', 410);
   }
 
   if (!res.ok) {

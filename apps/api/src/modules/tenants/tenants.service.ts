@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -18,8 +19,9 @@ interface UploadedFile {
   size: number;
   buffer: Buffer;
 }
-import { WaVerificationStatus } from '@pingloyal/types';
+import { UserRole, WaVerificationStatus } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
+import { MailerService } from '../../common/mailer/mailer.service';
 import { R2Service } from '../storage/r2.service';
 import { User } from '../auth/entities/user.entity';
 import { Tenant } from './entities/tenant.entity';
@@ -28,6 +30,7 @@ import { TierConfig } from './entities/tier-config.entity';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpsertTierConfigDto } from './dto/upsert-tier-config.dto';
+import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
 import { validateTiers } from './utils/validate-tiers.util';
 import { TierService } from './tier.service';
 
@@ -45,6 +48,7 @@ export class TenantsService {
     private readonly r2: R2Service,
     private readonly config: ConfigService,
     private readonly tierService: TierService,
+    private readonly mailer: MailerService,
   ) {}
 
   // ── Cache helpers ──────────────────────────────────────────────────────────
@@ -381,10 +385,84 @@ export class TenantsService {
     };
   }
 
-  async getPublicInfo(slug: string): Promise<{ businessName: string; logoUrl: string | null }> {
+  async getPublicInfo(
+    slug: string,
+  ): Promise<{ businessName: string; logoUrl: string | null }> {
     const tenant = await this.tenantRepo.findOne({ where: { slug } });
     if (!tenant) throw new NotFoundException('Store not found');
     return { businessName: tenant.businessName, logoUrl: tenant.logoUrl };
+  }
+
+  // ── Account deletion ─────────────────────────────────────────────────────────
+
+  async requestDeletion(
+    tenantId: string,
+    dto: RequestAccountDeletionDto,
+  ): Promise<{ scheduledAt: Date }> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    if (dto.confirmBusinessName.trim() !== tenant.businessName) {
+      throw new BadRequestException(
+        "Business name doesn't match — please type it exactly as shown.",
+      );
+    }
+
+    const owner = await this.userRepo.findOne({
+      where: { tenantId, role: UserRole.OWNER },
+    });
+    if (!owner) throw new NotFoundException('Owner account not found');
+
+    const requestedAt = new Date();
+    const scheduledAt = new Date(requestedAt.getTime() + 24 * 60 * 60 * 1000);
+    const cancelToken = crypto.randomBytes(32).toString('hex');
+
+    await this.tenantRepo.update(tenantId, {
+      deletionRequestedAt: requestedAt,
+      deletionScheduledAt: scheduledAt,
+      deletionCancelToken: cancelToken,
+    });
+
+    const cancelUrl = `${this.config.getOrThrow<string>('FRONTEND_URL')}/account-deletion/cancel?token=${cancelToken}`;
+
+    await Promise.all([
+      this.mailer.sendAccountDeletionRequested({
+        to: owner.email,
+        businessName: tenant.businessName,
+        scheduledAt,
+        cancelUrl,
+      }),
+      this.mailer.sendAccountDeletionSupportNotice({
+        businessName: tenant.businessName,
+        tenantId: tenant.id,
+        ownerEmail: owner.email,
+        scheduledAt,
+      }),
+    ]);
+
+    return { scheduledAt };
+  }
+
+  async cancelDeletion(token: string): Promise<{ businessName: string }> {
+    const tenant = await this.tenantRepo.findOne({
+      where: { deletionCancelToken: token },
+    });
+
+    if (
+      !tenant ||
+      !tenant.deletionScheduledAt ||
+      tenant.deletionScheduledAt <= new Date()
+    ) {
+      throw new BadRequestException('Invalid or expired cancellation link');
+    }
+
+    await this.tenantRepo.update(tenant.id, {
+      deletionRequestedAt: null,
+      deletionScheduledAt: null,
+      deletionCancelToken: null,
+    });
+
+    return { businessName: tenant.businessName };
   }
 }
 

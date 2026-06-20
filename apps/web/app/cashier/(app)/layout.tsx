@@ -28,7 +28,7 @@ function CashierGuard({ children }: { children: React.ReactNode }) {
     if (!token || isTokenExpired(token)) {
       localStorage.removeItem('cashier_token');
       const params = new URLSearchParams(window.location.search);
-      const slug = params.get('t');
+      const slug = params.get('t') ?? localStorage.getItem('cashier_tenant_slug');
       const loginUrl = slug ? `/cashier/login?t=${slug}` : '/cashier/login';
       router.replace(loginUrl);
     }

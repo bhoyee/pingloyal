@@ -5,7 +5,12 @@
 //   openssl rsa -in private.pem -pubout -out public.pem
 //   base64 -w 0 private.pem   → JWT_PRIVATE_KEY
 //   base64 -w 0 public.pem    → JWT_PUBLIC_KEY
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { PassportStrategy } from '@nestjs/passport';
@@ -36,11 +41,24 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload): Promise<RequestUser> {
     const user = await this.userRepo.findOne({
       where: { id: payload.sub, tenantId: payload.tenantId },
-      select: ['id', 'tenantId', 'role', 'isActive'],
+      select: {
+        id: true,
+        tenantId: true,
+        role: true,
+        isActive: true,
+        tenant: { id: true, deletionRequestedAt: true },
+      },
+      relations: { tenant: true },
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    // Deletion was requested — every active session must be force-logged-out
+    // immediately, not just blocked on next login.
+    if (user.tenant.deletionRequestedAt) {
+      throw new HttpException('This account has been deleted', HttpStatus.GONE);
     }
 
     return {

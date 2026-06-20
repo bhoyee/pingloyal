@@ -2,7 +2,10 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -12,7 +15,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import Redis from 'ioredis';
 import {
   PlanTier,
@@ -52,6 +60,7 @@ const DEFAULT_CATEGORIES = [
 const BCRYPT_ROUNDS = 12;
 const VERIFICATION_EXPIRY_HOURS = 24;
 const PASSWORD_RESET_EXPIRY_HOURS = 1;
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 export interface AuthTokens {
   accessToken: string;
@@ -102,82 +111,99 @@ export class AuthService {
   // ── Registration ──────────────────────────────────────────────────────────
 
   async register(dto: RegisterDto): Promise<RegisterResponse> {
+    const email = this.normalizeEmail(dto.email);
     const isNG = dto.country === Country.NG;
     const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    const { savedUser, savedTenant } = await this.dataSource.transaction(
-      async (manager) => {
-        // Step 1 — Tenant
-        const slug = await this.buildUniqueSlug(dto.businessName, manager);
-        const tenant = manager.create(Tenant, {
-          businessName: dto.businessName,
-          slug,
-          currency: isNG ? 'NGN' : 'GBP',
-          timezone: isNG ? 'Africa/Lagos' : 'Europe/London',
-          mode: TenantMode.NATIVE,
-          planTier: PlanTier.STARTER,
-          subscriptionStatus: SubscriptionStatus.TRIALING,
-          trialEndsAt: trialEnd,
-          waVerificationStatus: WaVerificationStatus.PENDING,
-          marketingWalletBalance: 0,
-        });
-        const savedTenant = await manager.save(Tenant, tenant);
+    const existingUser = await this.userRepo.findOne({ where: { email } });
+    if (existingUser) {
+      throw new ConflictException('An account with this email already exists');
+    }
 
-        // Step 2 — User (unverified)
-        const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-        const { code, hashedCode } = this.generateVerificationCode();
-        const expiry = new Date(
-          Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
-        );
+    let savedUser: User;
+    let savedTenant: Tenant;
+    try {
+      ({ savedUser, savedTenant } = await this.dataSource.transaction(
+        async (manager) => {
+          // Step 1 — Tenant
+          const slug = await this.buildUniqueSlug(dto.businessName, manager);
+          const tenant = manager.create(Tenant, {
+            businessName: dto.businessName,
+            slug,
+            currency: isNG ? 'NGN' : 'GBP',
+            timezone: isNG ? 'Africa/Lagos' : 'Europe/London',
+            mode: TenantMode.NATIVE,
+            planTier: PlanTier.STARTER,
+            subscriptionStatus: SubscriptionStatus.TRIALING,
+            trialEndsAt: trialEnd,
+            waVerificationStatus: WaVerificationStatus.PENDING,
+            marketingWalletBalance: 0,
+          });
+          const savedTenant = await manager.save(Tenant, tenant);
 
-        const user = manager.create(User, {
-          tenantId: savedTenant.id,
-          email: dto.email,
-          fullName: dto.fullName,
-          hashedPassword,
-          role: UserRole.OWNER,
-          isActive: true,
-          emailVerifiedAt: null,
-          emailVerificationToken: hashedCode,
-          emailVerificationExpiry: expiry,
-        });
-        const savedUser = await manager.save(User, user);
+          // Step 2 — User (unverified)
+          const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+          const { code, hashedCode } = this.generateVerificationCode();
+          const expiry = new Date(
+            Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
+          );
 
-        // Step 3 — Default product categories
-        const categories = DEFAULT_CATEGORIES.map((cat) =>
-          manager.create(ProductCategory, {
+          const user = manager.create(User, {
             tenantId: savedTenant.id,
-            name: cat.name,
-            slug: cat.slug,
+            email,
+            fullName: dto.fullName,
+            hashedPassword,
+            role: UserRole.OWNER,
             isActive: true,
-          }),
+            emailVerifiedAt: null,
+            emailVerificationToken: hashedCode,
+            emailVerificationExpiry: expiry,
+          });
+          const savedUser = await manager.save(User, user);
+
+          // Step 3 — Default product categories
+          const categories = DEFAULT_CATEGORIES.map((cat) =>
+            manager.create(ProductCategory, {
+              tenantId: savedTenant.id,
+              name: cat.name,
+              slug: cat.slug,
+              isActive: true,
+            }),
+          );
+          await manager.save(ProductCategory, categories);
+
+          // Step 4 — Starter subscription
+          const subscription = manager.create(Subscription, {
+            tenantId: savedTenant.id,
+            planTier: PlanTier.STARTER,
+            billingCycle: 'monthly',
+            currency: savedTenant.currency,
+            amount: isNG ? 8000 : 4900,
+            utilityIncluded: 300,
+            utilityUsedThisPeriod: 0,
+            utilityOverageRate: 20.0,
+            marketingRate: 130.0,
+            status: SubscriptionStatus.TRIALING,
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: trialEnd,
+            cancelAtPeriodEnd: false,
+          });
+          await manager.save(Subscription, subscription);
+
+          // Return the code so we can send email AFTER the transaction commits
+          (savedUser as User & { _plainCode?: string })._plainCode = code;
+
+          return { savedUser, savedTenant };
+        },
+      ));
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new ConflictException(
+          'An account with this email already exists',
         );
-        await manager.save(ProductCategory, categories);
-
-        // Step 4 — Starter subscription
-        const subscription = manager.create(Subscription, {
-          tenantId: savedTenant.id,
-          planTier: PlanTier.STARTER,
-          billingCycle: 'monthly',
-          currency: savedTenant.currency,
-          amount: isNG ? 8000 : 4900,
-          utilityIncluded: 300,
-          utilityUsedThisPeriod: 0,
-          utilityOverageRate: 20.0,
-          marketingRate: 130.0,
-          status: SubscriptionStatus.TRIALING,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: trialEnd,
-          cancelAtPeriodEnd: false,
-        });
-        await manager.save(Subscription, subscription);
-
-        // Return the code so we can send email AFTER the transaction commits
-        (savedUser as User & { _plainCode?: string })._plainCode = code;
-
-        return { savedUser, savedTenant };
-      },
-    );
+      }
+      throw err;
+    }
 
     // Step 5 — Send welcome email (outside transaction so DB row is committed first)
     const plainCode = (savedUser as User & { _plainCode?: string })._plainCode!;
@@ -217,7 +243,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<AuthResponse> {
     const user = await this.userRepo.findOne({
-      where: { email: dto.email },
+      where: { email: this.normalizeEmail(dto.email) },
       relations: ['tenant'],
     });
 
@@ -235,6 +261,10 @@ export class AuthService {
     );
     if (!passwordMatch) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.tenant.deletionRequestedAt) {
+      throw new HttpException('This account has been deleted', HttpStatus.GONE);
     }
 
     if (!user.emailVerifiedAt) {
@@ -268,7 +298,7 @@ export class AuthService {
 
   async verifyEmail(dto: VerifyEmailDto): Promise<AuthResponse> {
     const user = await this.userRepo.findOne({
-      where: { email: dto.email },
+      where: { email: this.normalizeEmail(dto.email) },
       relations: ['tenant'],
     });
 
@@ -330,7 +360,9 @@ export class AuthService {
   async resendVerification(
     dto: ResendVerificationDto,
   ): Promise<{ message: string }> {
-    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+    const user = await this.userRepo.findOne({
+      where: { email: this.normalizeEmail(dto.email) },
+    });
 
     // Return generic response to prevent email enumeration
     if (!user || user.emailVerifiedAt) {
@@ -379,7 +411,9 @@ export class AuthService {
   async forgotPassword(
     dto: ForgotPasswordDto,
   ): Promise<{ message: string; devCode?: string }> {
-    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+    const user = await this.userRepo.findOne({
+      where: { email: this.normalizeEmail(dto.email) },
+    });
 
     if (!user || !user.isActive) {
       throw new NotFoundException('No account found with this email address');
@@ -421,7 +455,9 @@ export class AuthService {
   // ── Reset password ───────────────────────────────────────────────────────
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    const user = await this.userRepo.findOne({ where: { email: dto.email } });
+    const user = await this.userRepo.findOne({
+      where: { email: this.normalizeEmail(dto.email) },
+    });
 
     if (!user) {
       throw new BadRequestException('Invalid or expired reset code');
@@ -582,14 +618,16 @@ export class AuthService {
       throw new BadRequestException('Password is incorrect');
     }
 
-    if (dto.newEmail === user.email) {
+    const newEmail = this.normalizeEmail(dto.newEmail);
+
+    if (newEmail === user.email) {
       throw new BadRequestException(
         'New email must be different from your current email',
       );
     }
 
     const existing = await this.userRepo.findOne({
-      where: { email: dto.newEmail },
+      where: { email: newEmail },
     });
     if (existing) {
       throw new BadRequestException('Email is already in use');
@@ -600,12 +638,19 @@ export class AuthService {
       Date.now() + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000,
     );
 
-    await this.userRepo.update(userId, {
-      email: dto.newEmail,
-      emailVerifiedAt: null,
-      emailVerificationToken: hashedCode,
-      emailVerificationExpiry: expiry,
-    });
+    try {
+      await this.userRepo.update(userId, {
+        email: newEmail,
+        emailVerifiedAt: null,
+        emailVerificationToken: hashedCode,
+        emailVerificationExpiry: expiry,
+      });
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new BadRequestException('Email is already in use');
+      }
+      throw err;
+    }
 
     // Invalidate the session — the user must verify the new email to sign in again
     await this.redis.del(`refresh:${userId}`);
@@ -613,14 +658,14 @@ export class AuthService {
     let emailSent = false;
     try {
       await this.mailer.sendVerificationCode({
-        to: dto.newEmail,
+        to: newEmail,
         name: user.fullName,
         code,
       });
       emailSent = true;
     } catch (err) {
       this.logger.error(
-        `Failed to send verification code to ${dto.newEmail}: ${String(err)}`,
+        `Failed to send verification code to ${newEmail}: ${String(err)}`,
       );
     }
 
@@ -635,6 +680,18 @@ export class AuthService {
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      err instanceof QueryFailedError &&
+      (err as QueryFailedError & { code?: string }).code ===
+        POSTGRES_UNIQUE_VIOLATION
+    );
+  }
 
   private generateVerificationCode(): { code: string; hashedCode: string } {
     const code = String(Math.floor(100000 + Math.random() * 900000));

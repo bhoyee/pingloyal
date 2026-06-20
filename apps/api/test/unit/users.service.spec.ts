@@ -75,7 +75,11 @@ describe('UsersService', () => {
       mockUserRepo.create.mockReturnValue(user);
       mockUserRepo.save.mockResolvedValue(user);
       const svc = await buildService();
-      const dto = { email: 'cashier@store.com', fullName: 'Test Cashier', password: 'pass123' };
+      const dto = {
+        email: 'cashier@store.com',
+        fullName: 'Test Cashier',
+        password: 'pass123',
+      };
       const result = await svc.createCashier(TENANT_ID, dto);
       expect(result.email).toBe('cashier@store.com');
       expect(mockUserRepo.save).toHaveBeenCalled();
@@ -85,7 +89,11 @@ describe('UsersService', () => {
       mockUserRepo.findOne.mockResolvedValue(makeUser());
       const svc = await buildService();
       await expect(
-        svc.createCashier(TENANT_ID, { email: 'cashier@store.com', fullName: 'X', password: 'p' }),
+        svc.createCashier(TENANT_ID, {
+          email: 'cashier@store.com',
+          fullName: 'X',
+          password: 'p',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -94,9 +102,14 @@ describe('UsersService', () => {
     it('updates and returns the cashier', async () => {
       const user = makeUser();
       mockUserRepo.findOne.mockResolvedValue(user);
-      mockUserRepo.save.mockResolvedValue({ ...user, fullName: 'Updated Name' });
+      mockUserRepo.save.mockResolvedValue({
+        ...user,
+        fullName: 'Updated Name',
+      });
       const svc = await buildService();
-      const result = await svc.updateCashier(TENANT_ID, USER_ID, { fullName: 'Updated Name' });
+      const result = await svc.updateCashier(TENANT_ID, USER_ID, {
+        fullName: 'Updated Name',
+      });
       expect(result.fullName).toBe('Updated Name');
     });
 
@@ -110,7 +123,10 @@ describe('UsersService', () => {
 
     it('throws BadRequestException when email conflicts with another user', async () => {
       const user = makeUser();
-      const conflicting = makeUser({ id: 'other-user', email: 'taken@store.com' });
+      const conflicting = makeUser({
+        id: 'other-user',
+        email: 'taken@store.com',
+      });
       mockUserRepo.findOne
         .mockResolvedValueOnce(user)
         .mockResolvedValueOnce(conflicting);
@@ -126,7 +142,9 @@ describe('UsersService', () => {
       mockUserRepo.findOne.mockResolvedValue(user);
       mockUserRepo.save.mockResolvedValue(updated);
       const svc = await buildService();
-      const result = await svc.updateCashier(TENANT_ID, USER_ID, { isActive: false });
+      const result = await svc.updateCashier(TENANT_ID, USER_ID, {
+        isActive: false,
+      });
       expect(result.isActive).toBe(false);
     });
   });
@@ -137,14 +155,18 @@ describe('UsersService', () => {
       mockUserRepo.findOne.mockResolvedValue(user);
       mockUserRepo.remove.mockResolvedValue(undefined);
       const svc = await buildService();
-      await expect(svc.deleteCashier(TENANT_ID, USER_ID)).resolves.toBeUndefined();
+      await expect(
+        svc.deleteCashier(TENANT_ID, USER_ID),
+      ).resolves.toBeUndefined();
       expect(mockUserRepo.remove).toHaveBeenCalledWith(user);
     });
 
     it('throws NotFoundException if cashier not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
       const svc = await buildService();
-      await expect(svc.deleteCashier(TENANT_ID, USER_ID)).rejects.toThrow(NotFoundException);
+      await expect(svc.deleteCashier(TENANT_ID, USER_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });
