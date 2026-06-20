@@ -118,6 +118,19 @@ export class Tenant {
   @Column({ type: 'varchar', length: 100, nullable: true })
   stripeCustomerId: string | null;
 
+  // ── Account deletion ───────────────────────────────────────────────────────
+  // Set when an owner requests deletion. Login is blocked the moment this is
+  // set (see JwtStrategy/AuthService) — deletionScheduledAt is just the cron
+  // trigger time for the actual hard delete, not a re-block point.
+  @Column({ type: 'timestamptz', nullable: true })
+  deletionRequestedAt: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  deletionScheduledAt: Date | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  deletionCancelToken: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

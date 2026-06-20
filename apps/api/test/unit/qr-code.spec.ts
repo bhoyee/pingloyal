@@ -9,6 +9,7 @@ import { ProductCategory } from '../../src/modules/tenants/entities/product-cate
 import { TierConfig } from '../../src/modules/tenants/entities/tier-config.entity';
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { R2Service } from '../../src/modules/storage/r2.service';
+import { MailerService } from '../../src/common/mailer/mailer.service';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 import { TierService } from '../../src/modules/tenants/tier.service';
 
@@ -44,6 +45,10 @@ const mockTierService = {
   recalculate: jest.fn().mockResolvedValue(undefined),
   recalculateAll: jest.fn().mockResolvedValue({ updated: 0 }),
 };
+const mockMailer = {
+  sendAccountDeletionRequested: jest.fn().mockResolvedValue(undefined),
+  sendAccountDeletionSupportNotice: jest.fn().mockResolvedValue(undefined),
+};
 
 describe('TenantsService – QR code', () => {
   let service: TenantsService;
@@ -64,6 +69,7 @@ describe('TenantsService – QR code', () => {
         { provide: R2Service, useValue: mockR2 },
         { provide: ConfigService, useValue: mockConfig },
         { provide: TierService, useValue: mockTierService },
+        { provide: MailerService, useValue: mockMailer },
       ],
     }).compile();
 

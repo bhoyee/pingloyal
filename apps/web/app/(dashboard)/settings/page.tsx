@@ -101,6 +101,11 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const businessForm = useForm<BusinessFormValues>({
     resolver: zodResolver(businessSchema),
     defaultValues: { businessName: '', timezone: 'Africa/Lagos' },
@@ -260,6 +265,23 @@ export default function SettingsPage() {
     } finally {
       setLogoUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleRequestDeletion() {
+    setDeleteError(null);
+    setDeleteLoading(true);
+    try {
+      await api.post('/api/v1/tenants/delete-request', {
+        confirmBusinessName: deleteConfirmInput,
+      });
+      localStorage.removeItem('access_token');
+      window.location.href = '/';
+    } catch (err) {
+      setDeleteError(
+        err instanceof ApiError ? err.message : 'Failed to request account deletion',
+      );
+      setDeleteLoading(false);
     }
   }
 
@@ -642,7 +664,7 @@ export default function SettingsPage() {
                   </div>
                   <a
                     href="/onboarding?step=4"
-                    className="shrink-0 text-sm font-semibold text-slate-600 hover:text-slate-900"
+                    className="shrink-0 text-sm font-semibold text-red-600 hover:text-red-700"
                   >
                     Reconnect
                   </a>
@@ -688,7 +710,7 @@ export default function SettingsPage() {
                 </p>
                 <a
                   href="/onboarding?step=4"
-                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50"
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-[#0DC56A] px-3 text-sm font-semibold text-white transition-colors hover:bg-[#0aad5b]"
                 >
                   Connect WhatsApp →
                 </a>
@@ -735,14 +757,97 @@ export default function SettingsPage() {
 
             <Link
               href="/cashier-app"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#0DC56A] px-3.5 py-2 text-sm font-semibold text-[#0DC56A] transition-colors hover:bg-[#0DC56A]/5"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#0DC56A] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#0aad5b]"
             >
               <UserPlus className="h-4 w-4" />
               Invite Cashier
             </Link>
           </CardContent>
         </Card>
+
+        {/* ── Danger Zone ─────────────────────────────────────────────────── */}
+        <Card className="lg:col-span-2 border-red-200">
+          <CardHeader>
+            <CardTitle className="text-red-700">Danger Zone</CardTitle>
+            <CardDescription>
+              Permanently delete your PingLoyal account and all associated data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-red-800">Delete this account</p>
+                <p className="mt-0.5 text-xs text-red-600">
+                  Login is disabled immediately. All data is permanently deleted within 24 hours.
+                  This cannot be undone once that runs.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  setDeleteConfirmInput('');
+                  setDeleteError(null);
+                  setDeleteModalOpen(true);
+                }}
+                className="shrink-0"
+              >
+                Delete My Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* ── Delete account confirmation modal ───────────────────────────────── */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-6 py-4">
+              <h3 className="text-base font-semibold text-red-700">Delete {tenant?.businessName}?</h3>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This immediately blocks all logins to the dashboard and cashier app for this
+                business. Within 24 hours, all customers, transactions, campaigns, and message
+                history are permanently deleted. We'll email the owner and our support team a
+                link to cancel before that happens.
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="deleteConfirm">
+                  Type <span className="font-semibold text-slate-900">{tenant?.businessName}</span> to confirm
+                </Label>
+                <Input
+                  id="deleteConfirm"
+                  value={deleteConfirmInput}
+                  onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+              <div className="flex justify-end gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeleteModalOpen(false)}
+                  disabled={deleteLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => void handleRequestDeletion()}
+                  loading={deleteLoading}
+                  disabled={deleteConfirmInput !== tenant?.businessName || deleteLoading}
+                >
+                  Delete My Account
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div

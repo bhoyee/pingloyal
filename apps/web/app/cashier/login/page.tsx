@@ -59,6 +59,11 @@ export default function CashierLoginPage() {
         return;
       }
 
+      if (res.status === 410) {
+        router.replace('/');
+        return;
+      }
+
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as Record<
           string,

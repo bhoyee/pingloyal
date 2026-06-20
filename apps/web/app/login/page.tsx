@@ -35,6 +35,10 @@ export default function LoginPage() {
       const tenant = await api.get<TenantMe>('/tenants/me').catch(() => null);
       router.replace(tenant?.qrCodeUrl ? '/dashboard' : '/onboarding');
     } catch (err) {
+      if (err instanceof ApiError && err.status === 410) {
+        router.replace('/');
+        return;
+      }
       if (err instanceof ApiError && err.status === 403) {
         router.replace(`/verify-email?email=${encodeURIComponent(email)}`);
         return;

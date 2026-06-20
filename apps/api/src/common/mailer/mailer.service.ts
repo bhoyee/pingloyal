@@ -104,6 +104,146 @@ export class MailerService {
     });
   }
 
+  async sendAccountDeletionRequested(params: {
+    to: string;
+    businessName: string;
+    scheduledAt: Date;
+    cancelUrl: string;
+  }): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] Account deletion requested for ${params.businessName} (${params.to}) — ` +
+          `scheduled ${params.scheduledAt.toISOString()} — cancel: ${params.cancelUrl}`,
+      );
+      return;
+    }
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.to,
+      subject: `${params.businessName} — Account deletion scheduled`,
+      html: this.buildAccountDeletionRequestedHtml(params),
+    });
+  }
+
+  async sendAccountDeletionSupportNotice(params: {
+    businessName: string;
+    tenantId: string;
+    ownerEmail: string;
+    scheduledAt: Date;
+  }): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] Account deletion support notice — tenant=${params.tenantId} ` +
+          `(${params.businessName}) owner=${params.ownerEmail} scheduled=${params.scheduledAt.toISOString()}`,
+      );
+      return;
+    }
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: this.supportEmail,
+      subject: `Account deletion requested — ${params.businessName}`,
+      html: this.buildAccountDeletionSupportHtml(params),
+    });
+  }
+
+  private buildAccountDeletionRequestedHtml(params: {
+    businessName: string;
+    scheduledAt: Date;
+    cancelUrl: string;
+  }): string {
+    const scheduledStr = params.scheduledAt.toUTCString();
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 16px">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <tr><td style="background:#0A1628;padding:24px 32px;text-align:center">
+          <span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px">PingLoyal</span>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <h2 style="margin:0 0 8px;font-size:20px;color:#b91c1c">Account deletion scheduled</h2>
+          <p style="margin:0 0 20px;color:#64748b;font-size:15px;line-height:1.6">
+            We've received a request to permanently delete the <strong>${params.businessName}</strong> account.
+            Login has been disabled immediately for both the dashboard and cashier app.
+          </p>
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:0 0 24px">
+            <p style="margin:0;color:#991b1b;font-size:14px;line-height:1.6">
+              All data — customers, transactions, campaigns, and message history — will be
+              <strong>permanently deleted</strong> on or after:<br>
+              <strong>${scheduledStr}</strong>
+            </p>
+          </div>
+          <p style="margin:0 0 16px;color:#64748b;font-size:15px;line-height:1.6">
+            Didn't request this, or changed your mind? Cancel the deletion before it runs:
+          </p>
+          <div style="text-align:center;margin:0 0 24px">
+            <a href="${params.cancelUrl}" style="display:inline-block;background:#0DC56A;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 28px;border-radius:8px">
+              Cancel deletion
+            </a>
+          </div>
+          <p style="margin:0;color:#94a3b8;font-size:13px">This link expires once the account is deleted.</p>
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
+          <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  private buildAccountDeletionSupportHtml(params: {
+    businessName: string;
+    tenantId: string;
+    ownerEmail: string;
+    scheduledAt: Date;
+  }): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 16px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <tr><td style="background:#0A1628;padding:20px 32px">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px">PingLoyal</span>
+          <span style="color:#94a3b8;font-size:13px;margin-left:12px">Account Deletion</span>
+        </td></tr>
+        <tr><td style="padding:28px 32px">
+          <h2 style="margin:0 0 4px;font-size:18px;color:#b91c1c">Account deletion requested</h2>
+          <p style="margin:0 0 24px;color:#64748b;font-size:14px">A store owner has requested to delete their account.</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <tr style="background:#f8fafc">
+              <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;width:160px">Store</td>
+              <td style="padding:10px 16px;font-size:14px;color:#0f172a;font-weight:600">${params.businessName}</td>
+            </tr>
+            <tr style="border-top:1px solid #e2e8f0">
+              <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Owner Email</td>
+              <td style="padding:10px 16px;font-size:14px;color:#0f172a">${params.ownerEmail}</td>
+            </tr>
+            <tr style="border-top:1px solid #e2e8f0">
+              <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px">Tenant ID</td>
+              <td style="padding:10px 16px;font-size:12px;color:#64748b;font-family:monospace">${params.tenantId}</td>
+            </tr>
+            <tr style="border-top:1px solid #e2e8f0;background:#fef2f2">
+              <td style="padding:10px 16px;font-size:12px;font-weight:600;color:#991b1b;text-transform:uppercase;letter-spacing:.5px">Hard delete at</td>
+              <td style="padding:10px 16px;font-size:14px;color:#991b1b;font-weight:600">${params.scheduledAt.toUTCString()}</td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
+          <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal · Internal notification</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+
   private buildTemplateRequestHtml(params: {
     tenantId: string;
     businessName: string;

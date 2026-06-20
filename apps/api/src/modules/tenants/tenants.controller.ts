@@ -24,6 +24,8 @@ import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { UpsertTierConfigDto } from './dto/upsert-tier-config.dto';
+import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
+import { CancelAccountDeletionDto } from './dto/cancel-account-deletion.dto';
 import { TenantsService } from './tenants.service';
 
 @Controller('tenants')
@@ -111,5 +113,23 @@ export class TenantsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.tenantsService.uploadLogo(req.user.tenantId, file);
+  }
+
+  // ── Account deletion ─────────────────────────────────────────────────────────
+
+  @Post('delete-request')
+  @Roles(UserRole.OWNER)
+  requestDeletion(
+    @Req() req: { user: RequestUser },
+    @Body() dto: RequestAccountDeletionDto,
+  ) {
+    return this.tenantsService.requestDeletion(req.user.tenantId, dto);
+  }
+
+  // Public — clicked from an email link by an owner who can no longer log in.
+  @Public()
+  @Post('delete-request/cancel')
+  cancelDeletion(@Body() dto: CancelAccountDeletionDto) {
+    return this.tenantsService.cancelDeletion(dto.token);
   }
 }

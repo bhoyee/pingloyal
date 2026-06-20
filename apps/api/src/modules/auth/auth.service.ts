@@ -3,6 +3,8 @@ import * as bcrypt from 'bcrypt';
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -235,6 +237,13 @@ export class AuthService {
     );
     if (!passwordMatch) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.tenant.deletionRequestedAt) {
+      throw new HttpException(
+        'This account has been deleted',
+        HttpStatus.GONE,
+      );
     }
 
     if (!user.emailVerifiedAt) {

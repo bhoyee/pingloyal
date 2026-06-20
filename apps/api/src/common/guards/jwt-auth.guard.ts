@@ -1,5 +1,7 @@
 import {
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -29,6 +31,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     err: Error | null,
     user: TUser | false,
   ): TUser {
+    // Account-deletion signal from JwtStrategy.validate() — must surface as
+    // 410 Gone (not a generic 401) so the frontend redirects to the landing
+    // page instead of bouncing back to a login screen for a deleted account.
+    if (err instanceof HttpException && err.getStatus() === HttpStatus.GONE) {
+      throw err;
+    }
     if (err || !user) {
       throw new UnauthorizedException('Invalid or expired token');
     }
