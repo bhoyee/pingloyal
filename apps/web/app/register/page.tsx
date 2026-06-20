@@ -102,7 +102,8 @@ export default function RegisterPage() {
             <span className="text-2xl font-bold text-[#0A1628]">PingLoyal</span>
           </div>
           <p className="text-sm text-gray-500">
-            Start your 14-day free trial — no card required
+            Start your 7-day free trial — card required, nothing charged
+            until day 7
           </p>
         </div>
 

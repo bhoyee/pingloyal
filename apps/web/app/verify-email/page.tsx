@@ -42,7 +42,7 @@ export default function VerifyEmailPage() {
       if (res.refreshToken) {
         localStorage.setItem('refresh_token', res.refreshToken);
       }
-      router.replace('/onboarding');
+      router.replace('/billing/start-trial');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Verification failed — please try again');
     } finally {

@@ -58,6 +58,15 @@ export class Subscription {
   @Column({ type: 'varchar', length: 100, nullable: true })
   stripeSubId: string | null;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  paystackAuthorizationCode: string | null;
+
+  @Column({ type: 'int', default: 0 })
+  trialChargeAttempts: number;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  lastChargeAttemptAt: Date | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   currentPeriodStart: Date | null;
 

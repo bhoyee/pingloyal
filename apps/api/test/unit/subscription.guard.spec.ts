@@ -265,18 +265,102 @@ describe('SubscriptionGuard', () => {
     expect(mockDataSource.query).toHaveBeenCalledTimes(1);
   });
 
-  // T15: Unknown status → allows with warning ───────────────────────────────
+  // T15: Unknown status → fails closed, not open ────────────────────────────
 
-  it('T15 — unknown status allows access and logs warning', async () => {
+  it('T15 — unknown status blocks access by default and logs an error', async () => {
     mockDataSource.query.mockResolvedValue([makeSubRow('unknown_status')]);
-    const warnSpy = jest
-      .spyOn(guard['logger'], 'warn')
+    const errorSpy = jest
+      .spyOn(guard['logger'], 'error')
       .mockImplementation(() => {});
 
-    await expect(guard.canActivate(makeContext())).resolves.toBe(true);
-    expect(warnSpy).toHaveBeenCalledWith(
+    await expect(guard.canActivate(makeContext())).rejects.toThrow(
+      HttpException,
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Unknown subscription status'),
     );
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('T15b — unknown status still allows the exempt POST paths through', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('unknown_status')]);
+    await expect(
+      guard.canActivate(
+        makeContext({ method: 'POST', path: '/api/v1/billing/subscribe' }),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  // T16: pending_payment → blocks everything except the exempt POSTs ────────
+
+  it('T16 — pending_payment blocks GET requests with action=start_trial', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('pending_payment')]);
+
+    try {
+      await guard.canActivate(makeContext({ method: 'GET' }));
+      fail('should have thrown');
+    } catch (err) {
+      expect(err instanceof HttpException).toBe(true);
+      const body = (err as HttpException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.action).toBe('start_trial');
+      expect(body.statusCode).toBe(402);
+    }
+  });
+
+  it('T17 — pending_payment allows POST /billing/start-trial', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('pending_payment')]);
+    await expect(
+      guard.canActivate(
+        makeContext({ method: 'POST', path: '/api/v1/billing/start-trial' }),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('T18 — pending_payment allows POST /billing/cancel-trial', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('pending_payment')]);
+    await expect(
+      guard.canActivate(
+        makeContext({ method: 'POST', path: '/api/v1/billing/cancel-trial' }),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('T19 — pending_payment blocks POST to an arbitrary other route', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('pending_payment')]);
+    await expect(
+      guard.canActivate(
+        makeContext({ method: 'POST', path: '/api/v1/customers' }),
+      ),
+    ).rejects.toThrow(HttpException);
+  });
+
+  // T20: cancelled → blocks everything except the exempt POSTs ──────────────
+
+  it('T20 — cancelled blocks GET requests with action=subscribe', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('cancelled')]);
+
+    try {
+      await guard.canActivate(makeContext({ method: 'GET' }));
+      fail('should have thrown');
+    } catch (err) {
+      expect(err instanceof HttpException).toBe(true);
+      const body = (err as HttpException).getResponse() as Record<
+        string,
+        unknown
+      >;
+      expect(body.action).toBe('subscribe');
+    }
+  });
+
+  it('T21 — cancelled allows POST /billing/subscribe', async () => {
+    mockDataSource.query.mockResolvedValue([makeSubRow('cancelled')]);
+    await expect(
+      guard.canActivate(
+        makeContext({ method: 'POST', path: '/api/v1/billing/subscribe' }),
+      ),
+    ).resolves.toBe(true);
   });
 });
