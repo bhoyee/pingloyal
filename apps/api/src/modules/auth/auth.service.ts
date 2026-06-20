@@ -36,6 +36,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { User } from '../auth/entities/user.entity';
 import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { Subscription } from '../billing/entities/subscription.entity';
+import { PLANS, type PlanId } from '../billing/plans.config';
 import { RegisterDto, Country } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -113,7 +114,15 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<RegisterResponse> {
     const email = this.normalizeEmail(dto.email);
     const isNG = dto.country === Country.NG;
-    const trialEnd = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const currency = isNG ? 'NGN' : 'GBP';
+    const planTier = dto.planTier ?? PlanTier.STARTER;
+    const planId = `${planTier}_${currency.toLowerCase()}` as PlanId;
+    const plan = PLANS[planId];
+    if (!plan) {
+      throw new BadRequestException(
+        `No plan available for ${planTier}/${currency}`,
+      );
+    }
 
     const existingUser = await this.userRepo.findOne({ where: { email } });
     if (existingUser) {
@@ -125,17 +134,19 @@ export class AuthService {
     try {
       ({ savedUser, savedTenant } = await this.dataSource.transaction(
         async (manager) => {
-          // Step 1 — Tenant
+          // Step 1 — Tenant. The trial clock does not start here — it starts
+          // once a card is captured via POST /billing/start-trial. Until then
+          // the tenant sits in PENDING_PAYMENT, blocked by SubscriptionGuard.
           const slug = await this.buildUniqueSlug(dto.businessName, manager);
           const tenant = manager.create(Tenant, {
             businessName: dto.businessName,
             slug,
-            currency: isNG ? 'NGN' : 'GBP',
+            currency,
             timezone: isNG ? 'Africa/Lagos' : 'Europe/London',
             mode: TenantMode.NATIVE,
-            planTier: PlanTier.STARTER,
-            subscriptionStatus: SubscriptionStatus.TRIALING,
-            trialEndsAt: trialEnd,
+            planTier,
+            subscriptionStatus: SubscriptionStatus.PENDING_PAYMENT,
+            trialEndsAt: null,
             waVerificationStatus: WaVerificationStatus.PENDING,
             marketingWalletBalance: 0,
           });
@@ -172,20 +183,21 @@ export class AuthService {
           );
           await manager.save(ProductCategory, categories);
 
-          // Step 4 — Starter subscription
+          // Step 4 — Subscription row, pending payment — amount/utility terms
+          // are looked up from plans.config.ts, never hardcoded or client-supplied.
           const subscription = manager.create(Subscription, {
             tenantId: savedTenant.id,
-            planTier: PlanTier.STARTER,
+            planTier,
             billingCycle: 'monthly',
-            currency: savedTenant.currency,
-            amount: isNG ? 8000 : 4900,
-            utilityIncluded: 300,
+            currency,
+            amount: plan.amount,
+            utilityIncluded: plan.utilityIncluded,
             utilityUsedThisPeriod: 0,
-            utilityOverageRate: 20.0,
-            marketingRate: 130.0,
-            status: SubscriptionStatus.TRIALING,
-            currentPeriodStart: new Date(),
-            currentPeriodEnd: trialEnd,
+            utilityOverageRate: plan.utilityOverageRate,
+            marketingRate: plan.marketingRate,
+            status: SubscriptionStatus.PENDING_PAYMENT,
+            currentPeriodStart: null,
+            currentPeriodEnd: null,
             cancelAtPeriodEnd: false,
           });
           await manager.save(Subscription, subscription);

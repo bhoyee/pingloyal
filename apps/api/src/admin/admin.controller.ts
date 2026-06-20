@@ -6,8 +6,8 @@ import { QuarterlyResetCron } from '../modules/tenants/quarterly-reset.cron';
 import { WaBotService } from '../modules/whatsapp/wa-bot.service';
 import { TenantsService } from '../modules/tenants/tenants.service';
 import { IntegrationSchedulerService } from '../modules/integrations/integration-scheduler.service';
-import { BillingService } from '../modules/billing/billing.service';
 import { WalletAlertCronService } from '../modules/billing/wallet-alert.cron';
+import { TrialBillingCronService } from '../modules/billing/trial-billing.cron';
 import { ReportsCronService } from '../modules/reports/reports.cron';
 
 @Public()
@@ -59,16 +59,37 @@ export class AdminController {
 @Public()
 @Controller('admin/crons')
 export class AdminBillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly trialBillingCronService: TrialBillingCronService,
+  ) {}
 
-  @Post('trial-check/trigger')
-  async triggerTrialCheck(): Promise<{ message: string; duration: number }> {
+  @Post('trial-conversion/trigger')
+  async triggerTrialConversion(): Promise<{
+    message: string;
+    duration: number;
+  }> {
     if (process.env.NODE_ENV === 'production') {
       throw new NotFoundException();
     }
     const start = Date.now();
-    await this.billingService.checkExpiredTrials();
-    return { message: 'Trial check triggered', duration: Date.now() - start };
+    await this.trialBillingCronService.chargeExpiredPaystackTrials();
+    return {
+      message: 'Trial conversion cron triggered',
+      duration: Date.now() - start,
+    };
+  }
+
+  @Post('trial-dunning/trigger')
+  async triggerTrialDunning(): Promise<{ message: string; duration: number }> {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+    const start = Date.now();
+    await this.trialBillingCronService.retryFailedPaystackCharges();
+    return {
+      message: 'Trial dunning cron triggered',
+      duration: Date.now() - start,
+    };
   }
 }
 

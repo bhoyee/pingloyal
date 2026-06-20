@@ -8,6 +8,7 @@ import { BillingService } from '../../src/modules/billing/billing.service';
 import { WalletService } from '../../src/modules/billing/wallet.service';
 import { UtilityTrackingService } from '../../src/modules/billing/utility-tracking.service';
 import { Subscription } from '../../src/modules/billing/entities/subscription.entity';
+import { WebhookEvent } from '../../src/modules/billing/entities/webhook-event.entity';
 import { Tenant } from '../../src/modules/tenants/entities/tenant.entity';
 import { User } from '../../src/modules/auth/entities/user.entity';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
@@ -37,6 +38,9 @@ jest.mock('stripe', () => {
           .fn()
           .mockResolvedValue({ url: 'https://checkout.stripe.com/test' }),
       },
+    },
+    subscriptions: {
+      update: jest.fn().mockResolvedValue({}),
     },
     webhooks: {
       constructEvent: jest.fn().mockReturnValue({
@@ -107,6 +111,15 @@ describe('BillingService', () => {
   let mockSubRepo: Record<string, jest.Mock>;
   let mockTenantRepo: Record<string, jest.Mock>;
   let mockUserRepo: Record<string, jest.Mock>;
+  let mockWebhookEventRepo: { createQueryBuilder: jest.Mock };
+  let mockWebhookEventQb: {
+    insert: jest.Mock;
+    into: jest.Mock;
+    values: jest.Mock;
+    orIgnore: jest.Mock;
+    returning: jest.Mock;
+    execute: jest.Mock;
+  };
   let mockDataSource: { query: jest.Mock };
   let mockRedis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let mockWaQueue: { add: jest.Mock };
@@ -141,6 +154,22 @@ describe('BillingService', () => {
       update: jest.fn().mockResolvedValue(undefined),
     };
     mockUserRepo = { findOne: jest.fn().mockResolvedValue(makeOwner()) };
+
+    // Every webhook test in this file represents a "first time seen" event
+    // by default — returning a row means recordWebhookEventOrSkip treats it
+    // as new and lets processing continue.
+    mockWebhookEventQb = {
+      insert: jest.fn().mockReturnThis(),
+      into: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ raw: [{ id: 'we-1' }] }),
+    };
+    mockWebhookEventRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(mockWebhookEventQb),
+    };
+
     mockDataSource = { query: jest.fn().mockResolvedValue([]) };
     mockRedis = {
       get: jest.fn().mockResolvedValue(null),
@@ -167,6 +196,10 @@ describe('BillingService', () => {
         { provide: getRepositoryToken(Subscription), useValue: mockSubRepo },
         { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
+        {
+          provide: getRepositoryToken(WebhookEvent),
+          useValue: mockWebhookEventRepo,
+        },
         { provide: getDataSourceToken(), useValue: mockDataSource },
         { provide: ConfigService, useValue: mockConfig },
         { provide: REDIS_CLIENT, useValue: mockRedis },
@@ -289,9 +322,15 @@ describe('BillingService', () => {
 
     await service.handlePaystackWebhook(rawBody, sig);
 
-    expect(mockSubRepo.update).toHaveBeenCalledWith(
-      { tenantId: TENANT_ID },
-      { status: SubscriptionStatus.PAST_DUE },
+    expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('grace_period_started_at = COALESCE'),
+      [SubscriptionStatus.PAST_DUE, TENANT_ID],
+    );
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.PAST_DUE,
+      }),
     );
   });
 
@@ -462,40 +501,429 @@ describe('BillingService', () => {
     );
   });
 
-  // ── T17: Trial expired yesterday → suspended ──────────────────────────────
+  // T17-T19 (trial-expiry-suspends-immediately behavior) were removed along
+  // with checkExpiredTrials() — trial expiry now triggers a charge attempt
+  // (NGN) or is handled natively by Stripe, not an immediate suspend. See
+  // trial-billing.cron.spec.ts for the new cron's equivalent coverage.
 
-  it('T17 — tenant with trial_ends_at yesterday gets suspended', async () => {
-    mockDataSource.query.mockResolvedValue([{ id: TENANT_ID }]);
+  // ── T20: startTrial rejects when not pending_payment ──────────────────────
 
-    await service.checkExpiredTrials();
+  it('T20 — startTrial throws when subscription is not pending_payment', async () => {
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ status: SubscriptionStatus.TRIALING }),
+    );
 
+    await expect(service.startTrial(TENANT_ID, OWNER_ID)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  // ── T21: startTrial (NGN) initializes a ₦50 verification charge ──────────
+
+  it('T21 — startTrial for NGN tenant initializes a ₦50 verification charge, not the plan amount', async () => {
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ status: SubscriptionStatus.PENDING_PAYMENT }),
+    );
+
+    await service.startTrial(TENANT_ID, OWNER_ID);
+
+    const initCall = mockFetch.mock.calls.find(([url]: [string]) =>
+      url.includes('transaction/initialize'),
+    ) as [string, { body: string }];
+    const body = JSON.parse(initCall[1].body) as {
+      amount: number;
+      metadata: { type: string };
+    };
+    expect(body.amount).toBe(5000); // ₦50 in kobo
+    expect(body.metadata.type).toBe('trial_verification');
+  });
+
+  // ── T22: trial_verification charge.success captures auth code, refunds,
+  //          and transitions the tenant to trialing ────────────────────────
+
+  it('T22 — trial_verification charge.success captures authorization code, refunds, and starts the trial', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce({
+      json: () => Promise.resolve({ status: true }),
+    });
+
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_verify_1',
+        amount: 5000,
+        authorization: { authorization_code: 'AUTH_abc123' },
+        metadata: { type: 'trial_verification', tenantId: TENANT_ID },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(JSON.stringify({ tenantId: TENANT_ID }));
+
+    await service.handlePaystackWebhook(rawBody, sig);
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      { tenantId: TENANT_ID },
+      { paystackAuthorizationCode: 'AUTH_abc123' },
+    );
+    const refundCall = mockFetch.mock.calls.find(([url]: [string]) =>
+      url.includes('/refund'),
+    ) as [string, { body: string }];
+    expect(JSON.parse(refundCall[1].body)).toEqual({
+      transaction: 'ref_verify_1',
+    });
     expect(mockTenantRepo.update).toHaveBeenCalledWith(
       TENANT_ID,
       expect.objectContaining({
-        subscriptionStatus: SubscriptionStatus.SUSPENDED,
+        subscriptionStatus: SubscriptionStatus.TRIALING,
       }),
     );
   });
 
-  // ── T18: Trial ends tomorrow → not suspended ──────────────────────────────
+  // ── T23: refund failure does not block trial activation ───────────────────
 
-  it('T18 — tenant with trial_ends_at tomorrow is not suspended', async () => {
-    mockDataSource.query.mockResolvedValue([]); // No expired trials
+  it('T23 — failed refund does not block the trial transition', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockRejectedValueOnce(new Error('refund API down'));
 
-    await service.checkExpiredTrials();
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_verify_2',
+        amount: 5000,
+        authorization: { authorization_code: 'AUTH_xyz' },
+        metadata: { type: 'trial_verification', tenantId: TENANT_ID },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(JSON.stringify({ tenantId: TENANT_ID }));
+
+    await service.handlePaystackWebhook(rawBody, sig);
+
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.TRIALING,
+      }),
+    );
+  });
+
+  // ── T24: cancelTrial sets cancelAtPeriodEnd, calls Stripe only for GBP ────
+
+  it('T24 — cancelTrial sets cancelAtPeriodEnd and updates Stripe for GBP subscriptions', async () => {
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({
+        status: SubscriptionStatus.TRIALING,
+        stripeSubId: 'sub_test123',
+      }),
+    );
+
+    await service.cancelTrial(TENANT_ID);
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith('sub-1', {
+      cancelAtPeriodEnd: true,
+    });
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      subscriptions: { update: jest.Mock };
+    };
+    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith(
+      'sub_test123',
+      { cancel_at_period_end: true },
+    );
+  });
+
+  // ── T25: duplicate webhook event is a no-op ───────────────────────────────
+
+  it('T25 — a duplicate webhook event id is skipped without reprocessing', async () => {
+    mockWebhookEventQb.execute.mockResolvedValue({ raw: [] }); // already seen
+
+    const body = {
+      event: 'subscription.disable',
+      data: { customer: { metadata: { tenantId: TENANT_ID } } },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    await service.handlePaystackWebhook(rawBody, sig);
 
     expect(mockTenantRepo.update).not.toHaveBeenCalled();
   });
 
-  // ── T19: Already suspended → not processed again ─────────────────────────
+  // ── T26: startTrial (GBP) uses Stripe Checkout with a 7-day native trial ──
 
-  it('T19 — already suspended tenants are excluded by SQL (not in query result)', async () => {
-    // The SQL filters WHERE subscription_status = 'trialing'
-    // so already suspended tenants won't be in the result
-    mockDataSource.query.mockResolvedValue([]); // Empty — suspended not included
+  it('T26 — startTrial for GBP tenant creates a Stripe Checkout session with a 7-day trial', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(
+      makeTenant({ currency: 'GBP', stripeCustomerId: 'cus_existing' }),
+    );
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ status: SubscriptionStatus.PENDING_PAYMENT }),
+    );
 
-    await service.checkExpiredTrials();
+    const result = await service.startTrial(TENANT_ID, OWNER_ID);
+
+    expect(result.checkoutUrl).toContain('stripe.com');
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      checkout: {
+        sessions: {
+          create: jest.Mock<unknown, [Record<string, unknown>]>;
+        };
+      };
+    };
+    const createCall = stripeMock.checkout.sessions.create.mock.calls[0][0];
+    expect(createCall.payment_method_collection).toBe('always');
+    expect(createCall.subscription_data).toEqual({ trial_period_days: 7 });
+    expect((createCall.metadata as { type: string }).type).toBe('trial_start');
+  });
+
+  // ── T27: Stripe checkout.session.completed (trial_start) → TRIALING ──────
+
+  it('T27 — Stripe trial_start checkout completion sets TRIALING with Stripe-provided trial_end', async () => {
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      webhooks: { constructEvent: jest.Mock };
+    };
+    const trialEndUnix = Math.floor(Date.now() / 1000) + 7 * 86400;
+    stripeMock.webhooks.constructEvent.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          mode: 'subscription',
+          subscription: { id: 'sub_new123', trial_end: trialEndUnix },
+          metadata: {
+            tenantId: TENANT_ID,
+            planId: 'starter_gbp',
+            type: 'trial_start',
+          },
+        },
+      },
+    });
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'stripe-sig');
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      { tenantId: TENANT_ID },
+      expect.objectContaining({
+        status: SubscriptionStatus.TRIALING,
+        stripeSubId: 'sub_new123',
+      }),
+    );
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.TRIALING,
+      }),
+    );
+  });
+
+  // ── T28: Stripe invoice.payment_failed → past_due ─────────────────────────
+
+  it('T28 — Stripe invoice.payment_failed marks the matching subscription past_due', async () => {
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      webhooks: { constructEvent: jest.Mock };
+    };
+    stripeMock.webhooks.constructEvent.mockReturnValueOnce({
+      type: 'invoice.payment_failed',
+      data: { object: { subscription: 'sub_test123' } },
+    });
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ stripeSubId: 'sub_test123' }),
+    );
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'stripe-sig');
+
+    expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('grace_period_started_at = COALESCE'),
+      [SubscriptionStatus.PAST_DUE, TENANT_ID],
+    );
+  });
+
+  // ── T29: Stripe invoice.payment_succeeded → activateSubscription ─────────
+
+  it('T29 — Stripe invoice.payment_succeeded activates the matching subscription', async () => {
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      webhooks: { constructEvent: jest.Mock };
+    };
+    stripeMock.webhooks.constructEvent.mockReturnValueOnce({
+      type: 'invoice.payment_succeeded',
+      data: { object: { subscription: { id: 'sub_test123' } } },
+    });
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ stripeSubId: 'sub_test123', currency: 'GBP' }),
+    );
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'stripe-sig');
+
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+      }),
+    );
+  });
+
+  // ── T30: Stripe subscription.deleted (cancelAtPeriodEnd) → cancelled ─────
+
+  it('T30 — Stripe customer.subscription.deleted cancels (not suspends) when cancelAtPeriodEnd was set', async () => {
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      webhooks: { constructEvent: jest.Mock };
+    };
+    stripeMock.webhooks.constructEvent.mockReturnValueOnce({
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          customer: { id: 'cus_1', metadata: { tenantId: TENANT_ID } },
+        },
+      },
+    });
+    mockSubRepo.findOne.mockResolvedValue(
+      makeSubscription({ cancelAtPeriodEnd: true }),
+    );
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'stripe-sig');
+
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.CANCELLED,
+      }),
+    );
+  });
+
+  // ── T31/T32: trial_verification guard branches ────────────────────────────
+
+  it('T31 — trial_verification charge.success with a mismatched amount does not transition the trial', async () => {
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_verify_bad_amount',
+        amount: 999999, // not ₦50
+        authorization: { authorization_code: 'AUTH_should_not_use' },
+        metadata: { type: 'trial_verification', tenantId: TENANT_ID },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(JSON.stringify({ tenantId: TENANT_ID }));
+
+    await service.handlePaystackWebhook(rawBody, sig);
 
     expect(mockSubRepo.update).not.toHaveBeenCalled();
+    expect(mockTenantRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('T32 — trial_verification charge.success with no authorization code does not transition the trial', async () => {
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_verify_no_auth',
+        amount: 5000,
+        metadata: { type: 'trial_verification', tenantId: TENANT_ID },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(JSON.stringify({ tenantId: TENANT_ID }));
+
+    await service.handlePaystackWebhook(rawBody, sig);
+
+    expect(mockSubRepo.update).not.toHaveBeenCalled();
+    expect(mockTenantRepo.update).not.toHaveBeenCalled();
+  });
+
+  // ── T33/T34: attemptPaystackCharge ─────────────────────────────────────────
+
+  it('T33 — attemptPaystackCharge increments the attempt counter and stores a pending reference on success', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce({
+      json: () =>
+        Promise.resolve({ status: true, data: { reference: 'ref_conv_1' } }),
+    });
+
+    await service.attemptPaystackCharge({
+      tenantId: TENANT_ID,
+      subscriptionId: 'sub-1',
+      planId: 'starter_ngn',
+      authorizationCode: 'AUTH_abc',
+      amount: 8000,
+      ownerEmail: 'owner@freshmart.ng',
+    });
+
+    expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'trial_charge_attempts = trial_charge_attempts + 1',
+      ),
+      ['sub-1'],
+    );
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      'billing:paystack:pending:ref_conv_1',
+      expect.stringContaining(TENANT_ID),
+      'EX',
+      3600,
+    );
+  });
+
+  it('T34 — attemptPaystackCharge marks the tenant past_due when the charge request fails', async () => {
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce({
+      json: () => Promise.resolve({ status: false }),
+    });
+
+    await service.attemptPaystackCharge({
+      tenantId: TENANT_ID,
+      subscriptionId: 'sub-1',
+      planId: 'starter_ngn',
+      authorizationCode: 'AUTH_abc',
+      amount: 8000,
+      ownerEmail: 'owner@freshmart.ng',
+    });
+
+    expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('grace_period_started_at = COALESCE'),
+      [SubscriptionStatus.PAST_DUE, TENANT_ID],
+    );
+    expect(mockRedis.set).not.toHaveBeenCalled();
+  });
+
+  // ── T35: cancelTenant ──────────────────────────────────────────────────────
+
+  it('T35 — cancelTenant sets status to cancelled and invalidates the cache', async () => {
+    await service.cancelTenant(TENANT_ID);
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      { tenantId: TENANT_ID },
+      { status: SubscriptionStatus.CANCELLED },
+    );
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(
+      TENANT_ID,
+      expect.objectContaining({
+        subscriptionStatus: SubscriptionStatus.CANCELLED,
+      }),
+    );
+    expect(mockRedis.del).toHaveBeenCalledWith(`tenant:${TENANT_ID}`);
   });
 });

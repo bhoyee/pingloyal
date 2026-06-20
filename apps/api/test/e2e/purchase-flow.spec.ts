@@ -148,6 +148,21 @@ describe('Complete Purchase Flow (E2E)', () => {
     );
     expect(sub.length).toBeGreaterThan(0);
     expect(Number(sub[0].utility_included)).toBeGreaterThan(0);
+
+    // Registration now leaves the tenant in pending_payment (card required
+    // before any access) — this test exercises the purchase/trigger flow,
+    // not card capture, so simulate a completed trial-start directly via DB,
+    // mirroring Step 3's "WA verification simulated (direct DB)" pattern.
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await dataSource.query(
+      `UPDATE tenants SET subscription_status = 'trialing', trial_ends_at = $2 WHERE id = $1`,
+      [tenantId, trialEndsAt],
+    );
+    await dataSource.query(
+      `UPDATE subscriptions SET status = 'trialing' WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await redis.del(`sub:status:${tenantId}`);
   }, 30_000);
 
   // ── Step 2: Configure points and tiers ────────────────────────────────────

@@ -20,6 +20,7 @@ import {
   WalletTransaction,
   WaTriggerTemplate,
   TemplateRequest,
+  WebhookEvent,
 } from './entities';
 
 const ALL_ENTITIES = [
@@ -40,6 +41,7 @@ const ALL_ENTITIES = [
   WalletTransaction,
   ReportSnapshot,
   ReportSchedule,
+  WebhookEvent,
 ];
 
 @Module({

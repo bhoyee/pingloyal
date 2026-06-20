@@ -15,5 +15,6 @@ export { TemplateRequest } from '../../modules/template-requests/entities/templa
 export { Integration } from '../../modules/integrations/entities/integration.entity';
 export { Subscription } from '../../modules/billing/entities/subscription.entity';
 export { WalletTransaction } from '../../modules/billing/entities/wallet-transaction.entity';
+export { WebhookEvent } from '../../modules/billing/entities/webhook-event.entity';
 export { ReportSnapshot } from '../../modules/reports/entities/report-snapshot.entity';
 export { ReportSchedule } from '../../modules/reports/entities/report-schedule.entity';

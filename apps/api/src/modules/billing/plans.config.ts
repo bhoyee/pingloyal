@@ -56,3 +56,8 @@ export const PLANS = {
 } as const;
 
 export type PlanId = keyof typeof PLANS;
+
+// Small refundable charge used to capture a reusable Paystack authorization
+// code at trial start, since Paystack has no true zero-amount authorization.
+// Refunded automatically once the authorization code is captured.
+export const PAYSTACK_VERIFICATION_CHARGE_NAIRA = 50;

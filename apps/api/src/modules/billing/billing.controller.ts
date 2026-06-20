@@ -62,6 +62,20 @@ export class BillingController {
     );
   }
 
+  @Post('start-trial')
+  @Roles(UserRole.OWNER)
+  @SkipSubscriptionCheck()
+  startTrial(@Req() req: { user: RequestUser }) {
+    return this.billingService.startTrial(req.user.tenantId, req.user.userId);
+  }
+
+  @Post('cancel-trial')
+  @Roles(UserRole.OWNER)
+  @SkipSubscriptionCheck()
+  cancelTrial(@Req() req: { user: RequestUser }) {
+    return this.billingService.cancelTrial(req.user.tenantId);
+  }
+
   @Post('webhook/paystack')
   @Public()
   @SkipSubscriptionCheck()

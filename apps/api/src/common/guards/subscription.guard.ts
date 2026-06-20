@@ -32,6 +32,8 @@ const ALWAYS_ALLOW_PATHS = ['/api/v1/auth', '/api/v1/health', '/api/docs'];
 
 const ALWAYS_ALLOW_POST_PATHS = [
   '/api/v1/billing/subscribe',
+  '/api/v1/billing/start-trial',
+  '/api/v1/billing/cancel-trial',
   '/api/v1/billing/webhook',
   '/api/v1/customers/register',
   '/api/v1/integrations/webhook',
@@ -132,12 +134,21 @@ export class SubscriptionGuard implements CanActivate {
 
     if (status === 'active') return true;
 
+    if (status === 'pending_payment') {
+      if (isExemptPost) return true;
+      throw402(
+        'Payment Method Required',
+        'Add a payment method to start your 7-day free trial.',
+        'start_trial',
+      );
+    }
+
     if (status === 'trialing') {
       if (!sub.trialEndsAt || new Date(sub.trialEndsAt) > new Date())
         return true;
       throw402(
         'Trial Expired',
-        'Your 14-day free trial has ended. Subscribe to continue using PingLoyal.',
+        'Your 7-day free trial has ended. Subscribe to continue using PingLoyal.',
         'subscribe',
       );
     }
@@ -160,9 +171,26 @@ export class SubscriptionGuard implements CanActivate {
       );
     }
 
-    this.logger.warn(
-      `Unknown subscription status: ${status} for tenant ${tenantId}`,
+    if (status === 'cancelled') {
+      if (isExemptPost) return true;
+      throw402(
+        'Subscription Cancelled',
+        'Your trial was cancelled. Subscribe to reactivate.',
+        'subscribe',
+      );
+    }
+
+    // Fail closed, not open: an unrecognized status string (a typo, a future
+    // status someone forgets to wire in here) must never silently grant
+    // full access — block and surface it for investigation instead.
+    this.logger.error(
+      `Unknown subscription status: ${status} for tenant ${tenantId} — blocking by default`,
     );
-    return true;
+    if (isExemptPost) return true;
+    throw402(
+      'Account Status Unrecognized',
+      'There was a problem with your account status. Please contact support.',
+      'subscribe',
+    );
   }
 }
