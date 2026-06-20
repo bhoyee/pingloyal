@@ -5,13 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { UserRole } from '@pingloyal/types';
 import { User } from '../auth/entities/user.entity';
 import { CreateCashierDto } from './dto/create-cashier.dto';
 import { UpdateCashierDto } from './dto/update-cashier.dto';
 
 const BCRYPT_ROUNDS = 12;
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 @Injectable()
 export class UsersService {
@@ -52,7 +53,15 @@ export class UsersService {
       isActive: true,
       emailVerifiedAt: new Date(),
     });
-    const saved = await this.userRepo.save(user);
+    let saved: User;
+    try {
+      saved = await this.userRepo.save(user);
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new BadRequestException('A user with that email already exists');
+      }
+      throw err;
+    }
     return {
       id: saved.id,
       fullName: saved.fullName,
@@ -80,7 +89,15 @@ export class UsersService {
       }
       user.email = dto.email.toLowerCase();
     }
-    const saved = await this.userRepo.save(user);
+    let saved: User;
+    try {
+      saved = await this.userRepo.save(user);
+    } catch (err) {
+      if (this.isUniqueViolation(err)) {
+        throw new BadRequestException('That email is already in use');
+      }
+      throw err;
+    }
     return {
       id: saved.id,
       fullName: saved.fullName,
@@ -97,5 +114,13 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException('Cashier not found');
     await this.userRepo.remove(user);
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      err instanceof QueryFailedError &&
+      (err as QueryFailedError & { code?: string }).code ===
+        POSTGRES_UNIQUE_VIOLATION
+    );
   }
 }
