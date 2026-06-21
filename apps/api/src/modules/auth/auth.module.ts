@@ -5,8 +5,6 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../auth/entities/user.entity';
 import { Tenant } from '../tenants/entities/tenant.entity';
-import { ProductCategory } from '../tenants/entities/product-category.entity';
-import { Subscription } from '../billing/entities/subscription.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -27,10 +25,10 @@ import { MailerService } from '../../common/mailer/mailer.service';
         ).toString('utf8'),
       }),
     }),
-    TypeOrmModule.forFeature([User, Tenant, ProductCategory, Subscription]),
+    TypeOrmModule.forFeature([User, Tenant]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, MailerService],
-  exports: [JwtModule, PassportModule],
+  exports: [JwtModule, PassportModule, AuthService],
 })
 export class FullAuthModule {}

@@ -104,7 +104,8 @@ export default function PricingSection() {
             Simple, transparent pricing
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-gray-600">
-            All plans include a 14-day free trial. No card required to start.
+            All plans include a 14-day free trial. Card required — nothing
+            charged until day 14.
           </p>
         </div>
 

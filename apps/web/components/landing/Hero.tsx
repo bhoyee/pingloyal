@@ -38,7 +38,7 @@ export default function Hero() {
                 href="/register"
                 className="inline-flex items-center justify-center rounded-xl bg-[#0DC56A] px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#0DC56A]/25 transition-colors hover:bg-[#0ab55e] active:bg-[#09a354]"
               >
-                Start free — no card needed →
+                Start your free trial →
               </Link>
               <a
                 href="#how-it-works"

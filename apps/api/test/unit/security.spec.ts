@@ -3,7 +3,7 @@ import { validate } from 'class-validator';
 import { TenantThrottleGuard } from '../../src/common/throttle/tenant-throttle.guard';
 import { maskPhonesInString } from '../../src/common/logger/winston.config';
 import { CreateCampaignDto } from '../../src/modules/campaigns/dto/create-campaign.dto';
-import { RegisterDto } from '../../src/modules/auth/dto/register.dto';
+import { SignupRegisterDto } from '../../src/modules/signup/dto/signup-register.dto';
 import { RegisterCustomerDto } from '../../src/modules/customers/dto/register-customer.dto';
 
 jest.mock('@pingloyal/utils', () => ({
@@ -99,8 +99,8 @@ describe('Input sanitisation', () => {
     expect(dto.name).toContain('Weekend Promo');
   });
 
-  it('T10 — RegisterDto trims leading/trailing whitespace', async () => {
-    const dto = plainToInstance(RegisterDto, {
+  it('T10 — SignupRegisterDto trims leading/trailing whitespace', async () => {
+    const dto = plainToInstance(SignupRegisterDto, {
       businessName: '  FreshMart  ',
       fullName: '  Adebayo Okafor  ',
       email: 'adebayo@freshmart.ng',

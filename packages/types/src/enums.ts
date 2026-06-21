@@ -17,7 +17,6 @@ export enum PlanTier {
 }
 
 export enum SubscriptionStatus {
-  PENDING_PAYMENT = 'pending_payment',
   TRIALING = 'trialing',
   ACTIVE = 'active',
   PAST_DUE = 'past_due',

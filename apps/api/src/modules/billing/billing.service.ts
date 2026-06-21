@@ -25,6 +25,7 @@ import {
 } from './plans.config';
 import { WalletService } from './wallet.service';
 import { UtilityTrackingService } from './utility-tracking.service';
+import { SignupService } from '../signup/signup.service';
 
 // ── Minimal Stripe interface (avoids nodenext type resolution issues) ─────────
 interface StripeCustomer {
@@ -93,7 +94,10 @@ interface PaystackEvent {
     status?: string;
     amount?: number;
     subscription_code?: string;
-    customer?: { metadata?: { tenantId?: string } };
+    customer?: {
+      customer_code?: string;
+      metadata?: { tenantId?: string };
+    };
     authorization?: { authorization_code?: string };
     metadata?: {
       type?: string;
@@ -101,6 +105,8 @@ interface PaystackEvent {
       planId?: string;
       amount?: number;
       initiatedBy?: string;
+      signupToken?: string;
+      planTier?: string;
     };
   };
 }
@@ -125,6 +131,7 @@ export class BillingService {
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
     private readonly walletService: WalletService,
     private readonly utilityTrackingService: UtilityTrackingService,
+    private readonly signupService: SignupService,
   ) {
     const stripeKey = this.config.get<string>('STRIPE_SECRET_KEY');
     this.stripe = stripeKey ? createStripeClient(stripeKey) : null;
@@ -355,126 +362,13 @@ export class BillingService {
     return { checkoutUrl: session.url ?? '' };
   }
 
-  // ── POST /billing/start-trial ─────────────────────────────────────────────
-
-  async startTrial(
-    tenantId: string,
-    ownerUserId: string,
-  ): Promise<{ authorizationUrl?: string; checkoutUrl?: string }> {
-    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
-    if (!tenant) throw new BadRequestException('Tenant not found');
-
-    const sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
-    if (!sub || sub.status !== SubscriptionStatus.PENDING_PAYMENT) {
-      throw new BadRequestException(
-        'Trial already started or subscription is no longer pending payment',
-      );
-    }
-
-    const owner = await this.userRepo.findOne({ where: { id: ownerUserId } });
-    if (!owner) throw new BadRequestException('Owner not found');
-
-    const planId =
-      `${tenant.planTier}_${tenant.currency.toLowerCase()}` as PlanId;
-    if (!(planId in PLANS)) {
-      throw new BadRequestException(`No plan available for ${planId}`);
-    }
-
-    if (tenant.currency === 'NGN') {
-      return this.startTrialPaystack(tenant, planId, owner);
-    }
-    return this.startTrialStripe(tenant, planId, owner);
-  }
-
-  private async startTrialPaystack(
-    tenant: Tenant,
-    planId: PlanId,
-    owner: User,
-  ): Promise<{ authorizationUrl: string }> {
-    const paystackKey = this.config.getOrThrow<string>('PAYSTACK_SECRET_KEY');
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? '';
-
-    await this.ensurePaystackCustomer(tenant, owner);
-
-    // Card verification only — a small refundable charge, never the plan
-    // amount. Paystack has no true $0 authorization, so this is the standard
-    // workaround: charge a small amount to capture a reusable authorization
-    // code, then refund it server-side once the webhook confirms the charge.
-    const initRes = await fetch(
-      'https://api.paystack.co/transaction/initialize',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${paystackKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: owner.email,
-          amount: PAYSTACK_VERIFICATION_CHARGE_NAIRA * 100,
-          callback_url: `${frontendUrl}/billing/start-trial?started=success`,
-          metadata: {
-            tenantId: tenant.id,
-            planId,
-            type: 'trial_verification',
-          },
-        }),
-      },
-    );
-
-    const initData = (await initRes.json()) as PaystackInitResponse;
-    const { authorization_url, reference } = initData.data;
-
-    await this.redis.set(
-      `billing:paystack:pending:${reference}`,
-      JSON.stringify({ tenantId: tenant.id, planId }),
-      'EX',
-      3600,
-    );
-
-    return { authorizationUrl: authorization_url };
-  }
-
-  private async startTrialStripe(
-    tenant: Tenant,
-    planId: PlanId,
-    owner: User,
-  ): Promise<{ checkoutUrl: string }> {
-    if (!this.stripe) throw new BadRequestException('Stripe not configured');
-
-    await this.ensureStripeCustomer(tenant, owner);
-
-    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? '';
-    const plan = PLANS[planId];
-    const priceId = 'stripePriceId' in plan ? plan.stripePriceId : undefined;
-
-    const session = await this.stripe.checkout.sessions.create({
-      customer: tenant.stripeCustomerId,
-      payment_method_types: ['card'],
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      // Required — otherwise Stripe may skip card collection for a session
-      // with nothing due today, which would defeat "card required".
-      payment_method_collection: 'always',
-      subscription_data: { trial_period_days: 7 },
-      success_url: `${frontendUrl}/billing/start-trial?started=success`,
-      cancel_url: `${frontendUrl}/billing/start-trial`,
-      metadata: { tenantId: tenant.id, planId, type: 'trial_start' },
-      expand: ['subscription'],
-    });
-
-    return { checkoutUrl: session.url ?? '' };
-  }
-
   // ── POST /billing/cancel-trial ────────────────────────────────────────────
 
   async cancelTrial(tenantId: string): Promise<{ message: string }> {
     const sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
     if (!sub) throw new BadRequestException('Subscription not found');
 
-    if (
-      sub.status !== SubscriptionStatus.PENDING_PAYMENT &&
-      sub.status !== SubscriptionStatus.TRIALING
-    ) {
+    if (sub.status !== SubscriptionStatus.TRIALING) {
       throw new BadRequestException(
         'Trial cannot be cancelled from its current state',
       );
@@ -616,13 +510,14 @@ export class BillingService {
           return;
         }
 
-        // ── Trial card verification (small refundable charge) ──
-        if (meta?.type === 'trial_verification') {
-          await this.handleTrialVerificationCharge(event, ref);
+        // ── Signup trial card verification (small refundable charge) —
+        //    no tenant exists yet, this is what creates one on success ──
+        if (meta?.type === 'signup_trial_verification') {
+          await this.handleSignupTrialVerificationCharge(event, ref);
           return;
         }
 
-        // ── Subscription payment — also used for the day-7/dunning
+        // ── Subscription payment — also used for the day-14/dunning
         //    charge_authorization conversion charge, which is tagged with
         //    this same metadata.type so it reuses this exact path. ──
         if (meta?.type !== 'subscription' || !meta.tenantId || !meta.planId)
@@ -718,14 +613,21 @@ export class BillingService {
       case 'checkout.session.completed': {
         if (obj.mode !== 'subscription') return;
         const meta = obj.metadata as Record<string, string> | undefined;
+
+        // ── Signup trial start — no tenant exists yet, this is what
+        //    creates one on success. Metadata carries signupToken/planTier
+        //    instead of tenantId/planId, so this must be checked first. ──
+        if (meta?.type === 'signup_trial_start') {
+          const signupToken = meta.signupToken;
+          const planTier = meta.planTier;
+          if (!signupToken || !planTier) return;
+          await this.handleSignupTrialStartCheckout(obj, signupToken, planTier);
+          break;
+        }
+
         const tenantId = meta?.tenantId;
         const planId = meta?.planId as PlanId | undefined;
         if (!tenantId || !planId) return;
-
-        if (meta?.type === 'trial_start') {
-          await this.handleTrialStartCheckout(obj, tenantId);
-          break;
-        }
 
         await this.activateSubscription(tenantId, planId);
         break;
@@ -789,64 +691,68 @@ export class BillingService {
     return undefined;
   }
 
-  private async handleTrialStartCheckout(
+  // No tenant/subscription row exists at this point — the account is
+  // created here, inside SignupService.completeSignup, not updated.
+  private async handleSignupTrialStartCheckout(
     obj: Record<string, unknown>,
-    tenantId: string,
+    signupToken: string,
+    planTier: string,
   ): Promise<void> {
     const subRef = obj.subscription as StripeSubscriptionRef | string | null;
     const stripeSubId =
-      typeof subRef === 'string' ? subRef : (subRef?.id ?? null);
+      typeof subRef === 'string' ? subRef : (subRef?.id ?? undefined);
     const trialEndUnix =
       typeof subRef === 'object' && subRef !== null
         ? subRef.trial_end
         : undefined;
     const trialEndsAt = trialEndUnix
       ? new Date(trialEndUnix * 1000)
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const now = new Date();
+      : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const customer = obj.customer;
+    const stripeCustomerId =
+      typeof customer === 'string' ? customer : undefined;
 
-    await this.subscriptionRepo.update(
-      { tenantId },
-      {
-        status: SubscriptionStatus.TRIALING,
-        stripeSubId,
-        currentPeriodStart: now,
-        currentPeriodEnd: trialEndsAt,
-      },
-    );
-    await this.tenantRepo.update(tenantId, {
-      subscriptionStatus: SubscriptionStatus.TRIALING,
+    await this.signupService.completeSignup({
+      signupToken,
+      planTier,
+      stripeSubId,
+      stripeCustomerId,
       trialEndsAt,
     });
-    await this.invalidateTenantCache(tenantId);
+
     this.logger.log(
-      `Trial started (Stripe) for tenant ${tenantId}, trialEndsAt=${trialEndsAt.toISOString()}`,
+      `Signup trial started (Stripe) for signupToken=${signupToken}, trialEndsAt=${trialEndsAt.toISOString()}`,
     );
   }
 
-  private async handleTrialVerificationCharge(
+  // No tenant/subscription row exists at this point — the account is
+  // created here, inside SignupService.completeSignup, not updated. This is
+  // the single most important amount check in the signup flow: it's the
+  // only thing standing between "the ₦50 actually cleared" and "an account
+  // gets created."
+  private async handleSignupTrialVerificationCharge(
     event: PaystackEvent,
     ref: string,
   ): Promise<void> {
     const cached = await this.redis.get(`billing:paystack:pending:${ref}`);
     if (!cached) {
       this.logger.warn(
-        `Trial verification webhook: no pending reference for ${ref}`,
+        `Signup trial verification webhook: no pending reference for ${ref}`,
       );
       return;
     }
-    const { tenantId } = JSON.parse(cached) as {
-      tenantId: string;
-      planId: PlanId;
+    const { signupToken, planTier } = JSON.parse(cached) as {
+      signupToken: string;
+      planTier: string;
     };
 
     const chargedNaira = (event.data.amount ?? 0) / 100;
     if (chargedNaira !== PAYSTACK_VERIFICATION_CHARGE_NAIRA) {
       this.logger.error(
-        `Trial verification amount mismatch: expected ₦${PAYSTACK_VERIFICATION_CHARGE_NAIRA}, ` +
+        `Signup trial verification amount mismatch: expected ₦${PAYSTACK_VERIFICATION_CHARGE_NAIRA}, ` +
           `got ₦${chargedNaira} for ref ${ref}`,
       );
-      Sentry.captureMessage('Trial verification amount mismatch', {
+      Sentry.captureMessage('Signup trial verification amount mismatch', {
         extra: { reference: ref, chargedNaira },
       });
       return;
@@ -855,18 +761,16 @@ export class BillingService {
     const authCode = event.data.authorization?.authorization_code;
     if (!authCode) {
       this.logger.error(
-        `Trial verification charge.success had no authorization code for ref ${ref}`,
+        `Signup trial verification charge.success had no authorization code for ref ${ref}`,
       );
-      Sentry.captureMessage('Trial verification missing authorization code', {
-        extra: { reference: ref },
-      });
+      Sentry.captureMessage(
+        'Signup trial verification missing authorization code',
+        { extra: { reference: ref } },
+      );
       return;
     }
 
-    await this.subscriptionRepo.update(
-      { tenantId },
-      { paystackAuthorizationCode: authCode },
-    );
+    const paystackCustomerId = event.data.customer?.customer_code;
 
     // Refund the verification charge immediately. A failed refund doesn't
     // block trial activation — the card is already validated either way,
@@ -883,32 +787,25 @@ export class BillingService {
       });
     } catch (err) {
       this.logger.error(
-        `Failed to refund trial verification charge ref=${ref}: ${String(err)}`,
+        `Failed to refund signup trial verification charge ref=${ref}: ${String(err)}`,
       );
-      Sentry.captureMessage('Failed to refund trial verification charge', {
-        extra: { reference: ref, err: String(err) },
-      });
+      Sentry.captureMessage(
+        'Failed to refund signup trial verification charge',
+        { extra: { reference: ref, err: String(err) } },
+      );
     }
 
-    const now = new Date();
-    const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    await this.subscriptionRepo.update(
-      { tenantId },
-      {
-        status: SubscriptionStatus.TRIALING,
-        currentPeriodStart: now,
-        currentPeriodEnd: trialEndsAt,
-      },
-    );
-    await this.tenantRepo.update(tenantId, {
-      subscriptionStatus: SubscriptionStatus.TRIALING,
-      trialEndsAt,
-    });
-    await this.invalidateTenantCache(tenantId);
     await this.redis.del(`billing:paystack:pending:${ref}`);
 
+    await this.signupService.completeSignup({
+      signupToken,
+      planTier,
+      paystackAuthorizationCode: authCode,
+      paystackCustomerId,
+    });
+
     this.logger.log(
-      `Trial started (Paystack) for tenant ${tenantId}, trialEndsAt=${trialEndsAt.toISOString()}`,
+      `Signup trial verified (Paystack) for signupToken=${signupToken}`,
     );
   }
 
@@ -958,7 +855,7 @@ export class BillingService {
     );
   }
 
-  // ── Charge attempt — used by both the day-7 conversion cron and the
+  // ── Charge attempt — used by both the day-14 conversion cron and the
   //    dunning retry cron. Never sets status to ACTIVE/PAST_DUE on the
   //    success path itself — the resulting charge.success webhook is the
   //    single source of truth for activation, consistent with every other

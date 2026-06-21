@@ -65,31 +65,6 @@ function SuspendedOverlay() {
   );
 }
 
-function PendingPaymentOverlay() {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white p-8 text-center"
-      data-testid="pending-payment-overlay"
-    >
-      <p className="mb-2 text-5xl">💳</p>
-      <h1 className="mt-4 text-2xl font-bold text-slate-900">
-        Add a payment method
-      </h1>
-      <p className="mt-3 max-w-md text-slate-600">
-        Add a card to start your 7-day free trial. Nothing is charged until
-        day 7.
-      </p>
-      <a
-        href="/billing/start-trial"
-        className="mt-6 rounded-xl bg-[#0F1E35] px-6 py-3 font-semibold text-white hover:bg-[#1a3050]"
-        data-testid="pending-payment-start-trial-link"
-      >
-        Start my trial →
-      </a>
-    </div>
-  );
-}
-
 function CancelledOverlay() {
   return (
     <div
@@ -168,17 +143,13 @@ function DashboardContent({ children }: { children: ReactNode }) {
   // Statuses that block dashboard access entirely — the onboarding redirect
   // below must never override these with a "go finish onboarding" bounce.
   const isBlockedByBilling =
-    billing?.status === 'pending_payment' ||
-    billing?.status === 'suspended' ||
-    billing?.status === 'cancelled';
+    billing?.status === 'suspended' || billing?.status === 'cancelled';
 
   useEffect(() => {
     // Onboarding is complete once the QR code has been generated. Skip this
     // on the onboarding route itself — otherwise every reload there would
     // immediately redirect back to itself, causing an infinite reload loop.
-    // Also skip it while billing blocks access — a brand-new pending_payment
-    // signup has no QR code yet either, and must see the billing overlay
-    // instead of being bounced into the onboarding wizard.
+    // Also skip it while billing blocks access entirely (suspended/cancelled).
     if (
       tenant &&
       !tenant.qrCodeUrl &&
@@ -202,10 +173,6 @@ function DashboardContent({ children }: { children: ReactNode }) {
         <Spinner className="h-8 w-8" />
       </div>
     );
-  }
-
-  if (billing?.status === 'pending_payment') {
-    return <PendingPaymentOverlay />;
   }
 
   if (billing?.status === 'cancelled') {

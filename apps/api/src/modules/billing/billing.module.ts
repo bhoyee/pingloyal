@@ -6,6 +6,7 @@ import { Tenant } from '../tenants/entities/tenant.entity';
 import { User } from '../auth/entities/user.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
+import { SignupModule } from '../signup/signup.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { WalletController } from './wallet.controller';
@@ -23,6 +24,7 @@ import { TrialBillingCronService } from './trial-billing.cron';
       WebhookEvent,
     ]),
     BullModule.registerQueue({ name: 'wa-messages' }),
+    SignupModule,
   ],
   controllers: [BillingController, WalletController],
   providers: [

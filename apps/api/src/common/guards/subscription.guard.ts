@@ -32,7 +32,6 @@ const ALWAYS_ALLOW_PATHS = ['/api/v1/auth', '/api/v1/health', '/api/docs'];
 
 const ALWAYS_ALLOW_POST_PATHS = [
   '/api/v1/billing/subscribe',
-  '/api/v1/billing/start-trial',
   '/api/v1/billing/cancel-trial',
   '/api/v1/billing/webhook',
   '/api/v1/customers/register',
@@ -134,21 +133,12 @@ export class SubscriptionGuard implements CanActivate {
 
     if (status === 'active') return true;
 
-    if (status === 'pending_payment') {
-      if (isExemptPost) return true;
-      throw402(
-        'Payment Method Required',
-        'Add a payment method to start your 7-day free trial.',
-        'start_trial',
-      );
-    }
-
     if (status === 'trialing') {
       if (!sub.trialEndsAt || new Date(sub.trialEndsAt) > new Date())
         return true;
       throw402(
         'Trial Expired',
-        'Your 7-day free trial has ended. Subscribe to continue using PingLoyal.',
+        'Your 14-day free trial has ended. Subscribe to continue using PingLoyal.',
         'subscribe',
       );
     }

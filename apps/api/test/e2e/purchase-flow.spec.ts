@@ -28,12 +28,15 @@ import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
 import {
   bootstrapTestApp,
   clearTestData,
+  createTestTenant,
   setWaVerified,
   setWalletBalance,
   getLedgerEntries,
   getTriggerLogs,
 } from '../helpers/test-helpers';
 import type Redis from 'ioredis';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
 // ── Test suite ────────────────────────────────────────────────────────────────
 
@@ -41,6 +44,8 @@ describe('Complete Purchase Flow (E2E)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let redis: Redis;
+  let jwtService: JwtService;
+  let configService: ConfigService;
   let triggerCheckQueue: Queue;
   let waMessagesQueue: Queue;
   let mockBspService: { sendMessage: jest.Mock };
@@ -70,6 +75,8 @@ describe('Complete Purchase Flow (E2E)', () => {
 
     dataSource = app.get<DataSource>(DataSource);
     redis = app.get<Redis>(REDIS_CLIENT);
+    jwtService = app.get<JwtService>(JwtService);
+    configService = app.get<ConfigService>(ConfigService);
     triggerCheckQueue = app.get<Queue>(
       getQueueToken(QUEUE_NAMES.TRIGGER_CHECK),
     );
@@ -83,63 +90,28 @@ describe('Complete Purchase Flow (E2E)', () => {
     await app.close();
   }, 30_000);
 
-  // ── Step 1: Business registers ────────────────────────────────────────────
+  // ── Step 1: Business account exists ───────────────────────────────────────
+  // A tenant only ever gets created once the signup card-verification charge
+  // succeeds (see SignupService.completeSignup) — this test exercises the
+  // purchase/trigger pipeline, not the signup flow itself, so it creates the
+  // tenant directly via the same helper every other integration test uses.
 
-  it('Step 1 — business registers, verifies email, and receives JWT + tenant', async () => {
+  it('Step 1 — business account exists with a trialing subscription', async () => {
     const email = `e2e-${Date.now()}@freshmart.ng`;
-    const password = 'SecurePass123!';
-
-    const registerRes = await request(
-      app.getHttpServer() as Parameters<typeof request>[0],
-    )
-      .post('/api/v1/auth/register')
-      .send({
-        businessName: 'FreshMart E2E',
-        fullName: 'Adaeze Okonkwo',
-        email,
-        password,
-        country: 'NG',
-      });
-
-    expect(registerRes.status).toBe(201);
-    type RegisterBody = { requiresVerification: boolean; email: string };
-    const registerBody = registerRes.body as RegisterBody;
-    expect(registerBody.requiresVerification).toBe(true);
-    expect(registerBody.email).toBe(email);
-
-    // Registration now withholds the tenant/token until the email is
-    // verified. Simulate verification directly via DB — mirrors Step 3's
-    // "WA verification simulated (direct DB)" pattern — then log in to
-    // obtain the JWT + tenant info, exactly like a real verified user would.
-    await dataSource.query(
-      `UPDATE users
-       SET email_verified_at = NOW(),
-           email_verification_token = NULL,
-           email_verification_expiry = NULL
-       WHERE email = $1`,
-      [email],
+    const { tenant, token } = await createTestTenant(
+      { dataSource, jwtService, configService },
+      { businessName: 'FreshMart E2E', email },
     );
 
-    const loginRes = await request(
-      app.getHttpServer() as Parameters<typeof request>[0],
-    )
-      .post('/api/v1/auth/login')
-      .send({ email, password });
-
-    expect(loginRes.status).toBe(200);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ownerToken = loginRes.body.accessToken as string;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    tenantId = loginRes.body.tenant?.id as string;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    tenantSlug = loginRes.body.tenant?.slug as string;
+    ownerToken = token;
+    tenantId = tenant.id;
+    tenantSlug = tenant.slug;
     createdTenantIds.push(tenantId);
 
     expect(ownerToken).toBeDefined();
     expect(tenantId).toBeDefined();
     expect(tenantSlug).toBeDefined();
 
-    // Verify subscription seeded
     const sub = await dataSource.query<
       [{ status: string; utility_included: string }]
     >(
@@ -147,22 +119,8 @@ describe('Complete Purchase Flow (E2E)', () => {
       [tenantId],
     );
     expect(sub.length).toBeGreaterThan(0);
+    expect(sub[0].status).toBe('trialing');
     expect(Number(sub[0].utility_included)).toBeGreaterThan(0);
-
-    // Registration now leaves the tenant in pending_payment (card required
-    // before any access) — this test exercises the purchase/trigger flow,
-    // not card capture, so simulate a completed trial-start directly via DB,
-    // mirroring Step 3's "WA verification simulated (direct DB)" pattern.
-    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await dataSource.query(
-      `UPDATE tenants SET subscription_status = 'trialing', trial_ends_at = $2 WHERE id = $1`,
-      [tenantId, trialEndsAt],
-    );
-    await dataSource.query(
-      `UPDATE subscriptions SET status = 'trialing' WHERE tenant_id = $1`,
-      [tenantId],
-    );
-    await redis.del(`sub:status:${tenantId}`);
   }, 30_000);
 
   // ── Step 2: Configure points and tiers ────────────────────────────────────

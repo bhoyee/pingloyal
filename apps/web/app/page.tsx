@@ -322,7 +322,7 @@ function CTASection() {
               Ready to grow your loyal customer base?
             </h2>
             <p className="mt-2 text-white/60">
-              Join 200+ stores across Lagos. 14-day free trial — no card needed.
+              Join 200+ stores across Lagos. 14-day free trial — card required, nothing charged until day 14.
             </p>
           </div>
           <Link
