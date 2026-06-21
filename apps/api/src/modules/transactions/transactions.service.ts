@@ -90,6 +90,7 @@ export class TransactionsService {
     tenantId: string,
     userId: string | null,
     dto: CreateTransactionDto,
+    source: TransactionSource = TransactionSource.CASHIER_APP,
   ): Promise<TransactionResult> {
     // Step 1 — Idempotency check (before any other DB query)
     const existing = await this.txRepo.findOne({
@@ -142,6 +143,22 @@ export class TransactionsService {
     // Pre-generate ID so ledger can reference it before we query back
     const transactionId = uuidv4();
 
+    // When the purchase actually happened — connected-mode integrations pass
+    // this for delayed/batched events so the record reflects real purchase
+    // time, not whenever we got around to processing it. Falls back to now
+    // if absent or unparseable (e.g. a malformed value from a flaky POS).
+    let occurredAt = new Date();
+    if (dto.occurredAt) {
+      const parsed = new Date(dto.occurredAt);
+      if (!isNaN(parsed.getTime())) {
+        occurredAt = parsed;
+      } else {
+        this.logger.warn(
+          `Invalid occurredAt "${dto.occurredAt}" for tenant ${tenantId} — using current time`,
+        );
+      }
+    }
+
     // Step 4 — All DB writes in a single atomic transaction
     await this.dataSource.transaction(async (em) => {
       // 4a. Insert transaction record
@@ -150,7 +167,7 @@ export class TransactionsService {
            (id, tenant_id, customer_id, category_id, logged_by_user_id,
             amount, points_earned, points_balance_after,
             source, idempotency_key, notes, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10, $11, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10, $11, $12)`,
         [
           transactionId,
           tenantId,
@@ -160,9 +177,10 @@ export class TransactionsService {
           dto.amount,
           pointsEarned,
           newBalance,
-          TransactionSource.CASHIER_APP,
+          source,
           dto.idempotencyKey,
           dto.notes ?? null,
+          occurredAt,
         ],
       );
 
@@ -171,7 +189,7 @@ export class TransactionsService {
         `INSERT INTO points_ledger
            (id, tenant_id, customer_id, delta, reason,
             ref_transaction_id, balance_after, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           uuidv4(),
           tenantId,
@@ -180,10 +198,14 @@ export class TransactionsService {
           PointsLedgerReason.PURCHASE,
           transactionId,
           newBalance,
+          occurredAt,
         ],
       );
 
-      // 4c. Atomic customer update — never read-then-write to avoid races
+      // 4c. Atomic customer update — never read-then-write to avoid races.
+      // last_purchase_at uses GREATEST so a delayed/batched event with an
+      // older occurredAt can never regress it behind a more recent purchase
+      // that's already been recorded.
       await em.query(
         `UPDATE customers SET
            points_balance   = points_balance   + $1,
@@ -191,10 +213,10 @@ export class TransactionsService {
            total_spend      = total_spend      + $2::numeric,
            quarterly_spend  = quarterly_spend  + $2::numeric,
            purchase_count   = purchase_count   + 1,
-           last_purchase_at = NOW(),
+           last_purchase_at = GREATEST(last_purchase_at, $5),
            updated_at       = NOW()
          WHERE id = $3 AND tenant_id = $4`,
-        [pointsEarned, dto.amount, dto.customerId, tenantId],
+        [pointsEarned, dto.amount, dto.customerId, tenantId, occurredAt],
       );
 
       // 4d. Tier recalculation (inside the same transaction)

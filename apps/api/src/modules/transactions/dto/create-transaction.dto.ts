@@ -1,4 +1,5 @@
 import {
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -32,4 +33,12 @@ export class CreateTransactionDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  /** When the purchase actually happened on the source system — used by
+   *  connected-mode integrations (webhook/API pull) to backdate delayed or
+   *  batched events instead of stamping them at processing time. Omitted
+   *  by the cashier app, which always means "now". */
+  @IsOptional()
+  @IsISO8601()
+  occurredAt?: string;
 }

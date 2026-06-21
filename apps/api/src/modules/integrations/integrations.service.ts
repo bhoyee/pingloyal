@@ -22,6 +22,7 @@ import {
   CustomerSource,
   IntegrationConnectionType,
   IntegrationSyncStatus,
+  TransactionSource,
 } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { Integration } from './entities/integration.entity';
@@ -372,12 +373,18 @@ export class IntegrationsService {
       : `webhook_${tenantId}_${crypto.randomUUID()}`;
 
     // Step 8 — Create transaction
-    const result = await this.txService.create(tenantId, null, {
-      customerId: customer.id,
-      amount: parseFloat(normalised.amount).toFixed(2),
-      categoryId,
-      idempotencyKey,
-    });
+    const result = await this.txService.create(
+      tenantId,
+      null,
+      {
+        customerId: customer.id,
+        amount: parseFloat(normalised.amount).toFixed(2),
+        categoryId,
+        idempotencyKey,
+        occurredAt: normalised.occurredAt || undefined,
+      },
+      TransactionSource.WEBHOOK,
+    );
 
     // Step 9 — Update sync status
     await this.integrationRepo.update(

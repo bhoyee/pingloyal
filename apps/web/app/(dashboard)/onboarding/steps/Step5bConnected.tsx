@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,15 @@ const FIELD_MAP = [
   { ourField: 'transactionId', placeholder: 'e.g. receipt_no (optional)' },
 ];
 
+// Generated once per session so the value shown to the user matches exactly
+// what gets sent to the backend on save — the backend always masks the
+// secret in its responses, so this is the only point the user ever sees it.
+function generateWebhookSecret(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
   const router = useRouter();
   const [connType, setConnType] = useState<ConnectionType>('webhook');
@@ -35,9 +44,9 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [webhookSecret] = useState(generateWebhookSecret);
 
-  const webhookUrl = `https://api.pingloyal.com/webhooks/${tenantSlug}`;
-  const webhookSecret = 'wh_' + tenantSlug.slice(0, 8) + '_secret';
+  const webhookUrl = `${process.env.NEXT_PUBLIC_API_URL ?? 'https://api.pingloyal.com'}/api/v1/integrations/webhook/${tenantSlug}`;
 
   function copyToClipboard(text: string, key: string) {
     void navigator.clipboard.writeText(text);
@@ -45,39 +54,60 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
     setTimeout(() => setCopied(null), 2000);
   }
 
+  function buildFieldMapping() {
+    return {
+      phone: fieldMap.phone ?? '',
+      amount: fieldMap.amount ?? '',
+      customerName: fieldMap.customerName || undefined,
+      categorySlug: fieldMap.categorySlug || undefined,
+      transactionId: fieldMap.transactionId || undefined,
+    };
+  }
+
+  // The backend's /integrations/test endpoint tests the already-saved
+  // integration for this tenant — it ignores the request body entirely.
+  // Before the first "Complete Setup" there's nothing saved yet, so this
+  // will 404 ("No integration configured"); that's expected, not a bug.
   async function handleTest() {
     setTestResult('idle');
     setTestMsg('');
     try {
-      await api.post('/integrations/test', {
-        type: connType,
-        apiUrl,
-        fieldMap,
-      });
+      await api.post('/integrations/test', {});
       setTestResult('ok');
       setTestMsg('Connection successful!');
     } catch (e) {
       setTestResult('error');
-      setTestMsg(e instanceof Error ? e.message : 'Connection failed');
+      setTestMsg(
+        e instanceof ApiError
+          ? e.message
+          : 'Connection failed — save your configuration first, then test it from Settings → Integrations.',
+      );
     }
   }
 
   async function handleComplete() {
-    setSaving(true);
     setError('');
+    if (connType !== 'file_export') {
+      if (!fieldMap.phone?.trim() || !fieldMap.amount?.trim()) {
+        setError('Phone and amount field names are required.');
+        return;
+      }
+    }
+    setSaving(true);
     try {
       await api.post('/integrations', {
-        type: connType,
-        apiUrl: connType === 'api_pull' ? apiUrl : undefined,
+        connectionType: connType,
+        endpointUrl: connType === 'api_pull' ? apiUrl : undefined,
         apiKey: connType === 'api_pull' ? apiKey : undefined,
-        pollInterval:
+        webhookSecret: connType === 'webhook' ? webhookSecret : undefined,
+        pollIntervalMins:
           connType === 'api_pull' ? Number(pollInterval) : undefined,
-        fieldMap,
+        fieldMapping: buildFieldMapping(),
       });
       localStorage.setItem('onboarding_step', 'complete');
       router.push('/dashboard');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setError(e instanceof ApiError ? e.message : 'Something went wrong');
       setSaving(false);
     }
   }
