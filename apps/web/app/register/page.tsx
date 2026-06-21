@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { publicPost } from '@/lib/api';
 
 interface RegisterResponse {
-  requiresVerification: true;
+  signupToken: string;
   email: string;
   devCode?: string;
 }
@@ -50,7 +50,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await publicPost<RegisterResponse>('/api/v1/auth/register', {
+      const res = await publicPost<RegisterResponse>('/api/v1/signup/register', {
         businessName: businessName.trim(),
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
@@ -58,7 +58,10 @@ export default function RegisterPage() {
         country,
       });
 
-      const params = new URLSearchParams({ email: res.email });
+      const params = new URLSearchParams({
+        token: res.signupToken,
+        email: res.email,
+      });
       if (res.devCode) params.set('devCode', res.devCode);
       router.replace(`/verify-email?${params.toString()}`);
     } catch (err) {
@@ -102,8 +105,8 @@ export default function RegisterPage() {
             <span className="text-2xl font-bold text-[#0A1628]">PingLoyal</span>
           </div>
           <p className="text-sm text-gray-500">
-            Start your 7-day free trial — card required, nothing charged
-            until day 7
+            Start your 14-day free trial — card required, nothing charged
+            until day 14
           </p>
         </div>
 

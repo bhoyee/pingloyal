@@ -13,18 +13,14 @@ import { Throttle } from '@nestjs/throttler';
 import {
   ForgotPasswordThrottleGuard,
   LoginThrottleGuard,
-  ResendVerificationThrottleGuard,
 } from '../../common/throttle/auth-throttle.guard';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
 import type { RequestUser } from '@pingloyal/types';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
-import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -38,14 +34,6 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new business account' })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
-  }
-
-  @Public()
   @UseGuards(LoginThrottleGuard)
   @Throttle({ login: { ttl: 15 * 60 * 1000, limit: 15 } })
   @Post('login')
@@ -53,24 +41,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Login — 15 attempts per 15 min per IP' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
-  }
-
-  @Public()
-  @Post('verify-email')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify email with 6-digit code' })
-  verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto);
-  }
-
-  @Public()
-  @UseGuards(ResendVerificationThrottleGuard)
-  @Throttle({ default: { ttl: 60 * 1000, limit: 3 } })
-  @Post('resend-verification')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resend email verification code' })
-  resendVerification(@Body() dto: ResendVerificationDto) {
-    return this.authService.resendVerification(dto);
   }
 
   @Public()

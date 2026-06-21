@@ -28,7 +28,6 @@ interface SubscribeResponse {
 }
 
 const STATUS_BADGES: Record<string, { label: string; className: string }> = {
-  pending_payment: { label: 'Payment method required', className: 'bg-amber-100 text-amber-800' },
   trialing: { label: 'Free trial', className: 'bg-blue-100 text-blue-800' },
   active: { label: 'Active', className: 'bg-emerald-100 text-emerald-800' },
   past_due: { label: 'Payment failed', className: 'bg-amber-100 text-amber-800' },
@@ -93,7 +92,7 @@ export default function BillingPage() {
   };
   const currencySymbol = status.currency === 'GBP' ? '£' : '₦';
   const manageUrl = status.paystackManageUrl ?? status.stripeManageUrl;
-  const canCancelTrial = status.status === 'pending_payment' || status.status === 'trialing';
+  const canCancelTrial = status.status === 'trialing';
   const needsReactivation =
     status.status === 'suspended' || status.status === 'cancelled' || status.status === 'past_due';
 
@@ -137,15 +136,6 @@ export default function BillingPage() {
             {status.trialDaysRemaining === 1 ? 'day' : 'days'}. You&apos;ll be charged{' '}
             {currencySymbol}
             {status.amount.toLocaleString()} automatically unless you cancel first.
-          </p>
-        )}
-
-        {status.status === 'pending_payment' && (
-          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-            Add a payment method to start your 7-day free trial.{' '}
-            <a href="/billing/start-trial" className="font-semibold underline">
-              Start trial →
-            </a>
           </p>
         )}
 

@@ -424,6 +424,13 @@ describe('Wallet Integration Tests', () => {
       const body = JSON.stringify({
         event: 'charge.success',
         data: {
+          // A unique numeric id is required — extractPaystackEventId() in
+          // billing.service.ts keys webhook-dedup on data.id when present,
+          // falling back to a composite of event+reference+status otherwise.
+          // Without it, this static ref collides with whatever the previous
+          // suite run inserted into webhook_events and gets silently skipped
+          // as a duplicate.
+          id: Date.now(),
           reference: ref,
           amount: 1_000_000, // 10,000 naira in kobo
           metadata: { type: 'wallet_topup', tenantId, amount: 10_000 },

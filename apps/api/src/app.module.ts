@@ -17,6 +17,7 @@ import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './common/redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { FullAuthModule } from './modules/auth/auth.module';
+import { SignupModule } from './modules/signup/signup.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { HealthModule } from './health/health.module';
@@ -80,6 +81,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     RedisModule,
     QueueModule,
     FullAuthModule,
+    SignupModule,
     TenantsModule,
     WhatsappModule,
     HealthModule,

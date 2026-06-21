@@ -2,12 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsEnum,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { PlanTier } from '@pingloyal/types';
 import { SanitiseString } from '../../../common/decorators/sanitise-string.decorator';
 
 export enum Country {
@@ -15,7 +13,7 @@ export enum Country {
   UK = 'UK',
 }
 
-export class RegisterDto {
+export class SignupRegisterDto {
   @ApiProperty({ example: 'FreshMart Lagos' })
   @SanitiseString()
   @IsString()
@@ -42,9 +40,4 @@ export class RegisterDto {
   @ApiProperty({ enum: Country, example: 'NG' })
   @IsEnum(Country)
   country: Country;
-
-  @ApiProperty({ enum: PlanTier, example: PlanTier.STARTER, required: false })
-  @IsOptional()
-  @IsEnum(PlanTier)
-  planTier?: PlanTier;
 }

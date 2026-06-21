@@ -100,50 +100,34 @@ describe('Tenant Isolation', () => {
 
   // ─── GROUP 1: Auth isolation ────────────────────────────────────────────────
   describe('Group 1 — Auth isolation', () => {
-    it('a second tenant cannot register with an email already in use', async () => {
-      const sharedEmail = `shared-${Date.now()}@isolation.test`;
-
-      const regA = await request(
-        app.getHttpServer() as Parameters<typeof request>[0],
-      )
-        .post('/api/v1/auth/register')
-        .send({
-          businessName: 'Same Email Store Alpha',
-          fullName: 'Owner Alpha',
-          email: sharedEmail,
-          password: 'StrongPass123!',
-          country: 'NG',
-        });
-
+    it('signup registration is rejected for an email already in use by an existing tenant', async () => {
+      // /auth/register no longer exists — accounts are only created via the
+      // signup flow once a trial card-verification payment succeeds (see
+      // SignupService.completeSignup). The duplicate-email guard now lives
+      // in SignupService.register(), checked against the real `users` table.
+      // tenantAResult's owner already exists (created in beforeAll), so a
+      // fresh signup attempt for that same email — even differently-cased —
+      // must be rejected before any pending signup state is created.
       const regB = await request(
         app.getHttpServer() as Parameters<typeof request>[0],
       )
-        .post('/api/v1/auth/register')
+        .post('/api/v1/signup/register')
         .send({
           businessName: 'Same Email Store Beta',
           fullName: 'Owner Beta',
-          email: sharedEmail.toUpperCase(),
+          email: tenantAResult.user.email.toUpperCase(),
           password: 'StrongPass123!',
           country: 'NG',
         });
 
-      expect(regA.status).toBe(201);
       expect(regB.status).toBe(409);
 
-      // Registration now requires email verification before returning
-      // tenant/user details, so look the created record up directly.
-      type RegisterBody = { requiresVerification: boolean; email: string };
-      const bodyA = regA.body as RegisterBody;
-      expect(bodyA.requiresVerification).toBe(true);
-
       const userRepo = dataSource.getRepository(User);
-      const users = await userRepo.find({ where: { email: sharedEmail } });
+      const users = await userRepo.find({
+        where: { email: tenantAResult.user.email },
+      });
       expect(users).toHaveLength(1);
-      const [userA] = users;
-      expect(userA.email).toBe(sharedEmail);
-
-      // Track for cleanup
-      createdTenantIds.push(userA.tenantId);
+      expect(users[0].tenantId).toBe(tenantAResult.tenant.id);
     });
 
     it("Tenant B's JWT tenantId is B's tenant — cannot masquerade as Tenant A", () => {

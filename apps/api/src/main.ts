@@ -11,6 +11,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
 import helmet from 'helmet';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import * as Sentry from '@sentry/node';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
@@ -91,6 +92,9 @@ async function bootstrap(): Promise<void> {
 
   // Gzip compression
   app.use(compression());
+
+  // Cookie parsing — needed for the signup_session second-factor cookie
+  app.use(cookieParser());
 
   // CORS — FRONTEND_URL supports comma-separated origins for LAN dev access
   const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3001')

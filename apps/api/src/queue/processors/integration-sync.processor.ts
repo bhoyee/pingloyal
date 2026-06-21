@@ -9,7 +9,11 @@ import {
   normalisePhone,
   PhoneNormalisationError,
 } from '@pingloyal/utils';
-import { CustomerSource, IntegrationSyncStatus } from '@pingloyal/types';
+import {
+  CustomerSource,
+  IntegrationSyncStatus,
+  TransactionSource,
+} from '@pingloyal/types';
 import { Integration } from '../../modules/integrations/entities/integration.entity';
 import { Customer } from '../../modules/customers/entities/customer.entity';
 import { ProductCategory } from '../../modules/tenants/entities/product-category.entity';
@@ -235,20 +239,26 @@ export class IntegrationSyncProcessor extends WorkerHost {
           ? `apipull_${tenantId}_${normalised.externalTransactionId}`
           : `apipull_${tenantId}_${crypto.randomUUID()}`;
 
-        await this.txService.create(tenantId, null, {
-          customerId: customer.id,
-          amount: parseFloat(normalised.amount).toFixed(2),
-          categoryId,
-          idempotencyKey,
-        });
+        await this.txService.create(
+          tenantId,
+          null,
+          {
+            customerId: customer.id,
+            amount: parseFloat(normalised.amount).toFixed(2),
+            categoryId,
+            idempotencyKey,
+            occurredAt: normalised.occurredAt || undefined,
+          },
+          TransactionSource.API_PULL,
+        );
 
         processed++;
 
         // Track cursor
         if (fm.transactionId) {
           newCursor = getStr(rawTx, fm.transactionId) || newCursor;
-        } else if (fm.occurredAt) {
-          newCursor = getStr(rawTx, fm.occurredAt) || newCursor;
+        } else if (normalised.occurredAt) {
+          newCursor = normalised.occurredAt || newCursor;
         } else {
           newCursor = new Date().toISOString();
         }

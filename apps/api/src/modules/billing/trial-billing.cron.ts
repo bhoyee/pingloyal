@@ -40,7 +40,7 @@ export class TrialBillingCronService {
   // Stripe trials convert and retry entirely through Stripe's own billing
   // engine (subscription_data.trial_period_days + its native invoice
   // retries) — webhooks already drive activation/past_due for that path.
-  // Paystack has no equivalent, so this cron does the day-7 charge attempt
+  // Paystack has no equivalent, so this cron does the day-14 charge attempt
   // for NGN tenants only.
   @Cron('0 * * * *')
   async chargeExpiredPaystackTrials(): Promise<void> {
@@ -69,13 +69,13 @@ export class TrialBillingCronService {
         });
       } catch (err) {
         this.logger.error(
-          `Day-7 charge attempt failed for tenant ${row.tenant_id}: ${String(err)}`,
+          `Day-14 charge attempt failed for tenant ${row.tenant_id}: ${String(err)}`,
         );
       }
     }
     if (due.length > 0) {
       this.logger.log(
-        `Day-7 trial conversion: attempted ${due.length} charge(s)`,
+        `Day-14 trial conversion: attempted ${due.length} charge(s)`,
       );
     }
 

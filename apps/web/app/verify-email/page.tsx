@@ -4,13 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { publicPost, ApiError } from '@/lib/api';
 
 interface VerifyResponse {
-  accessToken: string;
-  refreshToken?: string;
+  verified: true;
 }
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const params = useSearchParams();
+  const signupToken = params.get('token') ?? '';
   const email = params.get('email') ?? '';
   const devCode = params.get('devCode');
 
@@ -34,15 +34,11 @@ export default function VerifyEmailPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await publicPost<VerifyResponse>('/api/v1/auth/verify-email', {
-        email,
+      await publicPost<VerifyResponse>('/api/v1/signup/verify-email', {
+        signupToken,
         code: code.trim(),
       });
-      localStorage.setItem('access_token', res.accessToken);
-      if (res.refreshToken) {
-        localStorage.setItem('refresh_token', res.refreshToken);
-      }
-      router.replace('/billing/start-trial');
+      router.replace(`/select-plan?token=${encodeURIComponent(signupToken)}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Verification failed — please try again');
     } finally {
@@ -55,7 +51,7 @@ export default function VerifyEmailPage() {
     setError('');
     setSuccessMsg('');
     try {
-      await publicPost('/api/v1/auth/resend-verification', { email });
+      await publicPost('/api/v1/signup/resend-code', { signupToken });
       setSuccessMsg('A new code has been sent to your email');
     } catch {
       setError('Could not resend — please wait a moment and try again');
