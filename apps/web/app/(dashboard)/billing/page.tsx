@@ -32,6 +32,8 @@ interface BillingStatus {
   marketingMessagesThisMonth: number;
   marketingSpendThisMonth: number;
   botRepliesThisMonth: number;
+  pendingPlanTier: string | null;
+  pendingPlanEffectiveAt: string | null;
   paystackManageUrl: string | null;
   stripeManageUrl: string | null;
 }
@@ -59,6 +61,9 @@ interface SubscribeResponse {
 
 interface ChangePlanResponse {
   message: string;
+  requiresPayment: boolean;
+  authorizationUrl?: string;
+  checkoutUrl?: string;
 }
 
 // ── Plan marketing copy (purely presentational — billing numbers come from
@@ -152,6 +157,11 @@ export default function BillingPage() {
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [confirmUpgrade, setConfirmUpgrade] = useState<{
+    planTier: string;
+    name: string;
+    amountDisplay: string;
+  } | null>(null);
 
   const { data: status, isLoading } = useQuery<BillingStatus>({
     queryKey: ['billing-status'],
@@ -205,6 +215,12 @@ export default function BillingPage() {
       const res = await api.post<ChangePlanResponse>('/api/v1/billing/change-plan', {
         planTier,
       });
+      if (res.requiresPayment) {
+        const url = res.authorizationUrl ?? res.checkoutUrl;
+        if (!url) throw new Error('No checkout URL returned');
+        window.location.href = url;
+        return;
+      }
       setToast(res.message);
       refresh();
     } catch (err) {
@@ -215,6 +231,14 @@ export default function BillingPage() {
       setActionLoading(false);
       setPendingPlan(null);
     }
+  }
+
+  function handlePlanButtonClick(planTier: string, name: string, amountDisplay: string, isUpgrade: boolean) {
+    if (isUpgrade) {
+      setConfirmUpgrade({ planTier, name, amountDisplay });
+      return;
+    }
+    void handleChangePlan(planTier);
   }
 
   async function handleCancelTrial() {
@@ -249,6 +273,9 @@ export default function BillingPage() {
   const needsReactivation =
     status.status === 'suspended' || status.status === 'cancelled' || status.status === 'past_due';
   const canChangePlan = status.status === 'trialing' || status.status === 'active';
+  const pendingEffectiveDateLabel = status.pendingPlanEffectiveAt
+    ? new Date(status.pendingPlanEffectiveAt).toLocaleDateString()
+    : 'your next billing date';
   const utilityPercent = Math.min(
     100,
     Math.round((status.utilityUsedThisPeriod / Math.max(1, status.utilityIncluded)) * 100),
@@ -321,6 +348,13 @@ export default function BillingPage() {
           {status.status === 'cancelled' && (
             <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
               Your trial was cancelled before it converted. Subscribe any time to reactivate.
+            </p>
+          )}
+
+          {status.pendingPlanTier && (
+            <p className="mt-4 rounded-lg bg-blue-50 px-3 py-2.5 text-sm capitalize text-blue-800">
+              A change to the <span className="font-semibold">{status.pendingPlanTier}</span>{' '}
+              plan is scheduled to start on {pendingEffectiveDateLabel}.
             </p>
           )}
 
@@ -460,7 +494,7 @@ export default function BillingPage() {
           <p className="mt-0.5 text-sm text-slate-500">
             {needsReactivation
               ? 'Pick a plan to reactivate your subscription.'
-              : 'Upgrade or downgrade any time — changes apply immediately and the new price takes effect on your next billing date.'}
+              : 'Upgrade or downgrade any time — changes start on your next billing date. Upgrades require paying the new plan’s price upfront to confirm.'}
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -539,14 +573,27 @@ export default function BillingPage() {
                       <div className="rounded-xl border border-slate-200 bg-slate-50 py-3 text-center text-sm font-semibold text-slate-500">
                         Current Plan
                       </div>
+                    ) : status.pendingPlanTier === plan.planTier ? (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 py-3 text-center text-sm font-semibold text-blue-700">
+                        Pending — starts {pendingEffectiveDateLabel}
+                      </div>
+                    ) : status.pendingPlanTier && canChangePlan && !needsReactivation ? (
+                      <Button disabled className="w-full">
+                        Change pending
+                      </Button>
                     ) : (
                       <Button
                         loading={isPending}
                         disabled={actionLoading && !isPending}
                         onClick={() =>
-                          void (needsReactivation
-                            ? startCheckout(plan.planId)
-                            : handleChangePlan(plan.planTier))
+                          needsReactivation
+                            ? void startCheckout(plan.planId)
+                            : handlePlanButtonClick(
+                                plan.planTier,
+                                copy.name,
+                                plan.amountDisplay,
+                                isUpgrade,
+                              )
                         }
                         className={`w-full ${
                           popular
@@ -577,6 +624,41 @@ export default function BillingPage() {
           className="fixed bottom-4 left-4 right-4 mx-auto max-w-sm rounded-xl bg-gray-800 px-4 py-3 text-center text-sm text-white shadow-lg"
         >
           {toast}
+        </div>
+      )}
+
+      {confirmUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold capitalize text-slate-900">
+              Upgrade to {confirmUpgrade.name}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Your {confirmUpgrade.planTier} plan starts on {pendingEffectiveDateLabel}. You&apos;ll
+              be redirected to pay {confirmUpgrade.amountDisplay} now to confirm it.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setConfirmUpgrade(null)}
+                disabled={actionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-[#0DC56A] hover:bg-[#0ab55e]"
+                loading={actionLoading}
+                onClick={() => {
+                  const planTier = confirmUpgrade.planTier;
+                  setConfirmUpgrade(null);
+                  void handleChangePlan(planTier);
+                }}
+              >
+                Continue to payment →
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

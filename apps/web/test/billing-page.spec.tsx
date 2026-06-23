@@ -54,6 +54,8 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
     marketingMessagesThisMonth: 40,
     marketingSpendThisMonth: 5200,
     botRepliesThisMonth: 12,
+    pendingPlanTier: null,
+    pendingPlanEffectiveAt: null,
     paystackManageUrl: null,
     stripeManageUrl: null,
     ...overrides,
@@ -143,13 +145,23 @@ it('renders all three plans with full feature lists and marks the current plan',
   expect(screen.getByText('Dedicated onboarding support')).toBeInTheDocument();
 });
 
-it('clicking Upgrade on a higher plan calls POST /billing/change-plan with that planTier', async () => {
-  mockApi.post.mockResolvedValue({ message: 'Plan updated to growth.' });
+it('clicking Upgrade opens a confirm dialog, then redirects to the returned payment URL on confirm', async () => {
+  mockApi.post.mockResolvedValue({
+    message: 'Pay for your upgrade to confirm — it starts next billing cycle.',
+    requiresPayment: true,
+    authorizationUrl: 'https://paystack.com/pay/upgrade',
+  });
 
   render(<BillingPage />, { wrapper });
 
   await waitFor(() => screen.getByText(/Upgrade to growth/));
   await userEvent.click(screen.getByText(/Upgrade to growth/));
+
+  // Confirming should not call the API immediately — the dialog gates it.
+  expect(mockApi.post).not.toHaveBeenCalled();
+
+  await waitFor(() => screen.getByText('Continue to payment →'));
+  await userEvent.click(screen.getByText('Continue to payment →'));
 
   await waitFor(() => {
     expect(mockApi.post).toHaveBeenCalledWith('/api/v1/billing/change-plan', {
@@ -158,14 +170,29 @@ it('clicking Upgrade on a higher plan calls POST /billing/change-plan with that 
   });
 });
 
-it('clicking Downgrade on a lower plan calls POST /billing/change-plan with that planTier', async () => {
+it('clicking Cancel on the upgrade confirm dialog does not call the API', async () => {
+  render(<BillingPage />, { wrapper });
+
+  await waitFor(() => screen.getByText(/Upgrade to growth/));
+  await userEvent.click(screen.getByText(/Upgrade to growth/));
+
+  await waitFor(() => screen.getByText('Cancel'));
+  await userEvent.click(screen.getByText('Cancel'));
+
+  expect(mockApi.post).not.toHaveBeenCalled();
+});
+
+it('clicking Downgrade on a lower plan calls POST /billing/change-plan directly, no confirm dialog', async () => {
   mockApi.get.mockImplementation((path: string) => {
     if (path.includes('billing/status'))
       return Promise.resolve(makeStatus({ planTier: 'growth', amount: 20000 }));
     if (path.includes('billing/plans')) return Promise.resolve(makePlans('growth'));
     return Promise.resolve(null);
   });
-  mockApi.post.mockResolvedValue({ message: 'Plan updated to starter.' });
+  mockApi.post.mockResolvedValue({
+    message: 'Downgrade to starter scheduled for 7/1/2026.',
+    requiresPayment: false,
+  });
 
   render(<BillingPage />, { wrapper });
 
@@ -177,6 +204,26 @@ it('clicking Downgrade on a lower plan calls POST /billing/change-plan with that
       planTier: 'starter',
     });
   });
+  expect(screen.queryByText('Continue to payment →')).not.toBeInTheDocument();
+});
+
+it('shows a Pending state on the scheduled plan and disables other change buttons while a change is pending', async () => {
+  mockApi.get.mockImplementation((path: string) => {
+    if (path.includes('billing/status'))
+      return Promise.resolve(
+        makeStatus({
+          pendingPlanTier: 'growth',
+          pendingPlanEffectiveAt: new Date('2026-08-01').toISOString(),
+        }),
+      );
+    if (path.includes('billing/plans')) return Promise.resolve(makePlans());
+    return Promise.resolve(null);
+  });
+
+  render(<BillingPage />, { wrapper });
+
+  await waitFor(() => screen.getByText(/Pending — starts/));
+  expect(screen.getByText('Change pending')).toBeInTheDocument();
 });
 
 it('on the top Connect tier, every other plan shows Downgrade — never Upgrade — regardless of amount', async () => {

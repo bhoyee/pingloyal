@@ -35,11 +35,12 @@ export class BillingController {
   @Post('change-plan')
   @Roles(UserRole.OWNER)
   @SkipSubscriptionCheck()
-  changePlan(
-    @Req() req: { user: RequestUser },
-    @Body() dto: ChangePlanDto,
-  ) {
-    return this.billingService.changePlan(req.user.tenantId, dto.planTier);
+  changePlan(@Req() req: { user: RequestUser }, @Body() dto: ChangePlanDto) {
+    return this.billingService.changePlan(
+      req.user.tenantId,
+      dto.planTier,
+      req.user.userId,
+    );
   }
 
   // Polled on every dashboard page load to check for suspension/past-due —

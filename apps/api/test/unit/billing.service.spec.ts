@@ -29,7 +29,10 @@ jest.mock('../../src/modules/billing/plans.config', () => {
     ...actual,
     PLANS: {
       ...actual.PLANS,
-      growth_gbp: { ...actual.PLANS.growth_gbp, stripePriceId: 'price_test_growth_gbp' },
+      growth_gbp: {
+        ...actual.PLANS.growth_gbp,
+        stripePriceId: 'price_test_growth_gbp',
+      },
     },
   };
 });
@@ -902,7 +905,7 @@ describe('BillingService', () => {
 
   // ── T36: getPlans ──────────────────────────────────────────────────────────
 
-  it('T36 — getPlans returns NGN plans with the tenant\'s current tier flagged isCurrent', async () => {
+  it("T36 — getPlans returns NGN plans with the tenant's current tier flagged isCurrent", async () => {
     mockTenantRepo.findOne.mockResolvedValue(
       makeTenant({ currency: 'NGN', planTier: PlanTier.GROWTH }),
     );
@@ -945,32 +948,7 @@ describe('BillingService', () => {
   // ── T39-T44: changePlan ────────────────────────────────────────────────────
 
   describe('changePlan', () => {
-    it('T39 — trialing tenant: updates DB immediately, no Stripe call, no-charge message', async () => {
-      mockTenantRepo.findOne.mockResolvedValue(
-        makeTenant({
-          currency: 'NGN',
-          planTier: PlanTier.STARTER,
-          subscriptionStatus: SubscriptionStatus.TRIALING,
-        }),
-      );
-      mockSubRepo.findOne.mockResolvedValue(makeSubscription());
-
-      const result = await service.changePlan(TENANT_ID, 'growth');
-
-      expect(mockSubRepo.update).toHaveBeenCalledWith('sub-1', {
-        planTier: PlanTier.GROWTH,
-        amount: 20000,
-        utilityIncluded: 800,
-        utilityOverageRate: 16,
-        marketingRate: 115,
-      });
-      expect(mockTenantRepo.update).toHaveBeenCalledWith(TENANT_ID, {
-        planTier: PlanTier.GROWTH,
-      });
-      expect(result.message).toContain("won't be charged");
-    });
-
-    it('T40 — active NGN tenant: updates DB, defers the new price to the next billing date', async () => {
+    it('T39 — downgrade schedules pending* fields immediately, no payment required', async () => {
       mockTenantRepo.findOne.mockResolvedValue(
         makeTenant({
           currency: 'NGN',
@@ -978,25 +956,59 @@ describe('BillingService', () => {
           subscriptionStatus: SubscriptionStatus.ACTIVE,
         }),
       );
+      const periodEnd = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
       mockSubRepo.findOne.mockResolvedValue(
-        makeSubscription({ planTier: PlanTier.GROWTH, amount: 20000 }),
+        makeSubscription({
+          planTier: PlanTier.GROWTH,
+          amount: 20000,
+          currentPeriodEnd: periodEnd,
+        }),
       );
 
-      const result = await service.changePlan(TENANT_ID, 'starter');
+      const result = await service.changePlan(TENANT_ID, 'starter', OWNER_ID);
 
-      expect(mockSubRepo.update).toHaveBeenCalledWith(
-        'sub-1',
-        expect.objectContaining({ planTier: PlanTier.STARTER, amount: 8000 }),
-      );
-      expect(result.message).toContain('next billing date');
+      expect(mockSubRepo.update).toHaveBeenCalledWith('sub-1', {
+        pendingPlanTier: PlanTier.STARTER,
+        pendingPlanEffectiveAt: periodEnd,
+        pendingPlanReference: null,
+      });
+      expect(result.requiresPayment).toBe(false);
+      expect(result.message).toContain('Downgrade');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    it('T41 — active GBP tenant with a live Stripe subscription swaps the price with no proration', async () => {
+    it('T40 — active NGN tenant upgrade: initiates a Paystack checkout, writes nothing yet', async () => {
+      mockTenantRepo.findOne.mockResolvedValue(
+        makeTenant({
+          currency: 'NGN',
+          planTier: PlanTier.STARTER,
+          subscriptionStatus: SubscriptionStatus.ACTIVE,
+        }),
+      );
+      mockSubRepo.findOne.mockResolvedValue(
+        makeSubscription({ planTier: PlanTier.STARTER, amount: 8000 }),
+      );
+
+      const result = await service.changePlan(TENANT_ID, 'growth', OWNER_ID);
+
+      expect(result.requiresPayment).toBe(true);
+      expect(result.authorizationUrl).toContain('paystack.com');
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        'billing:planchange:pending:ref_test123',
+        JSON.stringify({ tenantId: TENANT_ID, planTier: 'growth' }),
+        'EX',
+        3600,
+      );
+      expect(mockSubRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('T41 — active GBP tenant upgrade: initiates a one-time Stripe Checkout, writes nothing yet', async () => {
       mockTenantRepo.findOne.mockResolvedValue(
         makeTenant({
           currency: 'GBP',
           planTier: PlanTier.STARTER,
           subscriptionStatus: SubscriptionStatus.ACTIVE,
+          stripeCustomerId: 'cus_existing',
         }),
       );
       mockSubRepo.findOne.mockResolvedValue(
@@ -1007,22 +1019,29 @@ describe('BillingService', () => {
         }),
       );
 
-      await service.changePlan(TENANT_ID, 'growth');
+      const result = await service.changePlan(TENANT_ID, 'growth', OWNER_ID);
 
       const Stripe = jest.requireMock<jest.Mock>('stripe');
       const stripeMock = Stripe.mock.results[0].value as {
-        subscriptions: { retrieve: jest.Mock; update: jest.Mock };
+        checkout: {
+          sessions: {
+            create: jest.Mock<
+              Promise<{ url: string }>,
+              [Record<string, unknown>]
+            >;
+          };
+        };
       };
-      expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledWith(
-        'sub_live123',
-      );
-      expect(stripeMock.subscriptions.update).toHaveBeenCalledWith(
-        'sub_live123',
-        expect.objectContaining({
-          items: [{ id: 'si_test123', price: 'price_test_growth_gbp' }],
-          proration_behavior: 'none',
-        }),
-      );
+      const sessionArgs = stripeMock.checkout.sessions.create.mock.calls[0][0];
+      expect(sessionArgs.mode).toBe('payment');
+      expect(sessionArgs.metadata).toEqual({
+        tenantId: TENANT_ID,
+        planTier: 'growth',
+        type: 'plan_change_upgrade',
+      });
+      expect(result.requiresPayment).toBe(true);
+      expect(result.checkoutUrl).toContain('stripe.com');
+      expect(mockSubRepo.update).not.toHaveBeenCalled();
     });
 
     it('T42 — throws 400 when the requested plan equals the current plan', async () => {
@@ -1030,9 +1049,9 @@ describe('BillingService', () => {
         makeTenant({ planTier: PlanTier.STARTER }),
       );
 
-      await expect(service.changePlan(TENANT_ID, 'starter')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.changePlan(TENANT_ID, 'starter', OWNER_ID),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('T43 — throws 400 when the tenant is suspended/cancelled/past_due', async () => {
@@ -1043,33 +1062,29 @@ describe('BillingService', () => {
         }),
       );
 
-      await expect(service.changePlan(TENANT_ID, 'growth')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.changePlan(TENANT_ID, 'growth', OWNER_ID),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it('T44 — wraps a Stripe swap failure in a BadRequestException', async () => {
+    it('T44 — throws 400 when a plan change is already pending', async () => {
       mockTenantRepo.findOne.mockResolvedValue(
         makeTenant({
-          currency: 'GBP',
-          planTier: PlanTier.STARTER,
+          currency: 'NGN',
+          planTier: PlanTier.GROWTH,
           subscriptionStatus: SubscriptionStatus.ACTIVE,
         }),
       );
       mockSubRepo.findOne.mockResolvedValue(
-        makeSubscription({ currency: 'GBP', stripeSubId: 'sub_live123' }),
-      );
-      const Stripe = jest.requireMock<jest.Mock>('stripe');
-      const stripeMock = Stripe.mock.results[0].value as {
-        subscriptions: { retrieve: jest.Mock };
-      };
-      stripeMock.subscriptions.retrieve.mockRejectedValueOnce(
-        new Error('stripe down'),
+        makeSubscription({
+          planTier: PlanTier.GROWTH,
+          pendingPlanTier: PlanTier.CONNECT,
+        }),
       );
 
-      await expect(service.changePlan(TENANT_ID, 'growth')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.changePlan(TENANT_ID, 'starter', OWNER_ID),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -1088,5 +1103,212 @@ describe('BillingService', () => {
     expect(status.marketingMessagesThisMonth).toBe(40);
     expect(status.marketingSpendThisMonth).toBe(4600);
     expect(status.botRepliesThisMonth).toBe(7);
+  });
+
+  // ── T46-T47: missing subscriptions row (manually seeded tenants) ──────────
+
+  it('T46 — getStatus falls back to the plan config amount when no subscriptions row exists', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(
+      makeTenant({ currency: 'NGN', planTier: PlanTier.GROWTH }),
+    );
+    mockSubRepo.findOne.mockResolvedValue(null);
+
+    const status = await service.getStatus(TENANT_ID);
+
+    expect(status.amount).toBe(20000);
+    expect(status.utilityIncluded).toBe(800);
+    expect(status.marketingRate).toBe(115);
+  });
+
+  it('T47 — changePlan creates a missing subscriptions row instead of throwing', async () => {
+    mockTenantRepo.findOne.mockResolvedValue(
+      makeTenant({
+        currency: 'NGN',
+        planTier: PlanTier.GROWTH,
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+      }),
+    );
+    mockSubRepo.findOne.mockResolvedValue(null);
+    const healedPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    mockSubRepo.save.mockResolvedValue(
+      makeSubscription({
+        id: 'sub-healed',
+        planTier: PlanTier.GROWTH,
+        currentPeriodEnd: healedPeriodEnd,
+      }),
+    );
+
+    const result = await service.changePlan(TENANT_ID, 'starter', OWNER_ID);
+
+    expect(mockSubRepo.create).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      planTier: PlanTier.GROWTH,
+      currency: 'NGN',
+      status: SubscriptionStatus.ACTIVE,
+    });
+    expect(mockSubRepo.update).toHaveBeenCalledWith('sub-healed', {
+      pendingPlanTier: PlanTier.STARTER,
+      pendingPlanEffectiveAt: healedPeriodEnd,
+      pendingPlanReference: null,
+    });
+    expect(result.requiresPayment).toBe(false);
+  });
+
+  // ── T48-T50: plan_change_upgrade webhooks ──────────────────────────────────
+
+  it('T48 — Paystack plan_change_upgrade charge.success schedules the pending plan change', async () => {
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_planchange1',
+        amount: 2000000,
+        metadata: {
+          type: 'plan_change_upgrade',
+          tenantId: TENANT_ID,
+          planTier: 'growth',
+        },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(
+      JSON.stringify({ tenantId: TENANT_ID, planTier: 'growth' }),
+    );
+    mockTenantRepo.findOne.mockResolvedValue(makeTenant({ currency: 'NGN' }));
+    mockSubRepo.findOne.mockResolvedValue(makeSubscription());
+
+    await service.handlePaystackWebhook(rawBody, sig);
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      'sub-1',
+      expect.objectContaining({ pendingPlanTier: 'growth' }),
+    );
+    expect(mockRedis.del).toHaveBeenCalledWith(
+      'billing:planchange:pending:ref_planchange1',
+    );
+  });
+
+  it('T49 — Paystack plan_change_upgrade charge.success with a mismatched amount does not schedule', async () => {
+    const body = {
+      event: 'charge.success',
+      data: {
+        reference: 'ref_planchange2',
+        amount: 100, // ₦1, nowhere near the growth plan's ₦20,000
+        metadata: {
+          type: 'plan_change_upgrade',
+          tenantId: TENANT_ID,
+          planTier: 'growth',
+        },
+      },
+    };
+    const rawBody = Buffer.from(JSON.stringify(body));
+    const sig = crypto
+      .createHmac('sha512', 'sk_live_paystack')
+      .update(rawBody)
+      .digest('hex');
+
+    mockRedis.get.mockResolvedValue(
+      JSON.stringify({ tenantId: TENANT_ID, planTier: 'growth' }),
+    );
+    mockTenantRepo.findOne.mockResolvedValue(makeTenant({ currency: 'NGN' }));
+
+    await service.handlePaystackWebhook(rawBody, sig);
+
+    expect(mockSubRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('T50 — Stripe plan_change_upgrade checkout.session.completed schedules the pending plan change', async () => {
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      webhooks: { constructEvent: jest.Mock };
+    };
+    stripeMock.webhooks.constructEvent.mockReturnValueOnce({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_planchange',
+          mode: 'payment',
+          metadata: {
+            type: 'plan_change_upgrade',
+            tenantId: TENANT_ID,
+            planTier: 'growth',
+          },
+        },
+      },
+    });
+    mockSubRepo.findOne.mockResolvedValue(makeSubscription());
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'stripe-sig');
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      'sub-1',
+      expect.objectContaining({
+        pendingPlanTier: 'growth',
+        pendingPlanReference: 'cs_test_planchange',
+      }),
+    );
+  });
+
+  // ── T51-T52: applyPendingPlanChange ────────────────────────────────────────
+
+  it('T51 — applyPendingPlanChange updates plan fields and clears pending* for an NGN tenant', async () => {
+    mockSubRepo.findOne.mockResolvedValue(makeSubscription());
+
+    await service.applyPendingPlanChange({
+      subscriptionId: 'sub-1',
+      tenantId: TENANT_ID,
+      pendingPlanTier: 'growth',
+      currency: 'NGN',
+      stripeSubId: null,
+    });
+
+    expect(mockSubRepo.update).toHaveBeenCalledWith(
+      'sub-1',
+      expect.objectContaining({
+        planTier: PlanTier.GROWTH,
+        amount: 20000,
+        utilityIncluded: 800,
+        pendingPlanTier: null,
+        pendingPlanEffectiveAt: null,
+        pendingPlanReference: null,
+      }),
+    );
+    expect(mockTenantRepo.update).toHaveBeenCalledWith(TENANT_ID, {
+      planTier: PlanTier.GROWTH,
+    });
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      subscriptions: { update: jest.Mock };
+    };
+    expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
+  });
+
+  it('T52 — applyPendingPlanChange swaps the Stripe price with no proration for a GBP tenant', async () => {
+    await service.applyPendingPlanChange({
+      subscriptionId: 'sub-1',
+      tenantId: TENANT_ID,
+      pendingPlanTier: 'growth',
+      currency: 'GBP',
+      stripeSubId: 'sub_live123',
+    });
+
+    const Stripe = jest.requireMock<jest.Mock>('stripe');
+    const stripeMock = Stripe.mock.results[0].value as {
+      subscriptions: { retrieve: jest.Mock; update: jest.Mock };
+    };
+    expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledWith(
+      'sub_live123',
+    );
+    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith(
+      'sub_live123',
+      expect.objectContaining({
+        items: [{ id: 'si_test123', price: 'price_test_growth_gbp' }],
+        proration_behavior: 'none',
+      }),
+    );
   });
 });

@@ -19,6 +19,14 @@ interface PendingTenantRow {
   tenant_id: string;
 }
 
+interface DuePlanChangeRow {
+  subscription_id: string;
+  tenant_id: string;
+  pending_plan_tier: string;
+  currency: string;
+  stripe_sub_id: string | null;
+}
+
 interface PastDueChargeRow extends DueChargeRow {
   trial_charge_attempts: number;
   grace_period_started_at: string;
@@ -124,6 +132,41 @@ export class TrialBillingCronService {
           `Failed to suspend stuck trial for tenant ${row.tenant_id}: ${String(err)}`,
         );
       }
+    }
+  }
+
+  // Applies upgrades/downgrades scheduled by BillingService.changePlan()
+  // (downgrades) or the plan_change_upgrade webhook (upgrades, once paid)
+  // once their effective date — the start of the tenant's next billing
+  // cycle — has arrived.
+  @Cron('0 * * * *')
+  async applyPendingPlanChanges(): Promise<void> {
+    const due: DuePlanChangeRow[] = await this.dataSource.query(
+      `SELECT s.id AS subscription_id, s.tenant_id, s.pending_plan_tier,
+              t.currency, s.stripe_sub_id
+       FROM subscriptions s
+       JOIN tenants t ON t.id = s.tenant_id
+       WHERE s.pending_plan_tier IS NOT NULL
+         AND s.pending_plan_effective_at <= NOW()`,
+    );
+
+    for (const row of due) {
+      try {
+        await this.billingService.applyPendingPlanChange({
+          subscriptionId: row.subscription_id,
+          tenantId: row.tenant_id,
+          pendingPlanTier: row.pending_plan_tier,
+          currency: row.currency,
+          stripeSubId: row.stripe_sub_id,
+        });
+      } catch (err) {
+        this.logger.error(
+          `Failed to apply pending plan change for tenant ${row.tenant_id}: ${String(err)}`,
+        );
+      }
+    }
+    if (due.length > 0) {
+      this.logger.log(`Applied ${due.length} scheduled plan change(s)`);
     }
   }
 
