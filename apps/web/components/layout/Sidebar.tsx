@@ -141,13 +141,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 <Icon size={17} />
                 {item.label}
                 {badge && (
-                  <span
-                    className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      isActive(item.href)
-                        ? 'bg-[#0A1628]/20 text-[#0A1628]'
-                        : 'bg-white/10 text-slate-300'
-                    }`}
-                  >
+                  <span className="ml-auto rounded-full bg-amber-400 px-2 py-0.5 text-xs font-semibold text-amber-950">
                     {badge}
                   </span>
                 )}

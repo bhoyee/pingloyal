@@ -249,6 +249,35 @@ export class WalletService {
     };
   }
 
+  async getMonthlyBreakdown(
+    tenantId: string,
+  ): Promise<Record<string, { count: number; amount: number }>> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const rows = await this.dataSource
+      .getRepository(WalletTransaction)
+      .createQueryBuilder('wt')
+      .select('wt.type', 'type')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('ABS(SUM(wt.amount))', 'amount')
+      .where('wt.tenantId = :tenantId', { tenantId })
+      .andWhere('wt.type != :topup', { topup: WalletTransactionType.TOPUP })
+      .andWhere('wt.createdAt >= :startOfMonth', { startOfMonth })
+      .groupBy('wt.type')
+      .getRawMany<{ type: string; count: string; amount: string }>();
+
+    const breakdown: Record<string, { count: number; amount: number }> = {};
+    for (const row of rows) {
+      breakdown[row.type] = {
+        count: Number(row.count),
+        amount: Number(row.amount),
+      };
+    }
+    return breakdown;
+  }
+
   private async checkLowBalanceAlert(
     tenantId: string,
     balance: number,
