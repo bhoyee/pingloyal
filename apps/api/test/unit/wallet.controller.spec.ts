@@ -34,6 +34,7 @@ describe('WalletController', () => {
   let mockWalletService: {
     getBalance: jest.Mock;
     getMonthlySpend: jest.Mock;
+    getMonthlyBreakdown: jest.Mock;
     topupWallet: jest.Mock;
   };
   let mockSubRepo: { findOne: jest.Mock };
@@ -63,6 +64,7 @@ describe('WalletController', () => {
       getMonthlySpend: jest
         .fn()
         .mockResolvedValue({ totalSpend: 1150, messageCount: 10 }),
+      getMonthlyBreakdown: jest.fn().mockResolvedValue({}),
       topupWallet: jest.fn().mockResolvedValue(15000),
     };
 

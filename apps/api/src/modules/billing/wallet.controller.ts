@@ -61,9 +61,10 @@ export class WalletController {
     const sub = await this.subRepo.findOne({ where: { tenantId } });
     const ratePerMessage = Number(sub?.marketingRate ?? 130);
 
-    const [balance, { totalSpend, messageCount }] = await Promise.all([
+    const [balance, { totalSpend, messageCount }, breakdown] = await Promise.all([
       this.walletService.getBalance(tenantId),
       this.walletService.getMonthlySpend(tenantId),
+      this.walletService.getMonthlyBreakdown(tenantId),
     ]);
 
     const response = {
@@ -74,6 +75,7 @@ export class WalletController {
       thisMonthMessageCount: messageCount,
       isLow: balance < 3000,
       isEmpty: balance <= 0,
+      breakdown,
     };
 
     await this.redis
@@ -91,6 +93,11 @@ export class WalletController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
     @Query('type') type?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('minAmount') minAmount?: string,
+    @Query('maxAmount') maxAmount?: string,
+    @Query('search') search?: string,
   ) {
     const tenantId = req.user.tenantId;
     const safePage = Math.max(1, page);
@@ -112,6 +119,38 @@ export class WalletController {
       )
     ) {
       qb.andWhere('wt.type = :type', { type });
+    }
+
+    if (startDate) {
+      const d = new Date(startDate);
+      if (!isNaN(d.getTime())) {
+        d.setHours(0, 0, 0, 0);
+        qb.andWhere('wt.createdAt >= :startDate', { startDate: d });
+      }
+    }
+
+    if (endDate) {
+      const d = new Date(endDate);
+      if (!isNaN(d.getTime())) {
+        d.setHours(23, 59, 59, 999);
+        qb.andWhere('wt.createdAt <= :endDate', { endDate: d });
+      }
+    }
+
+    const min = minAmount !== undefined ? parseFloat(minAmount) : NaN;
+    if (!isNaN(min)) {
+      qb.andWhere('ABS(wt.amount) >= :minAmount', { minAmount: min });
+    }
+
+    const max = maxAmount !== undefined ? parseFloat(maxAmount) : NaN;
+    if (!isNaN(max)) {
+      qb.andWhere('ABS(wt.amount) <= :maxAmount', { maxAmount: max });
+    }
+
+    if (search?.trim()) {
+      qb.andWhere('wt.description ILIKE :search', {
+        search: `%${search.trim()}%`,
+      });
     }
 
     const [transactions, total] = await qb.getManyAndCount();

@@ -1,8 +1,18 @@
 'use client';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { formatDistanceToNow, isToday, format } from 'date-fns';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Gift,
+  Megaphone,
+  RotateCcw,
+  Search,
+  Wallet as WalletIcon,
+  X,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -15,6 +25,7 @@ interface WalletBalance {
   thisMonthMessageCount: number;
   isLow: boolean;
   isEmpty: boolean;
+  breakdown?: Record<string, { count: number; amount: number }>;
 }
 
 interface WalletTransaction {
@@ -35,19 +46,28 @@ interface WalletTransactionsResult {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const TYPE_BADGES: Record<string, { label: string; cls: string }> = {
-  topup:                  { label: 'Top-up',   cls: 'bg-green-100 text-green-700' },
-  debit_birthday:         { label: 'Birthday', cls: 'bg-blue-100 text-blue-700' },
-  debit_lapsed:           { label: 'Win-back', cls: 'bg-red-100 text-red-700' },
-  debit_campaign:         { label: 'Campaign', cls: 'bg-amber-100 text-amber-700' },
-  debit_utility_overage:  { label: 'Overage',  cls: 'bg-slate-100 text-slate-600' },
-  refund:                 { label: 'Refund',   cls: 'bg-green-100 text-green-700' },
+const TYPE_BADGES: Record<string, { label: string; cls: string; activeCls: string }> = {
+  topup:                  { label: 'Top-up',   cls: 'bg-green-100 text-green-700', activeCls: 'bg-green-600 text-white' },
+  debit_birthday:         { label: 'Birthday', cls: 'bg-blue-100 text-blue-700',   activeCls: 'bg-blue-600 text-white' },
+  debit_lapsed:           { label: 'Win-back', cls: 'bg-red-100 text-red-700',     activeCls: 'bg-red-600 text-white' },
+  debit_campaign:         { label: 'Campaign', cls: 'bg-amber-100 text-amber-700', activeCls: 'bg-amber-600 text-white' },
+  debit_utility_overage:  { label: 'Overage',  cls: 'bg-slate-100 text-slate-600', activeCls: 'bg-slate-600 text-white' },
+  refund:                 { label: 'Refund',   cls: 'bg-green-100 text-green-700', activeCls: 'bg-green-600 text-white' },
 };
 
 function formatTxDate(iso: string): string {
   const d = new Date(iso);
   if (isToday(d)) return `Today ${format(d, 'HH:mm')}`;
   return formatDistanceToNow(d, { addSuffix: true });
+}
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState<T>(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
 }
 
 function TypeBadge({ type }: { type: string }) {
@@ -81,6 +101,46 @@ const LIMIT = 20;
 export default function WalletPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+
+  const debouncedSearch = useDebounce(search, 400);
+
+  const hasActiveFilters = Boolean(
+    search || typeFilter || startDate || endDate || minAmount || maxAmount,
+  );
+
+  function clearFilters() {
+    setSearch('');
+    setTypeFilter(null);
+    setStartDate('');
+    setEndDate('');
+    setMinAmount('');
+    setMaxAmount('');
+  }
+
+  // Any filter change should jump back to page 1 — staying on page 4 of a
+  // now-much-smaller filtered result set would just show an empty table.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, typeFilter, startDate, endDate, minAmount, maxAmount]);
+
+  const txQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(LIMIT));
+    if (typeFilter) params.set('type', typeFilter);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    if (minAmount) params.set('minAmount', minAmount);
+    if (maxAmount) params.set('maxAmount', maxAmount);
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
+    return params.toString();
+  }, [page, typeFilter, startDate, endDate, minAmount, maxAmount, debouncedSearch]);
 
   const { data: wallet, isLoading: walletLoading } = useQuery<WalletBalance>({
     queryKey: ['wallet-balance'],
@@ -89,11 +149,9 @@ export default function WalletPage() {
   });
 
   const { data: txResult, isLoading: txLoading } = useQuery<WalletTransactionsResult>({
-    queryKey: ['wallet-transactions', page],
+    queryKey: ['wallet-transactions', txQuery],
     queryFn: () =>
-      api.get<WalletTransactionsResult>(
-        `/api/v1/billing/wallet/transactions?page=${page}&limit=${LIMIT}`,
-      ),
+      api.get<WalletTransactionsResult>(`/api/v1/billing/wallet/transactions?${txQuery}`),
   });
 
   const balanceColour = wallet?.isEmpty
@@ -103,10 +161,11 @@ export default function WalletPage() {
       : 'text-green-400';
 
   function handleExportCsv() {
+    const params = new URLSearchParams(txQuery);
+    params.set('page', '1');
+    params.set('limit', '10000');
     void api
-      .get<WalletTransactionsResult>(
-        '/api/v1/billing/wallet/transactions?page=1&limit=10000',
-      )
+      .get<WalletTransactionsResult>(`/api/v1/billing/wallet/transactions?${params.toString()}`)
       .then(({ transactions }) => {
         const header = 'Date,Type,Description,Amount,Balance After\n';
         const rows = transactions.map((t) =>
@@ -131,16 +190,53 @@ export default function WalletPage() {
 
   const totalPages = txResult ? Math.ceil(txResult.total / LIMIT) : 1;
 
+  const stats = [
+    {
+      key: 'spend',
+      label: 'Spent This Month',
+      value: `₦${(wallet?.thisMonthSpend ?? 0).toLocaleString()}`,
+      sub: `${wallet?.thisMonthMessageCount ?? 0} Marketing messages`,
+      icon: WalletIcon,
+      valueCls: 'text-slate-900',
+      iconCls: 'bg-slate-100 text-slate-600',
+    },
+    {
+      key: 'birthday',
+      label: 'Birthday Messages',
+      value: wallet?.breakdown?.debit_birthday?.count ?? 0,
+      sub: `₦${(wallet?.breakdown?.debit_birthday?.amount ?? 0).toLocaleString()} this month`,
+      icon: Gift,
+      valueCls: 'text-green-600',
+      iconCls: 'bg-blue-100 text-blue-600',
+    },
+    {
+      key: 'lapsed',
+      label: 'Lapsed Win-backs',
+      value: wallet?.breakdown?.debit_lapsed?.count ?? 0,
+      sub: `₦${(wallet?.breakdown?.debit_lapsed?.amount ?? 0).toLocaleString()} this month`,
+      icon: RotateCcw,
+      valueCls: 'text-green-600',
+      iconCls: 'bg-red-100 text-red-600',
+    },
+    {
+      key: 'campaign',
+      label: 'Campaign Sends',
+      value: wallet?.breakdown?.debit_campaign?.count ?? 0,
+      sub: `₦${(wallet?.breakdown?.debit_campaign?.amount ?? 0).toLocaleString()} this month`,
+      icon: Megaphone,
+      valueCls: 'text-green-600',
+      iconCls: 'bg-amber-100 text-amber-600',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto max-w-4xl">
-          <h1 className="text-xl font-bold text-slate-900">Marketing Wallet</h1>
-        </div>
+        <h1 className="text-xl font-bold text-slate-900">Marketing Wallet</h1>
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-6 px-4 py-4 sm:px-6 sm:py-6">
+      <div className="space-y-6 px-4 py-4 sm:px-6 sm:py-6">
 
         {/* ── Balance Hero ─────────────────────────────────────────────────── */}
         <div className="rounded-2xl bg-[#0F1E35] p-5 text-white shadow-lg sm:p-6">
@@ -179,18 +275,22 @@ export default function WalletPage() {
         {/* ── Low balance warning ──────────────────────────────────────────── */}
         {wallet?.isLow && !wallet.isEmpty && (
           <div
-            className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
             data-testid="low-balance-warning"
           >
-            <p className="text-sm font-medium text-amber-800">
-              ⚠️ Your wallet is running low. Top up to keep Birthday messages and win-backs
-              firing automatically.
-            </p>
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+              <p className="text-sm text-amber-800">
+                <span className="font-bold">Low balance alert:</span> When your wallet drops
+                below ₦3,000, Marketing messages will pause automatically. Top up to keep
+                Birthday and win-back messages firing.
+              </p>
+            </div>
             <button
               onClick={() => router.push('/billing/wallet/topup')}
-              className="self-start shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 sm:ml-4 sm:self-auto"
+              className="self-start shrink-0 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600 sm:self-auto"
             >
-              Top Up Now →
+              Top Up →
             </button>
           </div>
         )}
@@ -198,19 +298,20 @@ export default function WalletPage() {
         {/* ── Empty warning ────────────────────────────────────────────────── */}
         {wallet?.isEmpty && (
           <div
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-4"
+            className="flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
             data-testid="empty-balance-warning"
           >
-            <p className="font-semibold text-red-700">
-              🔴 Wallet empty — Marketing messages are paused.
-            </p>
-            <p className="mt-1 text-sm text-red-600">
-              Birthday messages, lapsed win-backs, and campaign broadcasts will not send
-              until you top up.
-            </p>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+              <p className="text-sm text-red-800">
+                <span className="font-bold">Wallet empty:</span> Marketing messages are
+                paused. Birthday messages, lapsed win-backs, and campaign broadcasts will not
+                send until you top up.
+              </p>
+            </div>
             <button
               onClick={() => router.push('/billing/wallet/topup')}
-              className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              className="self-start shrink-0 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 sm:self-auto"
             >
               Top Up Now →
             </button>
@@ -219,30 +320,23 @@ export default function WalletPage() {
 
         {/* ── Stats row ────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            {
-              label: 'Spent This Month',
-              value: `₦${(wallet?.thisMonthSpend ?? 0).toLocaleString()}`,
-            },
-            {
-              label: 'Birthday Messages',
-              value: txResult?.transactions.filter((t) => t.type === 'debit_birthday').length ?? '—',
-            },
-            {
-              label: 'Lapsed Win-backs',
-              value: txResult?.transactions.filter((t) => t.type === 'debit_lapsed').length ?? '—',
-            },
-            {
-              label: 'Campaign Sends',
-              value: txResult?.transactions.filter((t) => t.type === 'debit_campaign').length ?? '—',
-            },
-          ].map(({ label, value }) => (
+          {stats.map(({ key, label, value, sub, icon: Icon, valueCls, iconCls }) => (
             <div
-              key={label}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              key={key}
+              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
-              <p className="text-2xl font-bold text-slate-900">{value}</p>
-              <p className="text-xs text-slate-500">{label}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {label}
+                </p>
+                <div
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110 ${iconCls}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+              </div>
+              <p className={`mt-2 text-2xl font-bold sm:text-3xl ${valueCls}`}>{value}</p>
+              <p className="mt-1 text-xs text-slate-400">{sub}</p>
             </div>
           ))}
         </div>
@@ -272,11 +366,105 @@ export default function WalletPage() {
             <h2 className="text-sm font-bold text-slate-900">Transaction History</h2>
             <button
               onClick={handleExportCsv}
-              className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-800"
+              className="shrink-0 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-green-700"
               data-testid="export-csv"
             >
               ⬇ Export CSV
             </button>
+          </div>
+
+          {/* Search + filters */}
+          <div className="space-y-3 border-b border-slate-100 px-5 py-4">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:flex-wrap">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search description…"
+                  data-testid="tx-search"
+                  className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  data-testid="tx-start-date"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20 [color-scheme:light]"
+                />
+                <span className="text-xs text-slate-400">→</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  data-testid="tx-end-date"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20 [color-scheme:light]"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Min ₦"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  data-testid="tx-min-amount"
+                  className="w-24 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20"
+                />
+                <span className="text-xs text-slate-400">–</span>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Max ₦"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  data-testid="tx-max-amount"
+                  className="w-24 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 focus:border-[#0F1E35] focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20"
+                />
+              </div>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  data-testid="clear-filters"
+                  className="flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear filters
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setTypeFilter(null)}
+                data-testid="filter-chip-all"
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                  typeFilter === null
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All
+              </button>
+              {Object.entries(TYPE_BADGES).map(([key, badge]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTypeFilter((cur) => (cur === key ? null : key))}
+                  data-testid={`filter-chip-${key}`}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                    typeFilter === key ? badge.activeCls : `${badge.cls} hover:opacity-75`
+                  }`}
+                >
+                  {badge.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -300,7 +488,9 @@ export default function WalletPage() {
                             colSpan={5}
                             className="py-10 text-center text-sm text-slate-400"
                           >
-                            No transactions yet — top up to get started.
+                            {hasActiveFilters
+                              ? 'No transactions match your filters.'
+                              : 'No transactions yet — top up to get started.'}
                           </td>
                         </tr>
                       )
