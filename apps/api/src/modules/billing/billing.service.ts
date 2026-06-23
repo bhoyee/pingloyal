@@ -45,6 +45,11 @@ interface StripeCheckoutSession {
   subscription?: StripeSubscriptionRef | string | null;
 }
 
+interface StripeSubscriptionDetails {
+  id: string;
+  items: { data: Array<{ id: string }> };
+}
+
 interface StripeEvent {
   id: string;
   type: string;
@@ -62,6 +67,7 @@ interface StripeClient {
   };
   subscriptions: {
     update: (id: string, params: object) => Promise<unknown>;
+    retrieve: (id: string) => Promise<StripeSubscriptionDetails>;
   };
   webhooks: {
     constructEvent: (
@@ -139,8 +145,10 @@ export class BillingService {
 
   // ── GET /billing/plans ────────────────────────────────────────────────────
 
-  getPlans(tenantCurrency: string, currentPlanTier: string) {
-    const currency = tenantCurrency as 'NGN' | 'GBP';
+  async getPlans(tenantId: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const currency = (tenant?.currency ?? 'NGN') as 'NGN' | 'GBP';
+    const currentPlanTier = tenant?.planTier ?? 'starter';
     const currencySymbol = currency === 'GBP' ? '£' : '₦';
 
     const plans = Object.entries(PLANS)
@@ -189,6 +197,12 @@ export class BillingService {
     const utilityUsed = sub?.utilityUsedThisPeriod ?? 0;
     const utilityIncluded = sub?.utilityIncluded ?? 300;
 
+    const [{ totalSpend, messageCount }, botRepliesThisMonth] =
+      await Promise.all([
+        this.walletService.getMonthlySpend(tenantId),
+        this.getBotReplyCountThisMonth(tenantId),
+      ]);
+
     return {
       status: tenant?.subscriptionStatus ?? 'trialing',
       planTier: tenant?.planTier ?? 'starter',
@@ -204,6 +218,9 @@ export class BillingService {
       utilityOverageRate: sub?.utilityOverageRate ?? 20,
       marketingWalletBalance: tenant?.marketingWalletBalance ?? 0,
       marketingRate: sub?.marketingRate ?? 130,
+      marketingMessagesThisMonth: messageCount,
+      marketingSpendThisMonth: totalSpend,
+      botRepliesThisMonth,
       paystackManageUrl: tenant?.paystackCustomerId
         ? `https://paystack.com/manage/${tenant.paystackCustomerId}`
         : null,
@@ -211,6 +228,18 @@ export class BillingService {
         ? `https://billing.stripe.com/p/login`
         : null,
     };
+  }
+
+  private async getBotReplyCountThisMonth(tenantId: string): Promise<number> {
+    const rows = await this.dataSource.query<[{ count: string }]>(
+      `SELECT COUNT(*) FROM trigger_logs
+       WHERE tenant_id = $1
+         AND trigger_type = 'balance_bot_reply'
+         AND status = 'sent'
+         AND created_at >= date_trunc('month', NOW())`,
+      [tenantId],
+    );
+    return Number(rows?.[0]?.count ?? 0);
   }
 
   // ── POST /billing/subscribe ───────────────────────────────────────────────
@@ -386,6 +415,108 @@ export class BillingService {
       message:
         'Your trial will not be charged. You can subscribe again any time.',
     };
+  }
+
+  // ── POST /billing/change-plan ─────────────────────────────────────────────
+  //
+  // Only for tenants who already have a billing relationship (trialing or
+  // active) — suspended/cancelled/past_due tenants have no card/subscription
+  // to update and must go through subscribe() to re-establish one.
+  //
+  // NGN: this app has no native recurring Paystack subscription for tenants
+  // that converted through the card-required trial flow — their renewals are
+  // driven entirely by trial-billing.cron.ts re-reading the Subscription row
+  // at charge time. So writing the new plan's fields here is sufficient; the
+  // next cron-driven charge will pick up the new amount automatically.
+  //
+  // GBP: these ARE live Stripe subscriptions billed by Stripe directly, so a
+  // DB-only update would silently diverge from what Stripe actually charges.
+  // We swap the subscription's price with no proration — the new amount
+  // takes effect on the next Stripe invoice, mirroring the no-proration
+  // behaviour on the NGN side.
+
+  async changePlan(
+    tenantId: string,
+    planTier: string,
+  ): Promise<{ message: string }> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new BadRequestException('Tenant not found');
+
+    if (tenant.planTier === planTier) {
+      throw new BadRequestException('You are already on this plan');
+    }
+
+    if (
+      tenant.subscriptionStatus !== SubscriptionStatus.TRIALING &&
+      tenant.subscriptionStatus !== SubscriptionStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Reactivate your subscription before changing plans',
+      );
+    }
+
+    const planId = `${planTier}_${tenant.currency.toLowerCase()}` as PlanId;
+    if (!(planId in PLANS) || PLANS[planId].currency !== tenant.currency) {
+      throw new BadRequestException(
+        `The ${planTier} plan is not available in ${tenant.currency}`,
+      );
+    }
+    const plan = PLANS[planId];
+
+    const sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
+    if (!sub) throw new BadRequestException('Subscription not found');
+
+    if (sub.stripeSubId && this.stripe) {
+      const priceId = 'stripePriceId' in plan ? plan.stripePriceId : undefined;
+      try {
+        await this.swapStripePrice(sub.stripeSubId, priceId);
+      } catch (err) {
+        this.logger.error(
+          `Stripe plan swap failed for tenant ${tenantId}: ${String(err)}`,
+        );
+        throw new BadRequestException(
+          'Could not update your Stripe subscription. Try again or contact support.',
+        );
+      }
+    }
+
+    await this.subscriptionRepo.update(sub.id, {
+      planTier: plan.planTier as PlanTier,
+      amount: plan.amount,
+      utilityIncluded: plan.utilityIncluded,
+      utilityOverageRate: plan.utilityOverageRate,
+      marketingRate: plan.marketingRate,
+    });
+    await this.tenantRepo.update(tenantId, {
+      planTier: plan.planTier as PlanTier,
+    });
+    await this.invalidateTenantCache(tenantId);
+
+    this.logger.log(`Plan changed: tenantId=${tenantId} -> ${planTier}`);
+
+    return {
+      message:
+        tenant.subscriptionStatus === SubscriptionStatus.TRIALING
+          ? `Plan updated to ${plan.planTier}. You won't be charged until your trial ends.`
+          : `Plan updated to ${plan.planTier}. The new price applies from your next billing date.`,
+    };
+  }
+
+  private async swapStripePrice(
+    stripeSubId: string,
+    priceId: string | undefined,
+  ): Promise<void> {
+    if (!priceId || !this.stripe) {
+      throw new Error('Stripe price not configured for this plan');
+    }
+    const details = await this.stripe.subscriptions.retrieve(stripeSubId);
+    const itemId = details.items.data[0]?.id;
+    if (!itemId) throw new Error('Stripe subscription has no line items');
+
+    await this.stripe.subscriptions.update(stripeSubId, {
+      items: [{ id: itemId, price: priceId }],
+      proration_behavior: 'none',
+    });
   }
 
   // ── Paystack webhook ──────────────────────────────────────────────────────
