@@ -17,7 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { BillingService } from './billing.service';
-import { Tenant } from '../tenants/entities/tenant.entity';
+import { ChangePlanDto } from './dto/change-plan.dto';
 
 @Controller('billing')
 export class BillingController {
@@ -28,13 +28,19 @@ export class BillingController {
   @Get('plans')
   @Roles(UserRole.OWNER)
   @SkipSubscriptionCheck()
-  getPlans(@Req() req: { user: RequestUser; tenantEntity?: Tenant }) {
-    const tenantCurrency =
-      (req as unknown as { tenantCurrency?: string }).tenantCurrency ?? 'NGN';
-    const currentPlanTier =
-      (req as unknown as { currentPlanTier?: string }).currentPlanTier ??
-      'starter';
-    return this.billingService.getPlans(tenantCurrency, currentPlanTier);
+  getPlans(@Req() req: { user: RequestUser }) {
+    return this.billingService.getPlans(req.user.tenantId);
+  }
+
+  @Post('change-plan')
+  @Roles(UserRole.OWNER)
+  @SkipSubscriptionCheck()
+  changePlan(@Req() req: { user: RequestUser }, @Body() dto: ChangePlanDto) {
+    return this.billingService.changePlan(
+      req.user.tenantId,
+      dto.planTier,
+      req.user.userId,
+    );
   }
 
   // Polled on every dashboard page load to check for suspension/past-due —

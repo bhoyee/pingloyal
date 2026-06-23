@@ -45,6 +45,11 @@ interface StripeCheckoutSession {
   subscription?: StripeSubscriptionRef | string | null;
 }
 
+interface StripeSubscriptionDetails {
+  id: string;
+  items: { data: Array<{ id: string }> };
+}
+
 interface StripeEvent {
   id: string;
   type: string;
@@ -62,6 +67,7 @@ interface StripeClient {
   };
   subscriptions: {
     update: (id: string, params: object) => Promise<unknown>;
+    retrieve: (id: string) => Promise<StripeSubscriptionDetails>;
   };
   webhooks: {
     constructEvent: (
@@ -111,6 +117,11 @@ interface PaystackEvent {
   };
 }
 
+// Tier rank, not price, decides upgrade vs downgrade — mirrors the
+// frontend's TIER_ORDER in billing/page.tsx so both sides agree on what
+// counts as "higher" regardless of any string/number formatting quirks.
+const TIER_ORDER = ['starter', 'growth', 'connect'];
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -139,8 +150,10 @@ export class BillingService {
 
   // ── GET /billing/plans ────────────────────────────────────────────────────
 
-  getPlans(tenantCurrency: string, currentPlanTier: string) {
-    const currency = tenantCurrency as 'NGN' | 'GBP';
+  async getPlans(tenantId: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const currency = (tenant?.currency ?? 'NGN') as 'NGN' | 'GBP';
+    const currentPlanTier = tenant?.planTier ?? 'starter';
     const currencySymbol = currency === 'GBP' ? '£' : '₦';
 
     const plans = Object.entries(PLANS)
@@ -186,14 +199,32 @@ export class BillingService {
         )
       : null;
 
+    // A subscriptions row can be missing for tenants that never went through
+    // the normal signup/activation flow (e.g. manually seeded test/demo
+    // accounts) — fall back to the tenant's nominal plan config instead of
+    // silently showing ₦0/month.
+    const currentPlanTier = tenant?.planTier ?? 'starter';
+    const currentCurrency = tenant?.currency ?? 'NGN';
+    const fallbackPlanId =
+      `${currentPlanTier}_${currentCurrency.toLowerCase()}` as PlanId;
+    const fallbackPlan: (typeof PLANS)[PlanId] | undefined =
+      fallbackPlanId in PLANS ? PLANS[fallbackPlanId] : undefined;
+
     const utilityUsed = sub?.utilityUsedThisPeriod ?? 0;
-    const utilityIncluded = sub?.utilityIncluded ?? 300;
+    const utilityIncluded =
+      sub?.utilityIncluded ?? fallbackPlan?.utilityIncluded ?? 300;
+
+    const [{ totalSpend, messageCount }, botRepliesThisMonth] =
+      await Promise.all([
+        this.walletService.getMonthlySpend(tenantId),
+        this.getBotReplyCountThisMonth(tenantId),
+      ]);
 
     return {
       status: tenant?.subscriptionStatus ?? 'trialing',
-      planTier: tenant?.planTier ?? 'starter',
-      currency: tenant?.currency ?? 'NGN',
-      amount: sub?.amount ?? 0,
+      planTier: currentPlanTier,
+      currency: currentCurrency,
+      amount: sub?.amount ?? fallbackPlan?.amount ?? 0,
       currentPeriodEnd: sub?.currentPeriodEnd ?? null,
       daysRemaining,
       trialEndsAt: tenant?.trialEndsAt ?? null,
@@ -201,9 +232,15 @@ export class BillingService {
       utilityIncluded,
       utilityUsedThisPeriod: utilityUsed,
       utilityRemainingThisPeriod: Math.max(0, utilityIncluded - utilityUsed),
-      utilityOverageRate: sub?.utilityOverageRate ?? 20,
+      utilityOverageRate:
+        sub?.utilityOverageRate ?? fallbackPlan?.utilityOverageRate ?? 20,
       marketingWalletBalance: tenant?.marketingWalletBalance ?? 0,
-      marketingRate: sub?.marketingRate ?? 130,
+      marketingRate: sub?.marketingRate ?? fallbackPlan?.marketingRate ?? 130,
+      marketingMessagesThisMonth: messageCount,
+      marketingSpendThisMonth: totalSpend,
+      botRepliesThisMonth,
+      pendingPlanTier: sub?.pendingPlanTier ?? null,
+      pendingPlanEffectiveAt: sub?.pendingPlanEffectiveAt ?? null,
       paystackManageUrl: tenant?.paystackCustomerId
         ? `https://paystack.com/manage/${tenant.paystackCustomerId}`
         : null,
@@ -211,6 +248,18 @@ export class BillingService {
         ? `https://billing.stripe.com/p/login`
         : null,
     };
+  }
+
+  private async getBotReplyCountThisMonth(tenantId: string): Promise<number> {
+    const rows = await this.dataSource.query<[{ count: string }]>(
+      `SELECT COUNT(*) FROM trigger_logs
+       WHERE tenant_id = $1
+         AND trigger_type = 'balance_bot_reply'
+         AND status = 'sent'
+         AND created_at >= date_trunc('month', NOW())`,
+      [tenantId],
+    );
+    return Number(rows?.[0]?.count ?? 0);
   }
 
   // ── POST /billing/subscribe ───────────────────────────────────────────────
@@ -388,6 +437,302 @@ export class BillingService {
     };
   }
 
+  // ── POST /billing/change-plan ─────────────────────────────────────────────
+  //
+  // Only for tenants who already have a billing relationship (trialing or
+  // active) — suspended/cancelled/past_due tenants have no card/subscription
+  // to update and must go through subscribe() to re-establish one.
+  //
+  // Plan changes never take effect immediately — the tenant already paid
+  // for the current plan this period. Instead they're scheduled to apply at
+  // sub.currentPeriodEnd (the cron's applyPendingPlanChanges() does that):
+  //   - Downgrade: scheduled immediately, no payment needed.
+  //   - Upgrade: scheduled only once the new plan's price has been paid
+  //     upfront (covering the upcoming period) — this method redirects the
+  //     tenant to a payment gateway instead of writing pending* directly;
+  //     the webhook does that write on payment success.
+
+  async changePlan(
+    tenantId: string,
+    planTier: string,
+    ownerUserId: string,
+  ): Promise<{
+    message: string;
+    requiresPayment: boolean;
+    authorizationUrl?: string;
+    checkoutUrl?: string;
+  }> {
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    if (!tenant) throw new BadRequestException('Tenant not found');
+
+    if ((tenant.planTier as string) === planTier) {
+      throw new BadRequestException('You are already on this plan');
+    }
+
+    if (
+      tenant.subscriptionStatus !== SubscriptionStatus.TRIALING &&
+      tenant.subscriptionStatus !== SubscriptionStatus.ACTIVE
+    ) {
+      throw new BadRequestException(
+        'Reactivate your subscription before changing plans',
+      );
+    }
+
+    const planId = `${planTier}_${tenant.currency.toLowerCase()}` as PlanId;
+    if (!(planId in PLANS) || PLANS[planId].currency !== tenant.currency) {
+      throw new BadRequestException(
+        `The ${planTier} plan is not available in ${tenant.currency}`,
+      );
+    }
+    const plan = PLANS[planId];
+
+    // A subscriptions row can be missing for tenants that never went through
+    // the normal signup/activation flow (e.g. manually seeded test/demo
+    // accounts) — heal it here instead of hard-failing on something the
+    // tenant has no way to fix themselves.
+    let sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
+    if (!sub) {
+      sub = await this.subscriptionRepo.save(
+        this.subscriptionRepo.create({
+          tenantId,
+          planTier: tenant.planTier,
+          currency: tenant.currency,
+          status: tenant.subscriptionStatus,
+        }),
+      );
+    }
+
+    if (sub.pendingPlanTier) {
+      throw new BadRequestException(
+        `A plan change to ${sub.pendingPlanTier} is already pending`,
+      );
+    }
+
+    const isUpgrade =
+      TIER_ORDER.indexOf(planTier) > TIER_ORDER.indexOf(tenant.planTier);
+
+    if (!isUpgrade) {
+      await this.subscriptionRepo.update(sub.id, {
+        pendingPlanTier: plan.planTier as PlanTier,
+        pendingPlanEffectiveAt: sub.currentPeriodEnd,
+        pendingPlanReference: null,
+      });
+      await this.invalidateTenantCache(tenantId);
+      this.logger.log(
+        `Downgrade scheduled: tenantId=${tenantId} -> ${planTier} effective ${sub.currentPeriodEnd?.toISOString()}`,
+      );
+      return {
+        message: sub.currentPeriodEnd
+          ? `Downgrade to ${plan.planTier} scheduled for ${sub.currentPeriodEnd.toLocaleDateString()}.`
+          : `Downgrade to ${plan.planTier} scheduled for your next billing date.`,
+        requiresPayment: false,
+      };
+    }
+
+    const owner = await this.userRepo.findOne({ where: { id: ownerUserId } });
+    if (!owner) throw new BadRequestException('Owner not found');
+
+    if (plan.currency === 'NGN') {
+      const { authorizationUrl } = await this.initiatePlanChangeUpgradePaystack(
+        tenant,
+        plan,
+        owner,
+      );
+      return {
+        message:
+          'Pay for your upgrade to confirm — it starts next billing cycle.',
+        requiresPayment: true,
+        authorizationUrl,
+      };
+    }
+
+    const { checkoutUrl } = await this.initiatePlanChangeUpgradeStripe(
+      tenant,
+      plan,
+      owner,
+    );
+    return {
+      message:
+        'Pay for your upgrade to confirm — it starts next billing cycle.',
+      requiresPayment: true,
+      checkoutUrl,
+    };
+  }
+
+  private async initiatePlanChangeUpgradePaystack(
+    tenant: Tenant,
+    plan: (typeof PLANS)[PlanId],
+    owner: User,
+  ): Promise<{ authorizationUrl: string }> {
+    const paystackKey = this.config.getOrThrow<string>('PAYSTACK_SECRET_KEY');
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? '';
+
+    await this.ensurePaystackCustomer(tenant, owner);
+
+    const initRes = await fetch(
+      'https://api.paystack.co/transaction/initialize',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${paystackKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: owner.email,
+          amount: plan.amount * 100,
+          callback_url: `${frontendUrl}/billing/plan-change-success`,
+          metadata: {
+            tenantId: tenant.id,
+            planTier: plan.planTier,
+            type: 'plan_change_upgrade',
+          },
+        }),
+      },
+    );
+
+    const initData = (await initRes.json()) as PaystackInitResponse;
+    const { authorization_url, reference } = initData.data;
+
+    await this.redis.set(
+      `billing:planchange:pending:${reference}`,
+      JSON.stringify({ tenantId: tenant.id, planTier: plan.planTier }),
+      'EX',
+      3600,
+    );
+
+    return { authorizationUrl: authorization_url };
+  }
+
+  private async initiatePlanChangeUpgradeStripe(
+    tenant: Tenant,
+    plan: (typeof PLANS)[PlanId],
+    owner: User,
+  ): Promise<{ checkoutUrl: string }> {
+    if (!this.stripe) throw new BadRequestException('Stripe not configured');
+
+    await this.ensureStripeCustomer(tenant, owner);
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? '';
+
+    const session = await this.stripe.checkout.sessions.create({
+      customer: tenant.stripeCustomerId,
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'gbp',
+            product_data: { name: `${plan.planTier} plan upgrade` },
+            unit_amount: plan.amount * 100,
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: `${frontendUrl}/billing/plan-change-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/billing`,
+      metadata: {
+        tenantId: tenant.id,
+        planTier: plan.planTier,
+        type: 'plan_change_upgrade',
+      },
+    });
+
+    return { checkoutUrl: session.url ?? '' };
+  }
+
+  // Shared by both the Paystack and Stripe upgrade-payment webhook branches —
+  // writes the pending* fields only once payment for the upgrade has cleared.
+  private async schedulePendingPlanChange(
+    tenantId: string,
+    planTier: string,
+    reference: string,
+  ): Promise<void> {
+    const sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
+    if (!sub) {
+      this.logger.error(
+        `Cannot schedule plan change for tenant ${tenantId}: no subscription row`,
+      );
+      return;
+    }
+    await this.subscriptionRepo.update(sub.id, {
+      pendingPlanTier: planTier as PlanTier,
+      pendingPlanEffectiveAt: sub.currentPeriodEnd,
+      pendingPlanReference: reference,
+    });
+    await this.invalidateTenantCache(tenantId);
+    this.logger.log(
+      `Plan change scheduled: tenantId=${tenantId} -> ${planTier} effective ${sub.currentPeriodEnd?.toISOString()}`,
+    );
+  }
+
+  // ── Applies a scheduled plan change once its effective date has passed —
+  // called by TrialBillingCronService.applyPendingPlanChanges() ───────────
+
+  async applyPendingPlanChange(row: {
+    subscriptionId: string;
+    tenantId: string;
+    pendingPlanTier: string;
+    currency: string;
+    stripeSubId: string | null;
+  }): Promise<void> {
+    const planId =
+      `${row.pendingPlanTier}_${row.currency.toLowerCase()}` as PlanId;
+    if (!(planId in PLANS)) {
+      this.logger.error(
+        `applyPendingPlanChange: unknown plan ${planId} for tenant ${row.tenantId}`,
+      );
+      return;
+    }
+    const plan = PLANS[planId];
+
+    if (row.stripeSubId && this.stripe) {
+      const priceId = 'stripePriceId' in plan ? plan.stripePriceId : undefined;
+      await this.swapStripePrice(row.stripeSubId, priceId);
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    await this.subscriptionRepo.update(row.subscriptionId, {
+      planTier: plan.planTier as PlanTier,
+      amount: plan.amount,
+      utilityIncluded: plan.utilityIncluded,
+      utilityOverageRate: plan.utilityOverageRate,
+      marketingRate: plan.marketingRate,
+      pendingPlanTier: null,
+      pendingPlanEffectiveAt: null,
+      pendingPlanReference: null,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+    });
+    await this.tenantRepo.update(row.tenantId, {
+      planTier: plan.planTier as PlanTier,
+    });
+    await this.invalidateTenantCache(row.tenantId);
+
+    this.logger.log(
+      `Plan change applied: tenantId=${row.tenantId} -> ${row.pendingPlanTier}`,
+    );
+  }
+
+  private async swapStripePrice(
+    stripeSubId: string,
+    priceId: string | undefined,
+  ): Promise<void> {
+    if (!priceId || !this.stripe) {
+      throw new Error('Stripe price not configured for this plan');
+    }
+    const details = await this.stripe.subscriptions.retrieve(stripeSubId);
+    const itemId = details.items.data[0]?.id;
+    if (!itemId) throw new Error('Stripe subscription has no line items');
+
+    await this.stripe.subscriptions.update(stripeSubId, {
+      items: [{ id: itemId, price: priceId }],
+      proration_behavior: 'none',
+    });
+  }
+
   // ── Paystack webhook ──────────────────────────────────────────────────────
 
   async handlePaystackWebhook(
@@ -510,6 +855,13 @@ export class BillingService {
           return;
         }
 
+        // ── Plan-change upgrade — upfront payment for next cycle's plan.
+        //    Only writes pending* fields once this charge clears. ──
+        if (meta?.type === 'plan_change_upgrade') {
+          await this.handlePlanChangeUpgradeCharge(event, ref);
+          return;
+        }
+
         // ── Signup trial card verification (small refundable charge) —
         //    no tenant exists yet, this is what creates one on success ──
         if (meta?.type === 'signup_trial_verification') {
@@ -611,6 +963,24 @@ export class BillingService {
 
     switch (event.type) {
       case 'checkout.session.completed': {
+        const earlyMeta = obj.metadata as Record<string, string> | undefined;
+
+        // ── Plan-change upgrade — one-time payment (mode: 'payment', not
+        //    'subscription'), so this must be checked before the mode gate
+        //    below. Stripe Checkout already guarantees success at this
+        //    webhook, so no further amount verification is needed here. ──
+        if (earlyMeta?.type === 'plan_change_upgrade') {
+          const tenantId = earlyMeta.tenantId;
+          const planTier = earlyMeta.planTier;
+          if (!tenantId || !planTier) return;
+          await this.schedulePendingPlanChange(
+            tenantId,
+            planTier,
+            obj.id as string,
+          );
+          return;
+        }
+
         if (obj.mode !== 'subscription') return;
         const meta = obj.metadata as Record<string, string> | undefined;
 
@@ -689,6 +1059,43 @@ export class BillingService {
       return (subscription as { id?: string }).id;
     }
     return undefined;
+  }
+
+  private async handlePlanChangeUpgradeCharge(
+    event: PaystackEvent,
+    ref: string,
+  ): Promise<void> {
+    const pendingKey = `billing:planchange:pending:${ref}`;
+    const cached = await this.redis.get(pendingKey);
+    if (!cached) {
+      this.logger.warn(
+        `Plan change upgrade webhook: no pending reference for ${ref}`,
+      );
+      return;
+    }
+    const { tenantId, planTier } = JSON.parse(cached) as {
+      tenantId: string;
+      planTier: string;
+    };
+
+    const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
+    const planId =
+      `${planTier}_${(tenant?.currency ?? 'NGN').toLowerCase()}` as PlanId;
+    const expectedAmount = planId in PLANS ? PLANS[planId].amount : null;
+    const chargedNaira = (event.data.amount ?? 0) / 100;
+
+    if (expectedAmount === null || chargedNaira !== expectedAmount) {
+      this.logger.error(
+        `Plan change upgrade amount mismatch: expected ₦${expectedAmount}, got ₦${chargedNaira} for ref ${ref}`,
+      );
+      Sentry.captureMessage('Plan change upgrade amount mismatch', {
+        extra: { reference: ref, expectedAmount, chargedNaira },
+      });
+      return;
+    }
+
+    await this.redis.del(pendingKey);
+    await this.schedulePendingPlanChange(tenantId, planTier, ref);
   }
 
   // No tenant/subscription row exists at this point — the account is

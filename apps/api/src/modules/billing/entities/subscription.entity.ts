@@ -83,6 +83,17 @@ export class Subscription {
   @Column({ default: false })
   cancelAtPeriodEnd: boolean;
 
+  // ── Scheduled plan change — set once an upgrade is paid for (or a
+  // downgrade is confirmed) and applied by the cron at currentPeriodEnd. ──
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  pendingPlanTier: PlanTier | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  pendingPlanEffectiveAt: Date | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  pendingPlanReference: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
