@@ -8,6 +8,8 @@ import { TransactionsModule } from '../transactions/transactions.module';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationSchedulerService } from './integration-scheduler.service';
+import { FileImportService } from './file-import.service';
+import { FileImportListener } from './file-import.listener';
 
 @Module({
   imports: [
@@ -15,7 +17,12 @@ import { IntegrationSchedulerService } from './integration-scheduler.service';
     TransactionsModule,
   ],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService, IntegrationSchedulerService],
+  providers: [
+    IntegrationsService,
+    IntegrationSchedulerService,
+    FileImportService,
+    FileImportListener,
+  ],
   exports: [IntegrationsService, IntegrationSchedulerService],
 })
 export class IntegrationsModule {}

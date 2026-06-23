@@ -3,14 +3,20 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   InternalServerErrorException,
   Logger,
   Param,
+  ParseUUIDPipe,
   Post,
   Req,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@pingloyal/types';
 import type { RequestUser } from '@pingloyal/types';
 import { Public } from '../../common/decorators/public.decorator';
@@ -18,7 +24,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SkipSubscriptionCheck } from '../../common/decorators/skip-subscription-check.decorator';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationSchedulerService } from './integration-scheduler.service';
+import { FileImportService } from './file-import.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
+import type { FieldMapping } from './utils/apply-mapping.util';
 
 @Controller('integrations')
 export class IntegrationsController {
@@ -27,6 +35,7 @@ export class IntegrationsController {
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly scheduler: IntegrationSchedulerService,
+    private readonly fileImportService: FileImportService,
   ) {}
 
   @Get()
@@ -73,6 +82,43 @@ export class IntegrationsController {
   @Roles(UserRole.OWNER)
   test(@Req() req: { user: RequestUser }) {
     return this.integrationsService.test(req.user.tenantId);
+  }
+
+  @Get('file-upload/template')
+  @Roles(UserRole.OWNER)
+  @Header('Content-Type', 'text/csv')
+  @Header(
+    'Content-Disposition',
+    'attachment; filename="pingloyal-transactions-template.csv"',
+  )
+  async getFileUploadTemplate(
+    @Req() req: { user: RequestUser },
+  ): Promise<StreamableFile> {
+    const integration = await this.integrationsService.findRaw(
+      req.user.tenantId,
+    );
+    const fm = (integration?.fieldMapping ?? {}) as unknown as FieldMapping;
+    return new StreamableFile(this.fileImportService.buildTemplate(fm));
+  }
+
+  @Post('file-upload')
+  @Roles(UserRole.OWNER)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseInterceptors(FileInterceptor('file'))
+  uploadFile(
+    @Req() req: { user: RequestUser },
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.fileImportService.uploadFile(req.user.tenantId, file);
+  }
+
+  @Get('file-upload/:jobId')
+  @Roles(UserRole.OWNER)
+  getFileUploadStatus(
+    @Req() req: { user: RequestUser },
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+  ) {
+    return this.fileImportService.getJobStatus(req.user.tenantId, jobId);
   }
 
   @Post('webhook/:tenantSlug')
