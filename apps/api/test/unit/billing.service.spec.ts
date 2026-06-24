@@ -1140,18 +1140,44 @@ describe('BillingService', () => {
 
     const result = await service.changePlan(TENANT_ID, 'starter', OWNER_ID);
 
-    expect(mockSubRepo.create).toHaveBeenCalledWith({
-      tenantId: TENANT_ID,
-      planTier: PlanTier.GROWTH,
-      currency: 'NGN',
-      status: SubscriptionStatus.ACTIVE,
-    });
+    expect(mockSubRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: TENANT_ID,
+        planTier: PlanTier.GROWTH,
+        currency: 'NGN',
+        status: SubscriptionStatus.ACTIVE,
+      }),
+    );
     expect(mockSubRepo.update).toHaveBeenCalledWith('sub-healed', {
       pendingPlanTier: PlanTier.STARTER,
       pendingPlanEffectiveAt: healedPeriodEnd,
       pendingPlanReference: null,
     });
     expect(result.requiresPayment).toBe(false);
+  });
+
+  it("T47b — healed subscription falls back to the tenant's trialEndsAt when still trialing", async () => {
+    const trialEndsAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    mockTenantRepo.findOne.mockResolvedValue(
+      makeTenant({
+        currency: 'NGN',
+        planTier: PlanTier.GROWTH,
+        subscriptionStatus: SubscriptionStatus.TRIALING,
+        trialEndsAt,
+      }),
+    );
+    mockSubRepo.findOne.mockResolvedValue(null);
+    mockSubRepo.save.mockResolvedValue(
+      makeSubscription({ id: 'sub-healed', planTier: PlanTier.GROWTH }),
+    );
+
+    await service.changePlan(TENANT_ID, 'starter', OWNER_ID);
+
+    expect(mockSubRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentPeriodEnd: trialEndsAt,
+      }),
+    );
   });
 
   // ── T48-T50: plan_change_upgrade webhooks ──────────────────────────────────
