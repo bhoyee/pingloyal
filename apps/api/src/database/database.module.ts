@@ -21,6 +21,9 @@ import {
   WaTriggerTemplate,
   TemplateRequest,
   WebhookEvent,
+  Staff,
+  SupportTicket,
+  SupportTicketMessage,
 } from './entities';
 
 const ALL_ENTITIES = [
@@ -42,6 +45,9 @@ const ALL_ENTITIES = [
   ReportSnapshot,
   ReportSchedule,
   WebhookEvent,
+  Staff,
+  SupportTicket,
+  SupportTicketMessage,
 ];
 
 @Module({

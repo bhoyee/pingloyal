@@ -111,7 +111,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-async function upload<T>(path: string, file: File): Promise<T> {
+async function upload<T>(
+  path: string,
+  file: File,
+  fields?: Record<string, string>,
+): Promise<T> {
   const token = getToken();
 
   if (!token) {
@@ -121,6 +125,11 @@ async function upload<T>(path: string, file: File): Promise<T> {
 
   const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
   const formData = new FormData();
+  if (fields) {
+    for (const [key, value] of Object.entries(fields)) {
+      formData.append(key, value);
+    }
+  }
   formData.append('file', file);
 
   let res: Response;
@@ -156,7 +165,8 @@ export const api = {
       method: 'DELETE',
       ...(body !== undefined && { body: JSON.stringify(body) }),
     }),
-  upload: <T>(path: string, file: File) => upload<T>(path, file),
+  upload: <T>(path: string, file: File, fields?: Record<string, string>) =>
+    upload<T>(path, file, fields),
 };
 
 // ── Typed API helpers ──────────────────────────────────────────────────────────
@@ -397,4 +407,66 @@ export const cashierApi = {
   get: <T>(path: string) => cashierRequest<T>(path),
   post: <T>(path: string, body: unknown) =>
     cashierRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+};
+
+// ── Staff API (PingLoyal-internal support panel — uses staff_access_token,
+// redirects to /staff/login on 401). Kept as its own request function rather
+// than parameterizing `request()` so the tenant-facing client above is never
+// at risk of being touched by staff-panel changes. ─────────────────────────
+
+function getStaffToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('staff_access_token');
+}
+
+async function staffRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const token = getStaffToken();
+
+  if (!token) {
+    window.location.href = '/staff/login';
+    throw new ApiError('No auth token', 401);
+  }
+
+  const normalizedPath = path.startsWith('/api/') ? path : `/api/v1${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${normalizedPath}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new ApiError('Network error — check your connection', 0);
+  }
+
+  if (res.status === 401) {
+    localStorage.removeItem('staff_access_token');
+    localStorage.removeItem('staff_refresh_token');
+    window.location.href = '/staff/login';
+    throw new ApiError('Session expired', 401);
+  }
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const msg = typeof body.message === 'string' ? body.message : `HTTP ${res.status}`;
+    throw new ApiError(msg, res.status);
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export const staffApi = {
+  get: <T>(path: string) => staffRequest<T>(path),
+  post: <T>(path: string, body: unknown) =>
+    staffRequest<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown) =>
+    staffRequest<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
 };

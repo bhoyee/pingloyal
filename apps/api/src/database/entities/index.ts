@@ -18,3 +18,6 @@ export { WalletTransaction } from '../../modules/billing/entities/wallet-transac
 export { WebhookEvent } from '../../modules/billing/entities/webhook-event.entity';
 export { ReportSnapshot } from '../../modules/reports/entities/report-snapshot.entity';
 export { ReportSchedule } from '../../modules/reports/entities/report-schedule.entity';
+export { Staff } from '../../modules/staff-auth/entities/staff.entity';
+export { SupportTicket } from '../../modules/support/entities/support-ticket.entity';
+export { SupportTicketMessage } from '../../modules/support/entities/support-ticket-message.entity';

@@ -55,10 +55,7 @@ function SuspendedOverlay() {
       >
         Subscribe to Reactivate →
       </a>
-      <a
-        href="mailto:support@pingloyal.com"
-        className="mt-3 text-sm text-slate-400 hover:underline"
-      >
+      <a href="/support" className="mt-3 text-sm text-slate-400 hover:underline">
         Need help? Contact support
       </a>
     </div>
@@ -85,6 +82,9 @@ function CancelledOverlay() {
         data-testid="cancelled-subscribe-link"
       >
         Subscribe to Reactivate →
+      </a>
+      <a href="/support" className="mt-3 text-sm text-slate-400 hover:underline">
+        Need help? Contact support
       </a>
     </div>
   );
@@ -125,7 +125,10 @@ function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const onOnboardingRoute = pathname.startsWith('/onboarding');
+  // Support must stay reachable mid-onboarding and while billing blocks
+  // access — that's exactly when a tenant is most likely to need it.
+  const onSupportRoute = pathname.startsWith('/support');
+  const onOnboardingRoute = pathname.startsWith('/onboarding') || onSupportRoute;
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Shared with Sidebar's and the dashboard page's ['tenant-me'] queries so
@@ -175,11 +178,11 @@ function DashboardContent({ children }: { children: ReactNode }) {
     );
   }
 
-  if (billing?.status === 'cancelled') {
+  if (!onSupportRoute && billing?.status === 'cancelled') {
     return <CancelledOverlay />;
   }
 
-  if (billing?.status === 'suspended') {
+  if (!onSupportRoute && billing?.status === 'suspended') {
     return <SuspendedOverlay />;
   }
 

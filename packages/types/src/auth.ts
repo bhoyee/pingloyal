@@ -15,3 +15,19 @@ export interface RequestUser {
   role: UserRole;
   planTier: PlanTier;
 }
+
+// PingLoyal-internal staff (support ticket panel) — deliberately separate
+// shape from RequestUser/JwtPayload above: no tenantId/role/planTier, so a
+// staff token can never be mistaken for a tenant token even if it somehow
+// reached the wrong guard.
+export interface StaffJwtPayload {
+  sub: string; // staffId
+  type: 'staff';
+  iat: number;
+  exp: number;
+}
+
+export interface RequestStaff {
+  staffId: string;
+  fullName: string;
+}

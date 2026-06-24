@@ -85,6 +85,16 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
     }
   }
 
+  // Onboarding completion is signalled by tenant.qrCodeUrl across the whole
+  // app (dashboard layout's redirect gate, login redirect, etc.) — generate
+  // it here too, same as Step5aNative, so connected-mode tenants actually
+  // reach the dashboard instead of bouncing back to /onboarding forever.
+  async function completeOnboarding() {
+    await api.get('/tenants/qr-code');
+    localStorage.setItem('onboarding_step', 'complete');
+    router.push('/dashboard');
+  }
+
   async function handleComplete() {
     setError('');
     if (connType !== 'file_export') {
@@ -104,8 +114,18 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
           connType === 'api_pull' ? Number(pollInterval) : undefined,
         fieldMapping: buildFieldMapping(),
       });
-      localStorage.setItem('onboarding_step', 'complete');
-      router.push('/dashboard');
+      await completeOnboarding();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Something went wrong');
+      setSaving(false);
+    }
+  }
+
+  async function handleSkip() {
+    setError('');
+    setSaving(true);
+    try {
+      await completeOnboarding();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Something went wrong');
       setSaving(false);
@@ -332,6 +352,18 @@ export function Step5bConnected({ tenantSlug }: Step5bConnectedProps) {
         >
           Complete Setup →
         </Button>
+
+        <p className="text-center text-xs text-slate-400 pt-1">
+          Don&apos;t have all your system&apos;s details yet?{' '}
+          <button
+            type="button"
+            onClick={() => void handleSkip()}
+            disabled={saving}
+            className="text-slate-500 underline hover:text-slate-700"
+          >
+            Skip for now — set up later in Settings → Integrations
+          </button>
+        </p>
       </div>
     </div>
   );

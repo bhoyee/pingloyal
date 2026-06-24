@@ -17,6 +17,7 @@ import {
   Wallet,
   CreditCard,
   UserCircle,
+  HelpCircle,
   LogOut,
   X,
   type LucideIcon,
@@ -83,6 +84,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { data: summary } = useQuery<SidebarSummary>({
     queryKey: ['dashboard-summary'],
     queryFn: () => api.get<SidebarSummary>('/api/v1/dashboard/summary'),
+  });
+
+  const { data: unread } = useQuery<{ count: number }>({
+    queryKey: ['support-unread-count'],
+    queryFn: () => api.get<{ count: number }>('/api/v1/support/unread-count'),
+    refetchInterval: 60_000,
   });
 
   const activeHref = [...OVERVIEW, ...AUTOMATION, ...NATIVE_MODE, ...SETTINGS]
@@ -235,8 +242,29 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           {renderSection('Settings', SETTINGS)}
         </nav>
 
+        {/* Help & Support — kept separate from Settings for discoverability */}
+        <div className="border-t border-white/10 p-3 pb-0">
+          <Link
+            href="/support"
+            onClick={onClose}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              pathname.startsWith('/support')
+                ? 'bg-[#0DC56A] text-[#0A1628]'
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <HelpCircle size={17} />
+            Help & Support
+            {!!unread?.count && (
+              <span className="ml-auto rounded-full bg-amber-400 px-2 py-0.5 text-xs font-semibold text-amber-950">
+                {unread.count}
+              </span>
+            )}
+          </Link>
+        </div>
+
         {/* Profile + Sign out */}
-        <div className="border-t border-white/10 p-3 space-y-0.5">
+        <div className="p-3 space-y-0.5">
           <Link
             href="/profile"
             onClick={onClose}
