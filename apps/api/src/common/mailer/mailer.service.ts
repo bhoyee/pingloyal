@@ -21,6 +21,10 @@ export class MailerService {
       this.config.get<string>('SUPPORT_EMAIL') ?? 'support@pingloyal.com';
   }
 
+  getSupportEmail(): string {
+    return this.supportEmail;
+  }
+
   async sendWelcomeVerification(params: {
     to: string;
     name: string;
@@ -101,6 +105,64 @@ export class MailerService {
       to: this.supportEmail,
       subject,
       html: this.buildTemplateRequestHtml(params),
+    });
+  }
+
+  async sendNewTicketNotification(params: {
+    ticketId: string;
+    businessName: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const subject = `New Support Ticket — ${params.businessName}: ${params.subject}`;
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] New support ticket ${params.ticketId} from ${params.businessName}: "${params.subject}"`,
+      );
+      return;
+    }
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: this.supportEmail,
+      subject,
+      html: this.buildTicketEmailHtml({
+        heading: 'New Support Ticket',
+        intro: 'A tenant has opened a new support ticket.',
+        ticketId: params.ticketId,
+        authorName: params.businessName,
+        body: `${params.subject}\n\n${params.message}`,
+      }),
+    });
+  }
+
+  // Covers both directions: staff get notified when a tenant replies
+  // (recipientEmail = the support inbox), and the tenant gets notified when
+  // staff replies (recipientEmail = the ticket's openedByEmail).
+  async sendTicketReplyNotification(params: {
+    ticketId: string;
+    recipientEmail: string;
+    subject: string;
+    authorName: string;
+    message: string;
+  }): Promise<void> {
+    const subject = `Re: ${params.subject}`;
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] Reply on ticket ${params.ticketId} from ${params.authorName} → ${params.recipientEmail}`,
+      );
+      return;
+    }
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.recipientEmail,
+      subject,
+      html: this.buildTicketEmailHtml({
+        heading: 'New Reply on Your Support Ticket',
+        intro: `${params.authorName} replied to ticket: ${params.subject}`,
+        ticketId: params.ticketId,
+        authorName: params.authorName,
+        body: params.message,
+      }),
     });
   }
 
@@ -233,6 +295,45 @@ export class MailerService {
               <td style="padding:10px 16px;font-size:14px;color:#991b1b;font-weight:600">${params.scheduledAt.toUTCString()}</td>
             </tr>
           </table>
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
+          <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal · Internal notification</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  private buildTicketEmailHtml(params: {
+    heading: string;
+    intro: string;
+    ticketId: string;
+    authorName: string;
+    body: string;
+  }): string {
+    const escapedBody = params.body
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 16px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <tr><td style="background:#0A1628;padding:20px 32px">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px">PingLoyal</span>
+          <span style="color:#94a3b8;font-size:13px;margin-left:12px">Support</span>
+        </td></tr>
+        <tr><td style="padding:28px 32px">
+          <h2 style="margin:0 0 4px;font-size:18px;color:#0f172a">${params.heading}</h2>
+          <p style="margin:0 0 20px;color:#64748b;font-size:14px">${params.intro}</p>
+          <p style="margin:0 0 8px;color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:.5px">From ${params.authorName} · Ticket ${params.ticketId}</p>
+          <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#0f172a;font-size:14px;line-height:1.6">${escapedBody}</div>
         </td></tr>
         <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
           <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal · Internal notification</p>

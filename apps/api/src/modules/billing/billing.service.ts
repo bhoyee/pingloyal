@@ -241,9 +241,10 @@ export class BillingService {
       botRepliesThisMonth,
       pendingPlanTier: sub?.pendingPlanTier ?? null,
       pendingPlanEffectiveAt: sub?.pendingPlanEffectiveAt ?? null,
-      paystackManageUrl: tenant?.paystackCustomerId
-        ? `https://paystack.com/manage/${tenant.paystackCustomerId}`
-        : null,
+      // Paystack has no hosted self-service customer portal (unlike Stripe) —
+      // there is no real URL to send a card-on-file tenant to, so this is
+      // always null rather than linking to a page that doesn't exist.
+      paystackManageUrl: null,
       stripeManageUrl: tenant?.stripeCustomerId
         ? `https://billing.stripe.com/p/login`
         : null,
@@ -489,15 +490,25 @@ export class BillingService {
     // A subscriptions row can be missing for tenants that never went through
     // the normal signup/activation flow (e.g. manually seeded test/demo
     // accounts) — heal it here instead of hard-failing on something the
-    // tenant has no way to fix themselves.
+    // tenant has no way to fix themselves. A concrete currentPeriodEnd is
+    // required even for healed rows — it's what pendingPlanEffectiveAt is
+    // derived from below, and a null value would silently fall back to a
+    // vague "your next billing date" instead of a real date on the UI.
     let sub = await this.subscriptionRepo.findOne({ where: { tenantId } });
     if (!sub) {
+      const fallbackPeriodEnd =
+        tenant.subscriptionStatus === SubscriptionStatus.TRIALING &&
+        tenant.trialEndsAt
+          ? tenant.trialEndsAt
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       sub = await this.subscriptionRepo.save(
         this.subscriptionRepo.create({
           tenantId,
           planTier: tenant.planTier,
           currency: tenant.currency,
           status: tenant.subscriptionStatus,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: fallbackPeriodEnd,
         }),
       );
     }

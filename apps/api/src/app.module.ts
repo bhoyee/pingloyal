@@ -30,6 +30,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { TriggersModule } from './modules/triggers/triggers.module';
 import { TemplateRequestsModule } from './modules/template-requests/template-requests.module';
+import { StaffAuthModule } from './modules/staff-auth/staff-auth.module';
+import { SupportModule } from './modules/support/support.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
@@ -96,6 +98,8 @@ import { createWinstonConfig } from './common/logger/winston.config';
     IntegrationsModule,
     TriggersModule,
     TemplateRequestsModule,
+    StaffAuthModule,
+    SupportModule,
     AdminModule,
   ],
   controllers: [AppController],
