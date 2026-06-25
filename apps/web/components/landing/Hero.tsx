@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import { HeroImageCarousel } from './HeroImageCarousel';
 
 export default function Hero() {
   return (
@@ -90,17 +90,10 @@ export default function Hero() {
           </div>
 
           {/* ── Right column ── */}
-          <div className="relative pb-10 pr-6">
+          <div className="relative pb-10 pr-2">
             {/* Main store card */}
-            <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-[#0A1628] shadow-2xl">
-              <Image
-                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=700&q=80"
-                alt="Nigerian retail store"
-                width={700}
-                height={525}
-                priority
-                className="h-full w-full object-cover opacity-50"
-              />
+            <div className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-[#0A1628] shadow-2xl">
+              <HeroImageCarousel />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0A1628] via-[#0A1628]/70 to-transparent p-6 pt-20">
                 <p className="text-sm text-white/60">FreshMart, Surulere</p>
                 <p className="mt-0.5 font-semibold text-white">
