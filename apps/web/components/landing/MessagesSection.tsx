@@ -154,7 +154,7 @@ export default function MessagesSection() {
 
           {/* ── Right: phone mockup ── */}
           <div className="flex justify-center lg:justify-end">
-            <div className="relative w-full max-w-[340px]">
+            <div className="relative w-full max-w-[270px]">
               {/* Side buttons */}
               <div className="absolute -left-[3px] top-24 h-8 w-[3px] rounded-l-sm bg-gray-700" />
               <div className="absolute -left-[3px] top-36 h-12 w-[3px] rounded-l-sm bg-gray-700" />
@@ -210,7 +210,7 @@ export default function MessagesSection() {
                 </div>
 
                 {/* Chat area — a real scrollable conversation history */}
-                <div className="h-[440px] space-y-3 overflow-y-auto bg-[#E5DDD5] p-4 scroll-smooth">
+                <div className="h-[580px] space-y-3 overflow-y-auto bg-[#E5DDD5] p-4 scroll-smooth">
                   {CONVERSATION.map((bubble, i) => {
                     const isActive = bubble.key === activeKey;
                     return bubble.direction === 'out' ? (
