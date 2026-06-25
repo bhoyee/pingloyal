@@ -67,8 +67,12 @@ export function CookieConsentBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0A1628]/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+    // No dimming/blur over the page — visitors should still be able to read
+    // what the site is while deciding. This layer is transparent but still
+    // covers the full viewport, so clicks on the page behind it are blocked
+    // until a choice is made.
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center p-4 sm:items-center">
+      <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl sm:p-8">
         {!managing ? (
           <>
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 text-2xl">
