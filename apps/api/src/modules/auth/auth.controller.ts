@@ -93,6 +93,13 @@ export class AuthController {
     return this.authService.updateProfile(user.userId, dto);
   }
 
+  @Post('tour-complete')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark the product tour as completed or skipped' })
+  markTourComplete(@CurrentUser() user: RequestUser) {
+    return this.authService.markTourComplete(user.userId);
+  }
+
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Change the current user password' })

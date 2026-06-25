@@ -59,6 +59,9 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   passwordResetExpiry: Date | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  productTourCompletedAt: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

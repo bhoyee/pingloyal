@@ -57,6 +57,7 @@ export interface ProfileResponse {
   emailVerified: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
+  productTourCompletedAt: Date | null;
 }
 
 @Injectable()
@@ -285,6 +286,7 @@ export class AuthService {
       emailVerified: !!user.emailVerifiedAt,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
+      productTourCompletedAt: user.productTourCompletedAt,
     };
   }
 
@@ -293,6 +295,13 @@ export class AuthService {
     dto: UpdateProfileDto,
   ): Promise<ProfileResponse> {
     await this.userRepo.update(userId, { fullName: dto.fullName });
+    return this.getProfile(userId);
+  }
+
+  // Idempotent — replaying the tour and finishing it again just bumps the
+  // timestamp, which is fine since nothing downstream reads the exact value.
+  async markTourComplete(userId: string): Promise<ProfileResponse> {
+    await this.userRepo.update(userId, { productTourCompletedAt: new Date() });
     return this.getProfile(userId);
   }
 

@@ -35,16 +35,19 @@ interface NavItem {
   label: string;
   badge?: 'customers' | 'wallet';
   external?: boolean;
+  /** Anchor for the product tour (components/tour/ProductTour.tsx) — omit
+   * for items the tour doesn't reference. */
+  tourId?: string;
 }
 
 const OVERVIEW: NavItem[] = [
-  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/customers', icon: Users, label: 'Customers', badge: 'customers' },
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', tourId: 'nav-dashboard' },
+  { href: '/customers', icon: Users, label: 'Customers', badge: 'customers', tourId: 'nav-customers' },
 ];
 
 const AUTOMATION: NavItem[] = [
-  { href: '/campaigns', icon: Megaphone, label: 'Campaigns' },
-  { href: '/triggers', icon: Zap, label: 'Triggers' },
+  { href: '/campaigns', icon: Megaphone, label: 'Campaigns', tourId: 'nav-campaigns' },
+  { href: '/triggers', icon: Zap, label: 'Triggers', tourId: 'nav-triggers' },
   { href: '/wa-bot', icon: Bot, label: 'WA Bot' },
   { href: '/templates', icon: FileText, label: 'Templates' },
   { href: '/reports', icon: BarChart3, label: 'Reports' },
@@ -139,6 +142,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 onClick={onClose}
+                data-tour={item.tourId}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive(item.href)
                     ? 'bg-[#0DC56A] text-[#0A1628]'
@@ -247,6 +251,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           <Link
             href="/support"
             onClick={onClose}
+            data-tour="nav-help"
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               pathname.startsWith('/support')
                 ? 'bg-[#0DC56A] text-[#0A1628]'

@@ -18,6 +18,7 @@ interface Profile {
   emailVerified: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  productTourCompletedAt: string | null;
 }
 
 interface ChangeEmailResponse {
@@ -190,6 +191,22 @@ export default function ProfilePage() {
                 <p className="text-sm font-medium text-slate-900">{formatDate(profile?.lastLoginAt ?? null)}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Product tour ───────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Product Tour</CardTitle>
+            <CardDescription>
+              A quick guided walkthrough of the dashboard, customers, campaigns, triggers, and
+              support.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" variant="outline" onClick={() => router.push('/dashboard?tour=1')}>
+              Replay product tour
+            </Button>
           </CardContent>
         </Card>
 
