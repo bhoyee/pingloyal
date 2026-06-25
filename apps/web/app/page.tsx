@@ -52,8 +52,8 @@ function FeaturesGrid() {
 
         <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2">
           {/* Card 1 — featured / navy */}
-          <div className="rounded-2xl bg-[#0A1628] p-8 text-white">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/20">
+          <div className="group rounded-2xl bg-[#0A1628] p-8 text-white transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-black/20">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/20 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
@@ -85,8 +85,8 @@ function FeaturesGrid() {
           </div>
 
           {/* Card 2 */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+          <div className="group rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
@@ -130,8 +130,8 @@ function FeaturesGrid() {
           </div>
 
           {/* Card 3 */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+          <div className="group rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
@@ -170,8 +170,8 @@ function FeaturesGrid() {
           </div>
 
           {/* Card 4 */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+          <div className="group rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"

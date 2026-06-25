@@ -66,7 +66,7 @@ export default function Testimonials() {
           {testimonials.map((t) => (
             <div
               key={t.name}
-              className="flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm"
+              className="group flex flex-col rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg"
             >
               <StarRating />
               <blockquote className="mt-4 flex-1 text-gray-700 leading-relaxed">
@@ -74,7 +74,7 @@ export default function Testimonials() {
               </blockquote>
               <div className="mt-6 flex items-center gap-3">
                 <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${t.avatarClass}`}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white transition-transform duration-300 group-hover:scale-110 ${t.avatarClass}`}
                 >
                   {t.initials}
                 </div>

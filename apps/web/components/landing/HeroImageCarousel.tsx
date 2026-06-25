@@ -5,15 +5,21 @@ import Image from 'next/image';
 const SLIDES = [
   {
     src: 'https://images.unsplash.com/photo-1687422808384-c896d0efd4ab?w=800&q=80',
-    alt: 'Shop owner handing change to a customer in a Nigerian store',
+    alt: 'Shop owner handing change to a customer in a Nigerian provisions store',
+    business: 'FreshMart, Surulere',
+    stat: '347 loyal customers',
   },
   {
-    src: 'https://images.unsplash.com/photo-1687422808311-a776f467a468?w=800&q=80',
-    alt: 'Shop owner smiling behind the counter of her store',
+    src: 'https://images.unsplash.com/photo-1709837167686-a2e33aad1bf0?w=800&q=80',
+    alt: 'Baker icing a cake in her home bakery kitchen',
+    business: 'Sweet Crumbs Bakery, Yaba',
+    stat: '212 loyal customers',
   },
   {
-    src: 'https://images.unsplash.com/photo-1585540083814-ea6ee8af9e4f?w=800&q=80',
-    alt: 'Vendor at a Nigerian market produce stall',
+    src: 'https://images.unsplash.com/photo-1761370571873-5d869310d731?w=800&q=80',
+    alt: 'Boutique owner arranging clothes on a rack in her shop',
+    business: 'Vogue Closet, Abuja',
+    stat: '189 loyal customers',
   },
 ];
 
@@ -41,6 +47,11 @@ export function HeroImageCarousel() {
           }`}
         />
       ))}
+
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0A1628] via-[#0A1628]/70 to-transparent p-6 pt-20">
+        <p className="text-sm text-white/60">{SLIDES[index].business}</p>
+        <p className="mt-0.5 font-semibold text-white">{SLIDES[index].stat}</p>
+      </div>
     </>
   );
 }
