@@ -1,82 +1,90 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Bubble {
+  key: string;
   direction: 'in' | 'out';
   text: string;
   time: string;
 }
 
-const messageTypes: {
-  name: string;
-  description: string;
-  type: string;
-  tagClass: string;
-  tagLabel: string;
-  bubbles: Bubble[];
-}[] = [
+// One continuous, realistic chat history — hovering a message type on the
+// left scrolls to and highlights its bubble(s) here, instead of swapping
+// out the whole screen for a single message.
+const CONVERSATION: Bubble[] = [
   {
+    key: 'welcome',
+    direction: 'in',
+    text: '🎉 Welcome to FreshMart Rewards, Chioma! You just earned 20 points for joining. Reply "balance" anytime to check your points.',
+    time: 'Mon 9:41 AM',
+  },
+  {
+    key: 'purchase',
+    direction: 'in',
+    text: '✅ Purchase confirmed! You earned 45 pts. Total: 230 pts',
+    time: 'Wed 3:12 PM',
+  },
+  {
+    key: 'birthday',
+    direction: 'in',
+    text: '🎂 Happy birthday, Chioma! Enjoy 50 bonus points on us — valid for your next purchase this month.',
+    time: 'Fri 9:00 AM',
+  },
+  { key: 'balance', direction: 'out', text: 'balance', time: 'Fri 2:14 PM ✓✓' },
+  {
+    key: 'balance',
+    direction: 'in',
+    text: '💰 Balance: 230 points (~₦1,150 value). Next reward at 300 pts!',
+    time: 'Fri 2:14 PM',
+  },
+];
+
+const messageTypes = [
+  {
+    key: 'welcome',
     name: 'Welcome message',
     description: 'Sent instantly when a customer registers via QR',
     type: 'Utility',
     tagClass: 'bg-blue-50 text-blue-700',
     tagLabel: 'Included',
-    bubbles: [
-      {
-        direction: 'in',
-        text: '🎉 Welcome to FreshMart Rewards, Chioma! You just earned 20 points for joining. Reply "balance" anytime to check your points.',
-        time: '9:41 AM',
-      },
-    ],
   },
   {
+    key: 'purchase',
     name: 'Purchase confirmation',
     description: 'Points earned + running total after every transaction',
     type: 'Utility',
     tagClass: 'bg-blue-50 text-blue-700',
     tagLabel: 'Included',
-    bubbles: [
-      {
-        direction: 'in',
-        text: '✅ Purchase confirmed! You earned 45 pts. Total: 230 pts',
-        time: '9:41 AM',
-      },
-    ],
   },
   {
+    key: 'birthday',
     name: 'Birthday greeting',
     description: 'Personalised message with a bonus offer on their birthday',
     type: 'Marketing',
     tagClass: 'bg-amber-50 text-amber-700',
     tagLabel: 'From wallet',
-    bubbles: [
-      {
-        direction: 'in',
-        text: '🎂 Happy birthday, Chioma! Enjoy 50 bonus points on us — valid for your next purchase this month.',
-        time: 'Wed 9:00 AM',
-      },
-    ],
   },
   {
+    key: 'balance',
     name: 'Balance bot reply',
     description: 'Customer texts "balance" and gets an instant points reply',
     type: 'Service',
     tagClass: 'bg-green-50 text-green-700',
     tagLabel: 'Free',
-    bubbles: [
-      { direction: 'out', text: 'balance', time: 'Thu 2:14 PM ✓✓' },
-      {
-        direction: 'in',
-        text: '💰 Balance: 230 points (~₦1,150 value). Next reward at 300 pts!',
-        time: 'Thu 2:14 PM',
-      },
-    ],
   },
 ];
 
 export default function MessagesSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const active = messageTypes[activeIndex];
+  const [activeKey, setActiveKey] = useState('welcome');
+  const bubbleRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const firstIndex = CONVERSATION.findIndex((b) => b.key === activeKey);
+    bubbleRefs.current[firstIndex]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+  }, [activeKey]);
 
   return (
     <section className="bg-[#0A1628] px-6 py-24 lg:px-8">
@@ -97,14 +105,14 @@ export default function MessagesSection() {
             </p>
 
             <div className="mt-10 space-y-4">
-              {messageTypes.map((msg, i) => (
+              {messageTypes.map((msg) => (
                 <button
-                  key={msg.name}
+                  key={msg.key}
                   type="button"
-                  onMouseEnter={() => setActiveIndex(i)}
-                  onClick={() => setActiveIndex(i)}
+                  onMouseEnter={() => setActiveKey(msg.key)}
+                  onClick={() => setActiveKey(msg.key)}
                   className={`flex w-full items-start gap-4 rounded-2xl border p-5 text-left backdrop-blur-sm transition-colors ${
-                    i === activeIndex
+                    msg.key === activeKey
                       ? 'border-[#0DC56A]/40 bg-white/10'
                       : 'border-white/10 bg-white/5 hover:bg-white/[0.07]'
                   }`}
@@ -146,7 +154,7 @@ export default function MessagesSection() {
 
           {/* ── Right: phone mockup ── */}
           <div className="flex justify-center lg:justify-end">
-            <div className="w-72 overflow-hidden rounded-[2.5rem] border-8 border-gray-700 bg-gray-800 shadow-2xl shadow-black/50">
+            <div className="w-[320px] overflow-hidden rounded-[2.5rem] border-8 border-gray-700 bg-gray-800 shadow-2xl shadow-black/50">
               {/* Status bar */}
               <div className="flex items-center justify-between bg-[#075E54] px-5 py-2.5">
                 <span className="text-xs font-medium text-white">9:41</span>
@@ -172,13 +180,19 @@ export default function MessagesSection() {
                 </div>
               </div>
 
-              {/* Chat area */}
-              <div className="min-h-[220px] space-y-3 bg-[#E5DDD5] p-4">
-                {active.bubbles.map((bubble, i) =>
-                  bubble.direction === 'out' ? (
+              {/* Chat area — a real scrollable conversation history */}
+              <div className="h-[460px] space-y-3 overflow-y-auto bg-[#E5DDD5] p-4 scroll-smooth">
+                {CONVERSATION.map((bubble, i) => {
+                  const isActive = bubble.key === activeKey;
+                  return bubble.direction === 'out' ? (
                     <div
                       key={i}
-                      className="ml-auto max-w-[75%] rounded-lg rounded-tr-none bg-[#DCF8C6] p-3 shadow-sm"
+                      ref={(el) => {
+                        bubbleRefs.current[i] = el;
+                      }}
+                      className={`ml-auto max-w-[75%] rounded-lg rounded-tr-none bg-[#DCF8C6] p-3 shadow-sm transition-all ${
+                        isActive ? 'ring-2 ring-[#0DC56A] ring-offset-1' : 'opacity-70'
+                      }`}
                     >
                       <p className="text-xs text-gray-800">{bubble.text}</p>
                       <p className="mt-1 text-right text-xs text-gray-400">{bubble.time}</p>
@@ -186,14 +200,19 @@ export default function MessagesSection() {
                   ) : (
                     <div
                       key={i}
-                      className="max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm"
+                      ref={(el) => {
+                        bubbleRefs.current[i] = el;
+                      }}
+                      className={`max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm transition-all ${
+                        isActive ? 'ring-2 ring-[#0DC56A] ring-offset-1' : 'opacity-70'
+                      }`}
                     >
                       <p className="text-xs font-semibold text-[#075E54]">PingLoyal</p>
                       <p className="mt-1 text-xs leading-relaxed text-gray-800">{bubble.text}</p>
                       <p className="mt-1 text-right text-xs text-gray-400">{bubble.time}</p>
                     </div>
-                  ),
-                )}
+                  );
+                })}
               </div>
             </div>
           </div>
