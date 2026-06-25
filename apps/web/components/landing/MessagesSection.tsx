@@ -1,10 +1,33 @@
-const messageTypes = [
+'use client';
+import { useState } from 'react';
+
+interface Bubble {
+  direction: 'in' | 'out';
+  text: string;
+  time: string;
+}
+
+const messageTypes: {
+  name: string;
+  description: string;
+  type: string;
+  tagClass: string;
+  tagLabel: string;
+  bubbles: Bubble[];
+}[] = [
   {
     name: 'Welcome message',
     description: 'Sent instantly when a customer registers via QR',
     type: 'Utility',
     tagClass: 'bg-blue-50 text-blue-700',
     tagLabel: 'Included',
+    bubbles: [
+      {
+        direction: 'in',
+        text: '🎉 Welcome to FreshMart Rewards, Chioma! You just earned 20 points for joining. Reply "balance" anytime to check your points.',
+        time: '9:41 AM',
+      },
+    ],
   },
   {
     name: 'Purchase confirmation',
@@ -12,6 +35,13 @@ const messageTypes = [
     type: 'Utility',
     tagClass: 'bg-blue-50 text-blue-700',
     tagLabel: 'Included',
+    bubbles: [
+      {
+        direction: 'in',
+        text: '✅ Purchase confirmed! You earned 45 pts. Total: 230 pts',
+        time: '9:41 AM',
+      },
+    ],
   },
   {
     name: 'Birthday greeting',
@@ -19,6 +49,13 @@ const messageTypes = [
     type: 'Marketing',
     tagClass: 'bg-amber-50 text-amber-700',
     tagLabel: 'From wallet',
+    bubbles: [
+      {
+        direction: 'in',
+        text: '🎂 Happy birthday, Chioma! Enjoy 50 bonus points on us — valid for your next purchase this month.',
+        time: 'Wed 9:00 AM',
+      },
+    ],
   },
   {
     name: 'Balance bot reply',
@@ -26,10 +63,21 @@ const messageTypes = [
     type: 'Service',
     tagClass: 'bg-green-50 text-green-700',
     tagLabel: 'Free',
+    bubbles: [
+      { direction: 'out', text: 'balance', time: 'Thu 2:14 PM ✓✓' },
+      {
+        direction: 'in',
+        text: '💰 Balance: 230 points (~₦1,150 value). Next reward at 300 pts!',
+        time: 'Thu 2:14 PM',
+      },
+    ],
   },
 ];
 
 export default function MessagesSection() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const active = messageTypes[activeIndex];
+
   return (
     <section className="bg-[#0A1628] px-6 py-24 lg:px-8">
       <div className="mx-auto max-w-6xl">
@@ -49,10 +97,17 @@ export default function MessagesSection() {
             </p>
 
             <div className="mt-10 space-y-4">
-              {messageTypes.map((msg) => (
-                <div
+              {messageTypes.map((msg, i) => (
+                <button
                   key={msg.name}
-                  className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm"
+                  type="button"
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onClick={() => setActiveIndex(i)}
+                  className={`flex w-full items-start gap-4 rounded-2xl border p-5 text-left backdrop-blur-sm transition-colors ${
+                    i === activeIndex
+                      ? 'border-[#0DC56A]/40 bg-white/10'
+                      : 'border-white/10 bg-white/5 hover:bg-white/[0.07]'
+                  }`}
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0DC56A]/20">
                     <svg
@@ -84,7 +139,7 @@ export default function MessagesSection() {
                       {msg.description}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -118,51 +173,27 @@ export default function MessagesSection() {
               </div>
 
               {/* Chat area */}
-              <div className="space-y-3 bg-[#E5DDD5] p-4">
-                {/* Purchase confirmation */}
-                <div className="max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm">
-                  <p className="text-xs font-semibold text-[#075E54]">PingLoyal</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-800">
-                    ✅ Purchase confirmed! You earned{' '}
-                    <span className="font-semibold">45 pts</span>. Total:{' '}
-                    <span className="font-semibold">230 pts</span>
-                  </p>
-                  <p className="mt-1 text-right text-xs text-gray-400">9:41 AM</p>
-                </div>
-
-                {/* Nudge */}
-                <div className="max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm">
-                  <p className="text-xs font-semibold text-[#075E54]">PingLoyal</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-800">
-                    👋 Chioma, it&apos;s been 14 days! Come back and use your{' '}
-                    <span className="font-semibold">230 pts</span> on your next
-                    purchase.
-                  </p>
-                  <p className="mt-1 text-right text-xs text-gray-400">
-                    Wed 11:00 AM
-                  </p>
-                </div>
-
-                {/* Outgoing balance check */}
-                <div className="ml-auto max-w-[75%] rounded-lg rounded-tr-none bg-[#DCF8C6] p-3 shadow-sm">
-                  <p className="text-xs text-gray-800">balance</p>
-                  <p className="mt-1 text-right text-xs text-gray-400">
-                    Thu 2:14 PM ✓✓
-                  </p>
-                </div>
-
-                {/* Balance reply */}
-                <div className="max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm">
-                  <p className="text-xs font-semibold text-[#075E54]">PingLoyal</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-800">
-                    💰 Balance:{' '}
-                    <span className="font-semibold">230 points</span> (~₦1,150
-                    value). Next reward at 300 pts!
-                  </p>
-                  <p className="mt-1 text-right text-xs text-gray-400">
-                    Thu 2:14 PM
-                  </p>
-                </div>
+              <div className="min-h-[220px] space-y-3 bg-[#E5DDD5] p-4">
+                {active.bubbles.map((bubble, i) =>
+                  bubble.direction === 'out' ? (
+                    <div
+                      key={i}
+                      className="ml-auto max-w-[75%] rounded-lg rounded-tr-none bg-[#DCF8C6] p-3 shadow-sm"
+                    >
+                      <p className="text-xs text-gray-800">{bubble.text}</p>
+                      <p className="mt-1 text-right text-xs text-gray-400">{bubble.time}</p>
+                    </div>
+                  ) : (
+                    <div
+                      key={i}
+                      className="max-w-[90%] rounded-lg rounded-tl-none bg-white p-3 shadow-sm"
+                    >
+                      <p className="text-xs font-semibold text-[#075E54]">PingLoyal</p>
+                      <p className="mt-1 text-xs leading-relaxed text-gray-800">{bubble.text}</p>
+                      <p className="mt-1 text-right text-xs text-gray-400">{bubble.time}</p>
+                    </div>
+                  ),
+                )}
               </div>
             </div>
           </div>
