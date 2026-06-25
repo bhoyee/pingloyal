@@ -1,11 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-// Real, already-published marketing numbers (Hero.tsx / landing page social
-// proof strip) — never invent new stats here, this panel just echoes the
-// same claims a visitor already saw before clicking through to sign in.
 const STATS = [
-  { value: '200+', label: 'Stores across Lagos' },
+  { value: '41%', label: 'Lift in return visits' },
   { value: '95%', label: 'WhatsApp open rate' },
   { value: '₦0', label: 'Setup cost — ever' },
   { value: '10min', label: 'Average time to go live' },

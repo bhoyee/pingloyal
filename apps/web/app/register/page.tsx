@@ -25,7 +25,6 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [country, setCountry] = useState('NG');
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -56,7 +55,7 @@ export default function RegisterPage() {
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        country,
+        country: 'NG',
       });
 
       const params = new URLSearchParams({
@@ -202,7 +201,7 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Country */}
+            {/* Country — Nigeria only while we focus on the NG market */}
             <div>
               <label
                 htmlFor="country"
@@ -210,15 +209,17 @@ export default function RegisterPage() {
               >
                 Country
               </label>
-              <select
+              <input
                 id="country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full rounded-lg border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm text-gray-900 transition-colors focus:border-[#0A1628]/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
-              >
-                <option value="NG">Nigeria</option>
-                <option value="UK">United Kingdom</option>
-              </select>
+                type="text"
+                value="Nigeria"
+                readOnly
+                disabled
+                className="w-full cursor-not-allowed rounded-lg border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm text-gray-500"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                We&apos;re currently focused on Nigeria — more countries coming soon.
+              </p>
             </div>
 
             {serverError && (
@@ -230,7 +231,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#0DC56A] py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#0ab55e] disabled:opacity-50"
+              className="w-full rounded-lg bg-[#0A1628] py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#16294a] disabled:opacity-50"
             >
               {loading ? 'Creating your account…' : 'Create free account →'}
             </button>
