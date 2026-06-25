@@ -4,6 +4,7 @@ import HowItWorks from '@/components/landing/HowItWorks';
 import MessagesSection from '@/components/landing/MessagesSection';
 import PricingSection from '@/components/landing/PricingSection';
 import Testimonials from '@/components/landing/Testimonials';
+import { BookDemoButton } from '@/components/landing/BookDemoModal';
 
 // ── Logo ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,9 @@ function Nav() {
 
         {/* Right CTAs */}
         <div className="flex items-center gap-3">
+          <BookDemoButton className="hidden rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-[#0A1628] transition-colors hover:border-[#0A1628] sm:inline-flex">
+            Book a demo
+          </BookDemoButton>
           <Link
             href="/login"
             className="hidden rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-[#0A1628] transition-colors hover:border-[#0A1628] sm:inline-flex"

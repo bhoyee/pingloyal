@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BookDemoButton } from './BookDemoModal';
 
 interface Plan {
   name: string;
@@ -12,21 +13,31 @@ interface Plan {
   popular: boolean;
 }
 
+// Kept in lockstep with apps/api/src/modules/billing/plans.config.ts (NGN
+// rates) and the PLAN_COPY feature lists on the dashboard Billing page
+// (apps/web/app/(dashboard)/billing/page.tsx) — these are the same plans
+// a tenant sees and gets charged for, just before they sign up.
 const plans: Plan[] = [
   {
     name: 'Starter',
     price: '₦8,000',
     period: '/month',
-    tagline: 'For solo retailers & kiosks',
-    utility: '500 utility messages/month',
-    wallet: '₦4 per marketing message',
+    tagline: 'Solo Store — for a single store doing up to 300 purchases per month',
+    utility: '300 utility messages/month',
+    wallet: '₦130 per marketing message',
     features: [
-      'WhatsApp automation',
+      'Unlimited customers',
+      'All 5 automated triggers',
+      'Cashier app (PWA)',
       'QR customer registration',
-      'Cashier PWA (offline-ready)',
-      'Points & tier system',
-      'Up to 500 customers',
-      'Email support',
+      'Campaign broadcast builder',
+      'VIP tier segmentation',
+      'Category targeting',
+      'CSV customer import',
+      'Self-service WhatsApp bot',
+      'Integration connector',
+      'Full dashboard & analytics',
+      'Unlimited bot replies (free)',
     ],
     cta: 'Start free trial',
     popular: false,
@@ -35,16 +46,12 @@ const plans: Plan[] = [
     name: 'Growth',
     price: '₦20,000',
     period: '/month',
-    tagline: 'For growing retail stores',
-    utility: '2,000 utility messages/month',
-    wallet: '₦3 per marketing message',
+    tagline: 'Growing Chain — for stores doing up to 800 purchases per month',
+    utility: '800 utility messages/month',
+    wallet: '₦115 per marketing message',
     features: [
       'Everything in Starter',
-      'Unlimited customers',
-      'Campaign scheduler',
-      'Analytics dashboard',
-      'Win-back automations',
-      'Priority WhatsApp support',
+      'Priority email support',
     ],
     cta: 'Start free trial',
     popular: true,
@@ -53,16 +60,13 @@ const plans: Plan[] = [
     name: 'Connect',
     price: '₦45,000',
     period: '/month',
-    tagline: 'For multi-location & existing POS',
-    utility: '10,000 utility messages/month',
-    wallet: '₦2 per marketing message',
+    tagline: 'Existing System — for stores doing 800+ purchases using their own loyalty system',
+    utility: '2,000 utility messages/month',
+    wallet: '₦105 per marketing message',
     features: [
       'Everything in Growth',
-      'Webhook & REST API access',
-      'Custom POS integrations',
-      'Dedicated onboarding session',
-      'Multi-location support',
-      'SLA-backed support',
+      'Webhook + API pull',
+      'Dedicated onboarding support',
     ],
     cta: 'Start free trial',
     popular: false,
@@ -106,6 +110,13 @@ export default function PricingSection() {
           <p className="mx-auto mt-4 max-w-xl text-lg text-gray-600">
             All plans include a 14-day free trial. Card required — nothing
             charged until day 14.
+          </p>
+          <p className="mt-3 text-sm text-gray-500">
+            Not sure which plan fits?{' '}
+            <BookDemoButton className="font-semibold text-[#0A1628] underline">
+              Book a demo
+            </BookDemoButton>{' '}
+            and we&apos;ll help you decide.
           </p>
         </div>
 
