@@ -77,7 +77,7 @@ export default function RegisterPage() {
   return (
     <AuthSplitLayout>
       <div className="w-full max-w-[440px]">
-        <Link href="/" className="mb-10 inline-flex lg:hidden" aria-label="PingLoyal home">
+        <Link href="/" className="mb-8 flex justify-center lg:hidden" aria-label="PingLoyal home">
           <BrandMark />
         </Link>
 
