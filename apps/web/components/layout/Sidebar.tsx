@@ -48,21 +48,21 @@ const OVERVIEW: NavItem[] = [
 const AUTOMATION: NavItem[] = [
   { href: '/campaigns', icon: Megaphone, label: 'Campaigns', tourId: 'nav-campaigns' },
   { href: '/triggers', icon: Zap, label: 'Triggers', tourId: 'nav-triggers' },
-  { href: '/wa-bot', icon: Bot, label: 'WA Bot' },
+  { href: '/wa-bot', icon: Bot, label: 'WA Bot', tourId: 'nav-bot' },
   { href: '/templates', icon: FileText, label: 'Templates' },
-  { href: '/reports', icon: BarChart3, label: 'Reports' },
+  { href: '/reports', icon: BarChart3, label: 'Reports', tourId: 'nav-reports' },
 ];
 
 const NATIVE_MODE: NavItem[] = [
-  { href: '/cashier-app', icon: Monitor, label: 'Cashier App' },
-  { href: '/qr-registration', icon: QrCode, label: 'QR Registration' },
+  { href: '/cashier-app', icon: Monitor, label: 'Cashier App', tourId: 'nav-cashier-app' },
+  { href: '/qr-registration', icon: QrCode, label: 'QR Registration', tourId: 'nav-qr-registration' },
 ];
 
 const SETTINGS: NavItem[] = [
-  { href: '/settings', icon: SettingsIcon, label: 'Settings' },
-  { href: '/settings/integrations', icon: Plug, label: 'Integration' },
-  { href: '/billing/wallet', icon: Wallet, label: 'Wallet', badge: 'wallet' },
-  { href: '/billing', icon: CreditCard, label: 'Billing' },
+  { href: '/settings', icon: SettingsIcon, label: 'Settings', tourId: 'nav-settings' },
+  { href: '/settings/integrations', icon: Plug, label: 'Integration', tourId: 'nav-integration' },
+  { href: '/billing/wallet', icon: Wallet, label: 'Wallet', badge: 'wallet', tourId: 'nav-wallet' },
+  { href: '/billing', icon: CreditCard, label: 'Billing', tourId: 'nav-billing' },
 ];
 
 function formatCompactNaira(amount: number): string {
