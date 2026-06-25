@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { CookieConsentBanner } from "@/components/cookies/CookieConsentBanner";
 
 export const metadata: Metadata = {
   title: "PingLoyal — WhatsApp Loyalty Automation for African Retail",
@@ -29,6 +30,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
+        <CookieConsentBanner />
       </body>
     </html>
   );
