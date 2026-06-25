@@ -12,8 +12,8 @@ const SLIDES = [
     alt: 'Shop owner smiling behind the counter of her store',
   },
   {
-    src: 'https://images.unsplash.com/photo-1585540083814-ea6ee8af9e4f?w=800&q=80',
-    alt: 'Vendor at a Nigerian market produce stall',
+    src: 'https://images.unsplash.com/photo-1761370571806-886404629697?w=800&q=80',
+    alt: 'Shop owner standing among the shelves of his provisions store',
   },
 ];
 
