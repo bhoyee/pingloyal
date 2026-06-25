@@ -11,7 +11,18 @@ export class ContactService {
   // the submission — there's nothing else persisted, so a send failure must
   // propagate rather than be swallowed into a false "thanks!" response.
   async submit(dto: ContactDto): Promise<{ message: string }> {
+    const CONFIRMATION = {
+      message: "Thanks for reaching out — we'll get back to you soon.",
+    };
+
+    // Honeypot hit — a bot filled in a field real visitors never see.
+    // Return the normal success response without sending anything, so the
+    // bot has no signal to tell it was caught.
+    if (dto.website) {
+      return CONFIRMATION;
+    }
+
     await this.mailer.sendContactFormNotification(dto);
-    return { message: "Thanks for reaching out — we'll get back to you soon." };
+    return CONFIRMATION;
   }
 }

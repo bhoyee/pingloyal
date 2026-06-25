@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class ContactDto {
   @IsString()
@@ -19,4 +25,12 @@ export class ContactDto {
   @MinLength(10, { message: 'Message must be at least 10 characters' })
   @MaxLength(4000, { message: 'Message must be 4000 characters or fewer' })
   message: string;
+
+  // Honeypot — invisible to real visitors, so any value here means a bot
+  // filled out every field on the form. Validated as optional so genuine
+  // empty submissions still pass; the service silently no-ops on a hit
+  // instead of erroring, so bots get no signal to adapt to.
+  @IsOptional()
+  @IsString()
+  website?: string;
 }

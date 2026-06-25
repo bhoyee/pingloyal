@@ -16,6 +16,9 @@ const contactSchema = z.object({
   email: z.string().email('Enter a valid email address'),
   subject: z.string().min(3, 'Subject is too short').max(200),
   message: z.string().min(10, 'Message is too short').max(4000),
+  // Honeypot — left blank by real visitors, hidden from view; a filled-in
+  // value tells the backend a bot submitted the form.
+  website: z.string().max(255).optional(),
 });
 type ContactFormValues = z.infer<typeof contactSchema>;
 
@@ -30,7 +33,7 @@ export default function ContactPage() {
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
-    defaultValues: { name: '', email: '', subject: '', message: '' },
+    defaultValues: { name: '', email: '', subject: '', message: '', website: '' },
   });
 
   async function onSubmit(values: ContactFormValues) {
@@ -66,6 +69,18 @@ export default function ContactPage() {
             onSubmit={form.handleSubmit(onSubmit)}
             className="mt-8 space-y-4 rounded-2xl border border-gray-200 p-6 shadow-sm sm:p-8"
           >
+            {/* Honeypot — invisible to real visitors and screen readers,
+                left out of normal tab order. Bots that auto-fill every
+                field trip this and get silently no-op'd server-side. */}
+            <input
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute left-[-9999px] top-auto h-0 w-0 overflow-hidden"
+              {...form.register('website')}
+            />
+
             <div className="space-y-1.5">
               <Label htmlFor="name">Your name</Label>
               <Input

@@ -34,6 +34,21 @@ describe('ContactService', () => {
     });
   });
 
+  it('silently no-ops when the honeypot field is filled in', async () => {
+    const result = await service.submit({
+      name: 'Bot',
+      email: 'bot@example.com',
+      subject: 'Hi',
+      message: 'This is an automated spam message of sufficient length.',
+      website: 'http://spam.example.com',
+    });
+
+    expect(mockMailer.sendContactFormNotification).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      message: "Thanks for reaching out — we'll get back to you soon.",
+    });
+  });
+
   it('propagates a mailer failure instead of returning a false success message', async () => {
     mockMailer.sendContactFormNotification.mockRejectedValue(
       new Error('email down'),
