@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, publicPost, ApiError, type TenantMe } from '@/lib/api';
+import { AuthSplitLayout, BrandMark } from '@/components/auth/AuthSplitLayout';
 
 interface LoginResponse {
   accessToken: string;
@@ -62,40 +64,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <AuthSplitLayout>
       <div className="w-full max-w-sm">
-        {/* Logo / Brand */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex items-center justify-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A1628]">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
-                <path
-                  d="M18 2H4C2.9 2 2 2.9 2 4v10c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
-                  stroke="rgba(255,255,255,0.65)"
-                  strokeWidth="1.5"
-                  fill="none"
-                />
-                <path
-                  d="M7 11l2.5 2.5 5.5-5.5"
-                  stroke="#0DC56A"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold text-[#0A1628]">PingLoyal</span>
-          </div>
-          <p className="text-sm text-slate-500">Sign in to your business dashboard</p>
-        </div>
+        <Link href="/" className="mb-10 inline-flex lg:hidden" aria-label="PingLoyal home">
+          <BrandMark />
+        </Link>
 
-        <form
-          onSubmit={(e) => void handleLogin(e)}
-          className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
-        >
+        <h1 className="text-2xl font-bold text-[#0A1628]">Welcome back</h1>
+        <p className="mt-1.5 text-sm text-slate-500">Sign in to your business dashboard</p>
+
+        <form onSubmit={(e) => void handleLogin(e)} className="mt-8">
           <div className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Email address
               </label>
               <input
@@ -105,14 +86,16 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="you@yourbusiness.com"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
+                className="w-full rounded-lg border border-transparent bg-slate-100 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#0A1628]/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
               />
             </div>
 
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700">Password</label>
-                <a href="/forgot-password" className="text-sm font-medium text-[#0F1E35] hover:underline">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Password
+                </label>
+                <a href="/forgot-password" className="text-xs font-semibold text-[#0DC56A] hover:underline">
                   Forgot password?
                 </a>
               </div>
@@ -123,12 +106,12 @@ export default function LoginPage() {
                 required
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]"
+                className="w-full rounded-lg border border-transparent bg-slate-100 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#0A1628]/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
               />
             </div>
 
             {resetSuccess && !error && (
-              <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+              <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                 Password reset successfully — sign in with your new password
               </p>
             )}
@@ -142,27 +125,27 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#0F1E35] py-2.5 text-sm font-semibold text-white hover:bg-[#1a3050] disabled:opacity-50"
+              className="w-full rounded-lg bg-[#0A1628] py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#16294a] disabled:opacity-50"
             >
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? 'Signing in…' : 'Sign in →'}
             </button>
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-500">
             New business?{' '}
-            <a href="/register" className="font-medium text-[#0F1E35] hover:underline">
+            <a href="/register" className="font-semibold text-[#0A1628] hover:underline">
               Create an account
             </a>
           </p>
         </form>
 
-        <p className="mt-4 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-slate-400">
           Cashier login?{' '}
           <a href="/cashier/login" className="underline hover:text-slate-600">
             Go to cashier app
           </a>
         </p>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }
