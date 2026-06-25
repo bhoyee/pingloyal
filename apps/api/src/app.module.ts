@@ -32,6 +32,7 @@ import { TriggersModule } from './modules/triggers/triggers.module';
 import { TemplateRequestsModule } from './modules/template-requests/template-requests.module';
 import { StaffAuthModule } from './modules/staff-auth/staff-auth.module';
 import { SupportModule } from './modules/support/support.module';
+import { ContactModule } from './modules/contact/contact.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
@@ -75,6 +76,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
       { name: 'transactions', ttl: 60_000, limit: 120 },
       { name: 'dashboard', ttl: 60_000, limit: 30 },
       { name: 'campaign_send', ttl: 60_000, limit: 1000 },
+      { name: 'contact_form', ttl: 60_000, limit: 5 },
       { name: 'default', ttl: 60_000, limit: 100 },
     ]),
     EventEmitterModule.forRoot(),
@@ -100,6 +102,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     TemplateRequestsModule,
     StaffAuthModule,
     SupportModule,
+    ContactModule,
     AdminModule,
   ],
   controllers: [AppController],

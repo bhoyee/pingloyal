@@ -166,6 +166,28 @@ export class MailerService {
     });
   }
 
+  async sendContactFormNotification(params: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): Promise<void> {
+    const subject = `Contact form: ${params.subject}`;
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] Contact form from ${params.name} <${params.email}>: "${params.subject}" — ${params.message}`,
+      );
+      return;
+    }
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: this.supportEmail,
+      replyTo: params.email,
+      subject,
+      html: this.buildContactFormHtml(params),
+    });
+  }
+
   async sendAccountDeletionRequested(params: {
     to: string;
     businessName: string;
@@ -206,6 +228,43 @@ export class MailerService {
       subject: `Account deletion requested — ${params.businessName}`,
       html: this.buildAccountDeletionSupportHtml(params),
     });
+  }
+
+  private buildContactFormHtml(params: {
+    name: string;
+    email: string;
+    subject: string;
+    message: string;
+  }): string {
+    const escapedMessage = params.message
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 16px">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <tr><td style="background:#0A1628;padding:20px 32px">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px">PingLoyal</span>
+          <span style="color:#94a3b8;font-size:13px;margin-left:12px">Contact Form</span>
+        </td></tr>
+        <tr><td style="padding:28px 32px">
+          <h2 style="margin:0 0 4px;font-size:18px;color:#0f172a">${params.subject}</h2>
+          <p style="margin:0 0 20px;color:#64748b;font-size:14px">From ${params.name} &lt;${params.email}&gt;</p>
+          <div style="padding:16px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#0f172a;font-size:14px;line-height:1.6">${escapedMessage}</div>
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
+          <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal · Reply directly to this email to respond</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
   }
 
   private buildAccountDeletionRequestedHtml(params: {
