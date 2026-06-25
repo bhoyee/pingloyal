@@ -42,26 +42,29 @@ export default function Hero() {
               </Link>
               <a
                 href="#how-it-works"
-                className="inline-flex items-center gap-2.5 text-base font-medium text-[#0A1628] transition-opacity hover:opacity-70"
+                className="group inline-flex items-center gap-2.5 text-base font-medium text-[#0A1628]"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:border-[#0DC56A] group-hover:bg-[#0DC56A]">
                   <svg
                     width="12"
                     height="14"
                     viewBox="0 0 12 14"
                     fill="none"
                     aria-hidden="true"
+                    className="transition-transform duration-300 group-hover:translate-x-0.5"
                   >
                     <path
                       d="M2 1L10 7L2 13"
-                      stroke="#0A1628"
+                      className="stroke-[#0A1628] transition-colors duration-300 group-hover:stroke-white"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                   </svg>
                 </span>
-                See how it works
+                <span className="transition-colors duration-300 group-hover:text-[#0DC56A]">
+                  See how it works
+                </span>
               </a>
             </div>
 

@@ -19,13 +19,13 @@ export default function HowItWorks() {
         {/* Step cards */}
         <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
           {/* Step 1 */}
-          <div className="relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1628] text-sm font-bold text-white">
                 1
               </div>
             </div>
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
@@ -58,13 +58,13 @@ export default function HowItWorks() {
           </div>
 
           {/* Step 2 */}
-          <div className="relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1628] text-sm font-bold text-white">
                 2
               </div>
             </div>
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
@@ -118,13 +118,13 @@ export default function HowItWorks() {
           </div>
 
           {/* Step 3 */}
-          <div className="relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-[#0DC56A]/30 hover:shadow-lg">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0A1628] text-sm font-bold text-white">
                 3
               </div>
             </div>
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 transition-transform duration-300 group-hover:scale-110">
               <svg
                 width="24"
                 height="24"
