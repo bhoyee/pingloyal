@@ -1,11 +1,12 @@
 'use client';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, Suspense, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { api, type TenantMe } from '@/lib/api';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Spinner } from '@/components/ui/spinner';
+import { ProductTour } from '@/components/tour/ProductTour';
 
 interface BillingStatus {
   status: string;
@@ -188,6 +189,9 @@ function DashboardContent({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      <Suspense fallback={null}>
+        <ProductTour />
+      </Suspense>
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex flex-1 flex-col overflow-y-auto">
         <MobileTopBar onOpenMenu={() => setMenuOpen(true)} />
