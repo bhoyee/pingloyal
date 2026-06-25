@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError } from '../../../lib/api';
+import { CashierAuthLayout } from '@/components/auth/CashierAuthLayout';
 
 interface LoginResponse {
   accessToken: string;
@@ -96,32 +97,48 @@ export default function CashierLoginPage() {
   const logoUrl = storeInfo?.logoUrl ?? null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-md p-8">
+    <CashierAuthLayout>
+      <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           {logoUrl ? (
-            <div className="w-14 h-14 mx-auto mb-4 rounded-xl overflow-hidden border border-slate-100 shadow-sm">
+            <div className="mx-auto mb-4 h-14 w-14 overflow-hidden rounded-xl border border-slate-100 shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoUrl}
                 alt={storeName ?? 'Store logo'}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
               />
             </div>
           ) : (
-            <div className="w-12 h-12 bg-green-600 rounded-xl mx-auto mb-4" />
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[#0A1628]">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+                <path
+                  d="M18 2H4C2.9 2 2 2.9 2 4v10c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
+                  stroke="rgba(255,255,255,0.65)"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+                <path
+                  d="M7 11l2.5 2.5 5.5-5.5"
+                  stroke="#0DC56A"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
           )}
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-bold text-[#0A1628]">
             {storeName ? `${storeName} Cashier` : 'PingLoyal Cashier'}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Sign in to continue</p>
+          <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} noValidate>
           <div className="mb-4">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500"
             >
               Email
             </label>
@@ -132,7 +149,7 @@ export default function CashierLoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full rounded-lg border border-transparent bg-slate-100 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#0A1628]/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
               placeholder="you@example.com"
             />
           </div>
@@ -140,7 +157,7 @@ export default function CashierLoginPage() {
           <div className="mb-6">
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500"
             >
               Password
             </label>
@@ -151,13 +168,13 @@ export default function CashierLoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="w-full rounded-lg border border-transparent bg-slate-100 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-[#0A1628]/20 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-red-600 mb-4">
+            <p role="alert" className="mb-4 text-sm text-red-600">
               {error}
             </p>
           )}
@@ -165,12 +182,12 @@ export default function CashierLoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-green-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full rounded-lg bg-[#0A1628] py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#16294a] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isLoading ? 'Signing in…' : 'Sign in'}
+            {isLoading ? 'Signing in…' : 'Sign in →'}
           </button>
         </form>
       </div>
-    </div>
+    </CashierAuthLayout>
   );
 }

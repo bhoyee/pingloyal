@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { publicPost } from '@/lib/api';
+import { AuthSplitLayout, BrandMark } from '@/components/auth/AuthSplitLayout';
 
 interface RegisterResponse {
   signupToken: string;
@@ -24,7 +25,6 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [country, setCountry] = useState('NG');
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -55,7 +55,7 @@ export default function RegisterPage() {
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        country,
+        country: 'NG',
       });
 
       const params = new URLSearchParams({
@@ -74,45 +74,20 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <AuthSplitLayout>
       <div className="w-full max-w-[440px]">
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 inline-flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0A1628]">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 22 22"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M18 2H4C2.9 2 2 2.9 2 4v10c0 1.1.9 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
-                  stroke="rgba(255,255,255,0.65)"
-                  strokeWidth="1.5"
-                  fill="none"
-                />
-                <path
-                  d="M7 11l2.5 2.5 5.5-5.5"
-                  stroke="#0DC56A"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold text-[#0A1628]">PingLoyal</span>
-          </div>
-          <p className="text-sm text-gray-500">
-            Start your 14-day free trial — card required, nothing charged
-            until day 14
-          </p>
-        </div>
+        <Link href="/" className="mb-8 flex justify-center lg:hidden" aria-label="PingLoyal home">
+          <BrandMark />
+        </Link>
+
+        <h1 className="text-2xl font-bold text-[#0A1628]">Create your account</h1>
+        <p className="mt-1.5 text-sm text-gray-500">
+          Start your 14-day free trial — card required, nothing charged until day 14.
+        </p>
 
         <form
           onSubmit={(e) => void handleRegister(e)}
-          className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm"
+          className="mt-8"
           noValidate
         >
           <div className="space-y-5">
@@ -120,7 +95,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="businessName"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500"
               >
                 Business name
               </label>
@@ -131,10 +106,10 @@ export default function RegisterPage() {
                 onChange={(e) => setBusinessName(e.target.value)}
                 autoComplete="organization"
                 placeholder="e.g. FreshMart Surulere"
-                className={`w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 ${
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 ${
                   fieldErrors.businessName
-                    ? 'border-red-400 focus:ring-red-200'
-                    : 'border-gray-300 focus:border-[#0A1628] focus:ring-[#0A1628]/10'
+                    ? 'border-red-300 bg-red-50 focus:ring-red-200'
+                    : 'border-transparent bg-gray-100 focus:border-[#0A1628]/20 focus:ring-[#0A1628]/10'
                 }`}
               />
               {fieldErrors.businessName && (
@@ -148,7 +123,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="fullName"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500"
               >
                 Your full name
               </label>
@@ -159,10 +134,10 @@ export default function RegisterPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 autoComplete="name"
                 placeholder="e.g. Adewale Ogundimu"
-                className={`w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 ${
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 ${
                   fieldErrors.fullName
-                    ? 'border-red-400 focus:ring-red-200'
-                    : 'border-gray-300 focus:border-[#0A1628] focus:ring-[#0A1628]/10'
+                    ? 'border-red-300 bg-red-50 focus:ring-red-200'
+                    : 'border-transparent bg-gray-100 focus:border-[#0A1628]/20 focus:ring-[#0A1628]/10'
                 }`}
               />
               {fieldErrors.fullName && (
@@ -176,7 +151,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500"
               >
                 Email address
               </label>
@@ -187,10 +162,10 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 placeholder="you@yourbusiness.com"
-                className={`w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 ${
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 ${
                   fieldErrors.email
-                    ? 'border-red-400 focus:ring-red-200'
-                    : 'border-gray-300 focus:border-[#0A1628] focus:ring-[#0A1628]/10'
+                    ? 'border-red-300 bg-red-50 focus:ring-red-200'
+                    : 'border-transparent bg-gray-100 focus:border-[#0A1628]/20 focus:ring-[#0A1628]/10'
                 }`}
               />
               {fieldErrors.email && (
@@ -202,7 +177,7 @@ export default function RegisterPage() {
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500"
               >
                 Password
               </label>
@@ -213,10 +188,10 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
                 placeholder="Min. 8 characters"
-                className={`w-full rounded-lg border px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 ${
+                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-colors focus:bg-white focus:outline-none focus:ring-2 ${
                   fieldErrors.password
-                    ? 'border-red-400 focus:ring-red-200'
-                    : 'border-gray-300 focus:border-[#0A1628] focus:ring-[#0A1628]/10'
+                    ? 'border-red-300 bg-red-50 focus:ring-red-200'
+                    : 'border-transparent bg-gray-100 focus:border-[#0A1628]/20 focus:ring-[#0A1628]/10'
                 }`}
               />
               {fieldErrors.password && (
@@ -226,23 +201,25 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Country */}
+            {/* Country — Nigeria only while we focus on the NG market */}
             <div>
               <label
                 htmlFor="country"
-                className="mb-1.5 block text-sm font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500"
               >
                 Country
               </label>
-              <select
+              <input
                 id="country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-[#0A1628] focus:outline-none focus:ring-2 focus:ring-[#0A1628]/10"
-              >
-                <option value="NG">Nigeria</option>
-                <option value="UK">United Kingdom</option>
-              </select>
+                type="text"
+                value="Nigeria"
+                readOnly
+                disabled
+                className="w-full cursor-not-allowed rounded-lg border border-transparent bg-gray-100 px-3.5 py-2.5 text-sm text-gray-500"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                We&apos;re currently focused on Nigeria — more countries coming soon.
+              </p>
             </div>
 
             {serverError && (
@@ -254,7 +231,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#0DC56A] py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-[#0ab55e] disabled:opacity-50"
+              className="w-full rounded-lg bg-[#0A1628] py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#16294a] disabled:opacity-50"
             >
               {loading ? 'Creating your account…' : 'Create free account →'}
             </button>
@@ -283,6 +260,6 @@ export default function RegisterPage() {
           </p>
         </form>
       </div>
-    </div>
+    </AuthSplitLayout>
   );
 }
