@@ -15,7 +15,7 @@ export default function Hero() {
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#0DC56A]" />
               </span>
               <span className="text-sm font-medium text-gray-600">
-                Now live in Lagos — 14-day free trial
+                Now live in Nigeria — 14-day free trial
               </span>
             </div>
 

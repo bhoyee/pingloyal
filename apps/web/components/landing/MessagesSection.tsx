@@ -77,12 +77,24 @@ const messageTypes = [
 export default function MessagesSection() {
   const [activeKey, setActiveKey] = useState('welcome');
   const bubbleRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
 
+  // Scroll only the chat box itself — never the page. scrollIntoView()
+  // would otherwise drag the whole window down to center this bubble,
+  // jumping visitors straight to this section on every page load.
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const container = chatContainerRef.current;
     const firstIndex = CONVERSATION.findIndex((b) => b.key === activeKey);
-    bubbleRefs.current[firstIndex]?.scrollIntoView({
+    const bubble = bubbleRefs.current[firstIndex];
+    if (!container || !bubble) return;
+    container.scrollTo({
+      top: bubble.offsetTop - container.clientHeight / 2 + bubble.clientHeight / 2,
       behavior: 'smooth',
-      block: 'center',
     });
   }, [activeKey]);
 
@@ -210,7 +222,10 @@ export default function MessagesSection() {
                 </div>
 
                 {/* Chat area — a real scrollable conversation history */}
-                <div className="h-[520px] space-y-3 overflow-y-auto bg-[#E5DDD5] p-4 scroll-smooth">
+                <div
+                  ref={chatContainerRef}
+                  className="h-[520px] space-y-3 overflow-y-auto bg-[#E5DDD5] p-4 scroll-smooth"
+                >
                   {CONVERSATION.map((bubble, i) => {
                     const isActive = bubble.key === activeKey;
                     return bubble.direction === 'out' ? (
