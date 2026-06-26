@@ -96,7 +96,11 @@ describe('JwtStrategy.validate', () => {
       tenantId: 'tenant-1',
       role: UserRole.OWNER,
       isActive: true,
-      tenant: { id: 'tenant-1', deletionRequestedAt: null, deletedAt: new Date() },
+      tenant: {
+        id: 'tenant-1',
+        deletionRequestedAt: null,
+        deletedAt: new Date(),
+      },
     });
 
     await expect(strategy.validate(PAYLOAD)).rejects.toThrow(HttpException);

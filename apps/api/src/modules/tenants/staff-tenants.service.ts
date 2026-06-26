@@ -92,9 +92,12 @@ export class StaffTenantsService {
     private readonly config: ConfigService,
   ) {}
 
-  async findAll(
-    query: StaffListTenantsQueryDto,
-  ): Promise<{ rows: StaffTenantListRow[]; total: number; page: number; pageSize: number }> {
+  async findAll(query: StaffListTenantsQueryDto): Promise<{
+    rows: StaffTenantListRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const includeDeleted = query.includeDeleted === 'true';
@@ -105,12 +108,17 @@ export class StaffTenantsService {
       qb.andWhere('tenant.deletedAt IS NULL');
     }
     if (query.status) {
-      qb.andWhere('tenant.subscriptionStatus = :status', { status: query.status });
+      qb.andWhere('tenant.subscriptionStatus = :status', {
+        status: query.status,
+      });
     }
     if (query.search) {
-      qb.andWhere('(tenant.businessName ILIKE :search OR tenant.slug ILIKE :search)', {
-        search: `%${query.search}%`,
-      });
+      qb.andWhere(
+        '(tenant.businessName ILIKE :search OR tenant.slug ILIKE :search)',
+        {
+          search: `%${query.search}%`,
+        },
+      );
     }
 
     const [rows, total] = await qb
@@ -140,22 +148,27 @@ export class StaffTenantsService {
     const tenant = await this.tenantRepo.findOne({ where: { id: tenantId } });
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const [users, subscription, waTriggerTemplates, recentTickets, recentTemplateRequests] =
-      await Promise.all([
-        this.userRepo.find({ where: { tenantId }, order: { createdAt: 'ASC' } }),
-        this.subscriptionRepo.findOne({ where: { tenantId } }),
-        this.waTriggerTemplateRepo.find({ where: { tenantId } }),
-        this.supportTicketRepo.find({
-          where: { tenantId },
-          order: { createdAt: 'DESC' },
-          take: 5,
-        }),
-        this.templateRequestRepo.find({
-          where: { tenantId },
-          order: { createdAt: 'DESC' },
-          take: 5,
-        }),
-      ]);
+    const [
+      users,
+      subscription,
+      waTriggerTemplates,
+      recentTickets,
+      recentTemplateRequests,
+    ] = await Promise.all([
+      this.userRepo.find({ where: { tenantId }, order: { createdAt: 'ASC' } }),
+      this.subscriptionRepo.findOne({ where: { tenantId } }),
+      this.waTriggerTemplateRepo.find({ where: { tenantId } }),
+      this.supportTicketRepo.find({
+        where: { tenantId },
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.templateRequestRepo.find({
+        where: { tenantId },
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+    ]);
 
     return {
       tenant,
@@ -186,7 +199,9 @@ export class StaffTenantsService {
       where: { email: dto.ownerEmail.trim().toLowerCase() },
     });
     if (existingUser) {
-      throw new ConflictException('An account with this owner email already exists');
+      throw new ConflictException(
+        'An account with this owner email already exists',
+      );
     }
 
     const isNG = dto.country === Country.NG;
@@ -194,7 +209,9 @@ export class StaffTenantsService {
     const planId = `${dto.planTier}_${currency.toLowerCase()}` as PlanId;
     const plan = PLANS[planId];
     if (!plan) {
-      throw new BadRequestException(`No plan available for ${dto.planTier}/${currency}`);
+      throw new BadRequestException(
+        `No plan available for ${dto.planTier}/${currency}`,
+      );
     }
 
     const now = new Date();
@@ -202,7 +219,10 @@ export class StaffTenantsService {
 
     const { savedTenant, savedUser } = await this.dataSource.transaction(
       async (manager) => {
-        const slug = await this.authService.buildUniqueSlug(dto.businessName, manager);
+        const slug = await this.authService.buildUniqueSlug(
+          dto.businessName,
+          manager,
+        );
         const tenant = manager.create(Tenant, {
           businessName: dto.businessName,
           slug,
@@ -262,7 +282,9 @@ export class StaffTenantsService {
     );
 
     const { code, hashedCode } = this.generateResetCode();
-    const expiry = new Date(now.getTime() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000);
+    const expiry = new Date(
+      now.getTime() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
     await this.userRepo.update(savedUser.id, {
       passwordResetToken: hashedCode,
       passwordResetExpiry: expiry,
@@ -301,7 +323,9 @@ export class StaffTenantsService {
     if (!owner) throw new NotFoundException('Owner account not found');
 
     const { code, hashedCode } = this.generateResetCode();
-    const expiry = new Date(Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000);
+    const expiry = new Date(
+      Date.now() + PASSWORD_RESET_EXPIRY_HOURS * 60 * 60 * 1000,
+    );
     await this.userRepo.update(owner.id, {
       passwordResetToken: hashedCode,
       passwordResetExpiry: expiry,
@@ -339,7 +363,9 @@ export class StaffTenantsService {
     userId: string,
     isActive: boolean,
   ): Promise<{ id: string; isActive: boolean }> {
-    const user = await this.userRepo.findOne({ where: { id: userId, tenantId } });
+    const user = await this.userRepo.findOne({
+      where: { id: userId, tenantId },
+    });
     if (!user) throw new NotFoundException('User not found for this tenant');
 
     await this.userRepo.update(userId, { isActive });

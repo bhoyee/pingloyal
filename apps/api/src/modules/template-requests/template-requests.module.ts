@@ -9,7 +9,11 @@ import { TenantsModule } from '../tenants/tenants.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([TemplateRequest]), TenantsModule, StaffAuthModule],
+  imports: [
+    TypeOrmModule.forFeature([TemplateRequest]),
+    TenantsModule,
+    StaffAuthModule,
+  ],
   controllers: [TemplateRequestsController, StaffTemplateRequestsController],
   providers: [TemplateRequestsService, MailerService],
 })

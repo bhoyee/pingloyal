@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { FileImportProcessPayload } from './file-import.service';
-import { FILE_IMPORT_PROCESS_EVENT, FileImportService } from './file-import.service';
+import {
+  FILE_IMPORT_PROCESS_EVENT,
+  FileImportService,
+} from './file-import.service';
 
 @Injectable()
 export class FileImportListener {

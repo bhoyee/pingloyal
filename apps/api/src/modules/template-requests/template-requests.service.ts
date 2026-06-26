@@ -1,7 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TemplateRequest, TemplateRequestStatus } from './entities/template-request.entity';
+import {
+  TemplateRequest,
+  TemplateRequestStatus,
+} from './entities/template-request.entity';
 import { CreateTemplateRequestDto } from './dto/create-template-request.dto';
 import { MailerService } from '../../common/mailer/mailer.service';
 

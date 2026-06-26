@@ -61,11 +61,12 @@ export class WalletController {
     const sub = await this.subRepo.findOne({ where: { tenantId } });
     const ratePerMessage = Number(sub?.marketingRate ?? 130);
 
-    const [balance, { totalSpend, messageCount }, breakdown] = await Promise.all([
-      this.walletService.getBalance(tenantId),
-      this.walletService.getMonthlySpend(tenantId),
-      this.walletService.getMonthlyBreakdown(tenantId),
-    ]);
+    const [balance, { totalSpend, messageCount }, breakdown] =
+      await Promise.all([
+        this.walletService.getBalance(tenantId),
+        this.walletService.getMonthlySpend(tenantId),
+        this.walletService.getMonthlyBreakdown(tenantId),
+      ]);
 
     const response = {
       balance,

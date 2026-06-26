@@ -1,4 +1,10 @@
-import { IsEmail, IsEnum, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { PlanTier } from '@pingloyal/types';
 import { Country } from '../../signup/dto/signup-register.dto';
 
