@@ -21,7 +21,7 @@ export default function Hero() {
 
             {/* Headline */}
             <h1 className="text-5xl font-bold leading-tight tracking-tight text-[#0A1628] lg:text-6xl">
-              Turn every purchase into a{' '}
+              Turn every visit into a{' '}
               <span className="text-[#0DC56A]">loyal customer</span>
             </h1>
 

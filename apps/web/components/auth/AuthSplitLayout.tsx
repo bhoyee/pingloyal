@@ -58,11 +58,11 @@ export function AuthSplitLayout({ children }: { children: ReactNode }) {
           </Link>
 
           <span className="mt-14 inline-flex w-fit items-center gap-1.5 rounded-full border border-[#0DC56A]/25 bg-[#0DC56A]/10 px-3.5 py-1.5 text-xs font-semibold text-[#0DC56A]">
-            🇳🇬 Built for African retail
+            🇳🇬 Built for African SMBs
           </span>
 
           <h2 className="mt-6 max-w-md text-[2.25rem] font-bold leading-[1.15] tracking-tight text-white">
-            Turn every purchase into a <span className="text-[#0DC56A]">loyal customer</span>
+            Turn every visit into a <span className="text-[#0DC56A]">loyal customer</span>
           </h2>
           <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-white/55">
             PingLoyal sends automated WhatsApp messages that bring customers back — points

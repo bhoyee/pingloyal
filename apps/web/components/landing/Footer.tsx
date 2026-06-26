@@ -9,8 +9,8 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-gray-500">
-              WhatsApp loyalty automation built for African retail. Turn every
-              purchase into a loyal customer.
+              WhatsApp loyalty automation for African SMBs — retail, food, and
+              service businesses alike. Turn every visit into a loyal customer.
             </p>
           </div>
 

@@ -16,10 +16,16 @@ const SLIDES = [
     stat: '212 loyal customers',
   },
   {
-    src: 'https://images.unsplash.com/photo-1761370571873-5d869310d731?w=800&q=80',
-    alt: 'Boutique owner arranging clothes on a rack in her shop',
-    business: 'Vogue Closet, Abuja',
-    stat: '189 loyal customers',
+    src: 'https://images.unsplash.com/photo-1761373564177-8505a38c91f2?w=800&q=80',
+    alt: 'Customer relaxing in the chair at a hair salon',
+    business: 'Glow Hair Studio, Lekki',
+    stat: '164 loyal customers',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1742134516280-d62ad935b951?w=800&q=80',
+    alt: 'Customers seated and dining at a restaurant table',
+    business: 'Spice Route, Victoria Island',
+    stat: '198 loyal customers',
   },
 ];
 
