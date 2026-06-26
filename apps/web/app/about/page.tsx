@@ -7,12 +7,12 @@ export const metadata = {
 
 const VALUES = [
   {
-    title: 'Built for how Nigerian retail actually works',
-    body: 'No POS overhaul, no app your customers have to download — WhatsApp is where they already are, so that’s where loyalty happens.',
+    title: 'Built for how Nigerian SMBs actually work',
+    body: 'No POS overhaul, no app your customers have to download — WhatsApp is where they already are, so that’s where loyalty happens, whether you run a store, a salon, or a restaurant.',
   },
   {
     title: 'Simple enough to run without a dev team',
-    body: 'Most of our merchants are small, busy retail teams. If a feature needs a manual to use, we’ve done it wrong.',
+    body: 'Most of our merchants are small, busy teams. If a feature needs a manual to use, we’ve done it wrong.',
   },
   {
     title: 'We charge for value delivered, not seats',
@@ -30,17 +30,19 @@ export default function AboutPage() {
             About us
           </p>
           <h1 className="mt-2 text-3xl font-bold text-[#0A1628] lg:text-4xl">
-            Turning one-time shoppers into loyal customers
+            Turning one-time customers into loyal regulars
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-gray-600">
-            PingLoyal is a WhatsApp loyalty automation platform built for retail businesses in
-            Nigeria. We help store owners reward repeat customers, win back the ones who&apos;ve
-            drifted, and do it all without hiring a marketing team or learning new software —
-            because it runs on WhatsApp, the app their customers already check every day.
+            PingLoyal is a WhatsApp loyalty automation platform built for small businesses in
+            Nigeria — retail stores, restaurants, salons, and any business that wants the people
+            who pay them once to come back. We help owners reward repeat customers, win back the
+            ones who&apos;ve drifted, and do it all without hiring a marketing team or learning
+            new software — because it runs on WhatsApp, the app their customers already check
+            every day.
           </p>
           <p className="mt-4 text-[15px] leading-relaxed text-gray-600">
             We&apos;re operated by Bhoyee Global Enterprise and based in Lagos, where we started
-            by working closely with local retailers to understand what actually keeps customers
+            by working closely with local businesses to understand what actually keeps customers
             coming back — and built PingLoyal around that, not around what a typical SaaS loyalty
             tool looks like elsewhere.
           </p>

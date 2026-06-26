@@ -46,7 +46,7 @@ function FeaturesGrid() {
             Features
           </span>
           <h2 className="mt-4 text-4xl font-bold tracking-tight text-[#0A1628] lg:text-5xl">
-            Built for African retail
+            Built for African SMBs
           </h2>
         </div>
 

@@ -3,9 +3,9 @@ import "./globals.css";
 import { CookieConsentBanner } from "@/components/cookies/CookieConsentBanner";
 
 export const metadata: Metadata = {
-  title: "PingLoyal — WhatsApp Loyalty Automation for African Retail",
+  title: "PingLoyal — WhatsApp Loyalty Automation for African SMBs",
   description:
-    "Turn every purchase into a loyal customer. WhatsApp loyalty automation built for Nigerian retail SMBs.",
+    "Turn every visit into a loyal customer. WhatsApp loyalty automation built for Nigerian SMBs — retail, food, and service businesses alike.",
 };
 
 export default function RootLayout({
