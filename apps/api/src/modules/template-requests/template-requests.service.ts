@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TemplateRequest } from './entities/template-request.entity';
+import { TemplateRequest, TemplateRequestStatus } from './entities/template-request.entity';
 import { CreateTemplateRequestDto } from './dto/create-template-request.dto';
 import { MailerService } from '../../common/mailer/mailer.service';
 
@@ -48,5 +48,29 @@ export class TemplateRequestsService {
       where: { tenantId },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  findAllForStaff(
+    status?: TemplateRequestStatus,
+    tenantId?: string,
+  ): Promise<TemplateRequest[]> {
+    return this.repo.find({
+      where: {
+        ...(status ? { status } : {}),
+        ...(tenantId ? { tenantId } : {}),
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async updateStatusForStaff(
+    requestId: string,
+    status: TemplateRequestStatus,
+  ): Promise<TemplateRequest> {
+    const request = await this.repo.findOne({ where: { id: requestId } });
+    if (!request) throw new NotFoundException('Template request not found');
+
+    await this.repo.update(requestId, { status });
+    return { ...request, status };
   }
 }

@@ -97,7 +97,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.tenant.deletionRequestedAt) {
+    if (user.tenant.deletionRequestedAt || user.tenant.deletedAt) {
       throw new HttpException('This account has been deleted', HttpStatus.GONE);
     }
 

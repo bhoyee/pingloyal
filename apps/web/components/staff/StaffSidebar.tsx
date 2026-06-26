@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, LifeBuoy, LogOut, X } from 'lucide-react';
+import { LayoutDashboard, Users, LifeBuoy, Building2, FileText, LogOut, X } from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -13,6 +13,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/staff', icon: LayoutDashboard, label: 'Overview' },
+  { href: '/staff/tenants', icon: Building2, label: 'Tenants' },
+  { href: '/staff/template-requests', icon: FileText, label: 'Template Requests' },
   { href: '/staff/team', icon: Users, label: 'Team', superAdminOnly: true },
   { href: '/staff/tickets', icon: LifeBuoy, label: 'Tickets' },
 ];

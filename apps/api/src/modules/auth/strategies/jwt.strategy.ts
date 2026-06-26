@@ -46,7 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         tenantId: true,
         role: true,
         isActive: true,
-        tenant: { id: true, deletionRequestedAt: true },
+        tenant: { id: true, deletionRequestedAt: true, deletedAt: true },
       },
       relations: { tenant: true },
     });
@@ -55,9 +55,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    // Deletion was requested — every active session must be force-logged-out
+    // Deletion was requested (self-service) or a staff member soft-deleted
+    // the tenant — either way every active session must be force-logged-out
     // immediately, not just blocked on next login.
-    if (user.tenant.deletionRequestedAt) {
+    if (user.tenant.deletionRequestedAt || user.tenant.deletedAt) {
       throw new HttpException('This account has been deleted', HttpStatus.GONE);
     }
 

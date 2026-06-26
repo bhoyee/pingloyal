@@ -86,6 +86,27 @@ export class MailerService {
     });
   }
 
+  async sendStaffCreatedAccountWelcome(params: {
+    to: string;
+    name: string;
+    businessName: string;
+    code: string;
+  }): Promise<void> {
+    if (!this.resend) {
+      this.logger.warn(
+        `[DEV] Staff-created account welcome for ${params.to} (${params.businessName}) — reset code: ${params.code}`,
+      );
+      return;
+    }
+
+    await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.to,
+      subject: `Your PingLoyal account is ready — ${params.businessName}`,
+      html: this.buildStaffCreatedWelcomeHtml(params),
+    });
+  }
+
   async sendTemplateRequestNotification(params: {
     tenantId: string;
     businessName: string;
@@ -613,6 +634,40 @@ export class MailerService {
             <p style="margin:0;font-size:36px;font-weight:700;color:#0A1628;letter-spacing:6px">${params.code}</p>
           </div>
           <p style="margin:0;color:#94a3b8;font-size:13px">This code expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
+        </td></tr>
+        <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
+          <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal. All rights reserved.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  private buildStaffCreatedWelcomeHtml(params: {
+    name: string;
+    businessName: string;
+    code: string;
+  }): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:40px 16px">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
+        <tr><td style="background:#0A1628;padding:24px 32px;text-align:center">
+          <span style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px">PingLoyal</span>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Your account is ready, ${params.name}</h2>
+          <p style="margin:0 0 24px;color:#64748b;font-size:15px">The PingLoyal team has set up <strong>${params.businessName}</strong> on PingLoyal. Use this code to set your password and get started:</p>
+          <div style="background:#f1f5f9;border-radius:8px;padding:20px;text-align:center;margin:0 0 24px">
+            <p style="margin:0 0 8px;color:#64748b;font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">Set-password code</p>
+            <p style="margin:0;font-size:36px;font-weight:700;color:#0A1628;letter-spacing:6px">${params.code}</p>
+          </div>
+          <p style="margin:0;color:#94a3b8;font-size:13px">This code expires in 1 hour. Enter it on the reset-password page along with your email and a new password to log in.</p>
         </td></tr>
         <tr><td style="padding:16px 32px 24px;border-top:1px solid #f1f5f9;text-align:center">
           <p style="margin:0;color:#94a3b8;font-size:12px">© 2026 PingLoyal. All rights reserved.</p>

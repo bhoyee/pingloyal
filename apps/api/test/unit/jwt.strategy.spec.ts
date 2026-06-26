@@ -90,6 +90,23 @@ describe('JwtStrategy.validate', () => {
     }
   });
 
+  it('T4b — tenant has deletedAt set (staff soft-delete): throws 410 Gone', async () => {
+    mockUserRepo.findOne.mockResolvedValue({
+      id: 'user-1',
+      tenantId: 'tenant-1',
+      role: UserRole.OWNER,
+      isActive: true,
+      tenant: { id: 'tenant-1', deletionRequestedAt: null, deletedAt: new Date() },
+    });
+
+    await expect(strategy.validate(PAYLOAD)).rejects.toThrow(HttpException);
+    try {
+      await strategy.validate(PAYLOAD);
+    } catch (e) {
+      expect((e as HttpException).getStatus()).toBe(HttpStatus.GONE);
+    }
+  });
+
   it('T5 — queries by both id and tenantId from the JWT payload', async () => {
     mockUserRepo.findOne.mockResolvedValue({
       id: 'user-1',
