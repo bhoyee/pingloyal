@@ -138,13 +138,6 @@ export default function LoginPage() {
             </a>
           </p>
         </form>
-
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Cashier login?{' '}
-          <a href="/cashier/login" className="underline hover:text-slate-600">
-            Go to cashier app
-          </a>
-        </p>
       </div>
     </AuthSplitLayout>
   );
