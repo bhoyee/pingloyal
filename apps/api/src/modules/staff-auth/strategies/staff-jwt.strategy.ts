@@ -39,10 +39,14 @@ export class StaffJwtStrategy extends PassportStrategy(Strategy, 'jwt-staff') {
     const staff = await this.staffRepo.findOne({
       where: { id: payload.sub },
     });
-    if (!staff) {
+    if (!staff || !staff.isActive) {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    return { staffId: staff.id, fullName: staff.fullName };
+    return {
+      staffId: staff.id,
+      fullName: staff.fullName,
+      staffRole: staff.role,
+    };
   }
 }

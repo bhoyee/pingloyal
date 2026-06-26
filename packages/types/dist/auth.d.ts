@@ -1,4 +1,4 @@
-import { PlanTier, UserRole } from './enums';
+import { PlanTier, StaffRole, UserRole } from './enums';
 export interface JwtPayload {
     sub: string;
     tenantId: string;
@@ -12,5 +12,17 @@ export interface RequestUser {
     tenantId: string;
     role: UserRole;
     planTier: PlanTier;
+}
+export interface StaffJwtPayload {
+    sub: string;
+    type: 'staff';
+    staffRole: StaffRole;
+    iat: number;
+    exp: number;
+}
+export interface RequestStaff {
+    staffId: string;
+    fullName: string;
+    staffRole: StaffRole;
 }
 //# sourceMappingURL=auth.d.ts.map

@@ -7,6 +7,9 @@ import { Staff } from './entities/staff.entity';
 import { StaffJwtStrategy } from './strategies/staff-jwt.strategy';
 import { StaffAuthController } from './staff-auth.controller';
 import { StaffAuthService } from './staff-auth.service';
+import { StaffManagementController } from './staff-management.controller';
+import { StaffManagementService } from './staff-management.service';
+import { StaffRolesGuard } from './guards/staff-roles.guard';
 
 @Module({
   imports: [
@@ -23,8 +26,13 @@ import { StaffAuthService } from './staff-auth.service';
     }),
     TypeOrmModule.forFeature([Staff]),
   ],
-  controllers: [StaffAuthController],
-  providers: [StaffAuthService, StaffJwtStrategy],
+  controllers: [StaffAuthController, StaffManagementController],
+  providers: [
+    StaffAuthService,
+    StaffJwtStrategy,
+    StaffManagementService,
+    StaffRolesGuard,
+  ],
   exports: [StaffAuthService],
 })
 export class StaffAuthModule {}

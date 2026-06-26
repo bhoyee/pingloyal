@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { StaffSidebar } from '@/components/staff/StaffSidebar';
 
 function isTokenExpired(token: string): boolean {
   try {
@@ -32,26 +33,36 @@ function StaffGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function TopBar() {
-  const pathname = usePathname();
-  if (pathname === '/staff/login') return null;
+function MobileTopBar({ onOpenMenu }: { onOpenMenu: () => void }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
+      <button
+        onClick={onOpenMenu}
+        aria-label="Open menu"
+        className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      <span className="text-sm font-bold text-[#0A1628]">PingLoyal Staff</span>
+    </div>
+  );
+}
 
-  function handleLogout() {
-    localStorage.removeItem('staff_access_token');
-    localStorage.removeItem('staff_refresh_token');
-    window.location.href = '/staff/login';
-  }
+function StaffShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  if (pathname === '/staff/login') return <>{children}</>;
 
   return (
-    <div className="flex items-center justify-between border-b border-white/10 bg-[#0A1628] px-4 py-3 sm:px-6">
-      <span className="text-sm font-bold text-white">PingLoyal Staff</span>
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white"
-      >
-        Log out
-      </button>
+    <div className="flex h-screen overflow-hidden bg-slate-50">
+      <StaffSidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <MobileTopBar onOpenMenu={() => setMenuOpen(true)} />
+        <div className="flex-1">{children}</div>
+      </div>
     </div>
   );
 }
@@ -60,10 +71,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   return (
     <QueryProvider>
       <StaffGuard>
-        <div className="min-h-screen bg-slate-50">
-          <TopBar />
-          {children}
-        </div>
+        <StaffShell>{children}</StaffShell>
       </StaffGuard>
     </QueryProvider>
   );

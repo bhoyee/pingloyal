@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
 import type { StaffJwtPayload } from '@pingloyal/types';
+import { StaffRole } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { Staff } from './entities/staff.entity';
 import { StaffLoginDto } from './dto/staff-login.dto';
@@ -18,7 +19,7 @@ export interface StaffAuthTokens {
 }
 
 export interface StaffLoginResponse extends StaffAuthTokens {
-  staff: { id: string; email: string; fullName: string };
+  staff: { id: string; email: string; fullName: string; role: StaffRole };
 }
 
 @Injectable()
@@ -34,7 +35,7 @@ export class StaffAuthService {
     const staff = await this.staffRepo.findOne({
       where: { email: dto.email.toLowerCase().trim() },
     });
-    if (!staff) {
+    if (!staff || !staff.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -49,7 +50,12 @@ export class StaffAuthService {
     const tokens = await this.issueTokens(staff);
     return {
       ...tokens,
-      staff: { id: staff.id, email: staff.email, fullName: staff.fullName },
+      staff: {
+        id: staff.id,
+        email: staff.email,
+        fullName: staff.fullName,
+        role: staff.role,
+      },
     };
   }
 
@@ -87,7 +93,7 @@ export class StaffAuthService {
     await this.redis.del(`refresh:staff:${staffId}`);
 
     const staff = await this.staffRepo.findOne({ where: { id: staffId } });
-    if (!staff) {
+    if (!staff || !staff.isActive) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -105,14 +111,17 @@ export class StaffAuthService {
       'base64',
     ).toString('utf8');
 
-    const accessToken = this.jwtService.sign({ sub: staff.id, type: 'staff' }, {
-      algorithm: 'RS256',
-      privateKey,
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    } as Parameters<typeof this.jwtService.sign>[1]);
+    const accessToken = this.jwtService.sign(
+      { sub: staff.id, type: 'staff', staffRole: staff.role },
+      {
+        algorithm: 'RS256',
+        privateKey,
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+      } as Parameters<typeof this.jwtService.sign>[1],
+    );
 
     const refreshToken = this.jwtService.sign(
-      { sub: staff.id, type: 'staff' },
+      { sub: staff.id, type: 'staff', staffRole: staff.role },
       {
         algorithm: 'RS256',
         privateKey,

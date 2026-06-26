@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import { StaffJwtStrategy } from '../../src/modules/staff-auth/strategies/staff-jwt.strategy';
 import { Staff } from '../../src/modules/staff-auth/entities/staff.entity';
+import { StaffRole } from '@pingloyal/types';
 
 const mockStaffRepo = { findOne: jest.fn() };
 
@@ -29,15 +30,22 @@ describe('StaffJwtStrategy', () => {
     mockStaffRepo.findOne.mockResolvedValue({
       id: 'staff-1',
       fullName: 'Ada PingLoyal',
+      role: 'super_admin',
+      isActive: true,
     });
     const strategy = await buildStrategy();
     const result = await strategy.validate({
       sub: 'staff-1',
       type: 'staff',
+      staffRole: StaffRole.SUPER_ADMIN,
       iat: 0,
       exp: 0,
     });
-    expect(result).toEqual({ staffId: 'staff-1', fullName: 'Ada PingLoyal' });
+    expect(result).toEqual({
+      staffId: 'staff-1',
+      fullName: 'Ada PingLoyal',
+      staffRole: 'super_admin',
+    });
   });
 
   it('rejects a tenant-shaped payload (no type: "staff")', async () => {
@@ -46,6 +54,7 @@ describe('StaffJwtStrategy', () => {
       strategy.validate({
         sub: 'user-1',
         type: 'tenant' as 'staff',
+        staffRole: StaffRole.SUPER_ADMIN,
         iat: 0,
         exp: 0,
       }),
@@ -57,7 +66,32 @@ describe('StaffJwtStrategy', () => {
     mockStaffRepo.findOne.mockResolvedValue(null);
     const strategy = await buildStrategy();
     await expect(
-      strategy.validate({ sub: 'staff-1', type: 'staff', iat: 0, exp: 0 }),
+      strategy.validate({
+        sub: 'staff-1',
+        type: 'staff',
+        staffRole: StaffRole.SUPER_ADMIN,
+        iat: 0,
+        exp: 0,
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('rejects when the staff account has been deactivated', async () => {
+    mockStaffRepo.findOne.mockResolvedValue({
+      id: 'staff-1',
+      fullName: 'Ada PingLoyal',
+      role: 'super_admin',
+      isActive: false,
+    });
+    const strategy = await buildStrategy();
+    await expect(
+      strategy.validate({
+        sub: 'staff-1',
+        type: 'staff',
+        staffRole: StaffRole.SUPER_ADMIN,
+        iat: 0,
+        exp: 0,
+      }),
     ).rejects.toThrow(UnauthorizedException);
   });
 });
