@@ -54,6 +54,8 @@ export class TransactionsController {
     @Query('limit') limit?: string,
     @Query('customerId') customerId?: string,
     @Query('categoryId') categoryId?: string,
+    @Query('cashierId') cashierId?: string,
+    @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
@@ -62,6 +64,8 @@ export class TransactionsController {
       limit: limit ? parseInt(limit, 10) : undefined,
       customerId,
       categoryId,
+      cashierId,
+      search,
       startDate,
       endDate,
     };

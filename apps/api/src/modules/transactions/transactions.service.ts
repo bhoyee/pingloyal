@@ -47,8 +47,44 @@ export interface TransactionResult {
   createdAt: string;
 }
 
+// Manually mapped row — never return the raw Transaction entity here, since
+// its loggedByUser relation pulls in the full User row (incl. hashedPassword).
+export interface TransactionLogRow {
+  id: string;
+  amount: string;
+  pointsEarned: number;
+  source: TransactionSource;
+  createdAt: string;
+  customer: { id: string; fullName: string } | null;
+  categoryName: string | null;
+  cashierName: string | null;
+}
+
 export interface TransactionListResult {
-  data: Transaction[];
+  data: TransactionLogRow[];
+  total: number;
+  page: number;
+  limit: number;
+  // Aggregated across every row matching the filters, not just the current
+  // page — the transaction log's summary bar needs period-wide totals.
+  totalAmount: string;
+  totalPoints: number;
+}
+
+// Manually mapped row — never return the raw Transaction entity here, since
+// its loggedByUser relation pulls in the full User row (incl. hashedPassword).
+export interface CustomerTransactionRow {
+  id: string;
+  amount: string;
+  pointsEarned: number;
+  source: TransactionSource;
+  createdAt: string;
+  categoryName: string | null;
+  cashierName: string | null;
+}
+
+export interface CustomerTransactionListResult {
+  data: CustomerTransactionRow[];
   total: number;
   page: number;
   limit: number;
@@ -59,6 +95,8 @@ export interface ListTransactionsQuery {
   limit?: number;
   customerId?: string;
   categoryId?: string;
+  cashierId?: string;
+  search?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -286,40 +324,99 @@ export class TransactionsService {
     query: ListTransactionsQuery,
   ): Promise<TransactionListResult> {
     const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
+    // Capped generously (not just the usual 100) so the transaction log's
+    // "export CSV" action — which calls this same endpoint with a high
+    // limit instead of a separate export endpoint — can pull a full
+    // tenant's worth of rows for a bounded date range in one request.
+    const limit = Math.min(query.limit ?? 20, 10_000);
 
-    const qb = this.txRepo
-      .createQueryBuilder('tx')
-      .leftJoinAndSelect('tx.customer', 'customer')
-      .leftJoinAndSelect('tx.category', 'category')
-      .where('tx.tenantId = :tenantId', { tenantId })
+    // Shared filter set, reused for both the paginated page query and the
+    // separate period-wide aggregate query below — built fresh each time
+    // since TypeORM query builders mutate in place and don't clone safely
+    // once .take()/.skip()/.orderBy() have been applied.
+    const applyFilters = (
+      builder: ReturnType<typeof this.txRepo.createQueryBuilder>,
+    ) => {
+      builder.where('tx.tenantId = :tenantId', { tenantId });
+      if (query.customerId) {
+        builder.andWhere('customer.id = :customerId', {
+          customerId: query.customerId,
+        });
+      }
+      if (query.categoryId) {
+        builder.andWhere('category.id = :categoryId', {
+          categoryId: query.categoryId,
+        });
+      }
+      if (query.cashierId) {
+        builder.andWhere('cashier.id = :cashierId', {
+          cashierId: query.cashierId,
+        });
+      }
+      if (query.search) {
+        builder.andWhere('customer.fullName ILIKE :search', {
+          search: `%${query.search}%`,
+        });
+      }
+      if (query.startDate) {
+        builder.andWhere('tx.createdAt >= :startDate', {
+          startDate: new Date(query.startDate),
+        });
+      }
+      if (query.endDate) {
+        builder.andWhere('tx.createdAt <= :endDate', {
+          endDate: new Date(query.endDate),
+        });
+      }
+      return builder;
+    };
+
+    const qb = applyFilters(
+      this.txRepo
+        .createQueryBuilder('tx')
+        .leftJoinAndSelect('tx.customer', 'customer')
+        .leftJoinAndSelect('tx.category', 'category')
+        .leftJoin('tx.loggedByUser', 'cashier')
+        .addSelect(['cashier.id', 'cashier.fullName']),
+    )
       .orderBy('tx.createdAt', 'DESC')
       .take(limit)
       .skip((page - 1) * limit);
 
-    if (query.customerId) {
-      qb.andWhere('customer.id = :customerId', {
-        customerId: query.customerId,
-      });
-    }
-    if (query.categoryId) {
-      qb.andWhere('category.id = :categoryId', {
-        categoryId: query.categoryId,
-      });
-    }
-    if (query.startDate) {
-      qb.andWhere('tx.createdAt >= :startDate', {
-        startDate: new Date(query.startDate),
-      });
-    }
-    if (query.endDate) {
-      qb.andWhere('tx.createdAt <= :endDate', {
-        endDate: new Date(query.endDate),
-      });
-    }
+    const aggregateQb = applyFilters(
+      this.txRepo
+        .createQueryBuilder('tx')
+        .leftJoin('tx.customer', 'customer')
+        .leftJoin('tx.category', 'category')
+        .leftJoin('tx.loggedByUser', 'cashier'),
+    )
+      .select('COALESCE(SUM(tx.amount), 0)', 'totalAmount')
+      .addSelect('COALESCE(SUM(tx.pointsEarned), 0)', 'totalPoints');
 
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    const [[rows, total], aggregate] = await Promise.all([
+      qb.getManyAndCount(),
+      aggregateQb.getRawOne<{ totalAmount: string; totalPoints: string }>(),
+    ]);
+
+    return {
+      data: rows.map((tx) => ({
+        id: tx.id,
+        amount: String(tx.amount),
+        pointsEarned: tx.pointsEarned,
+        source: tx.source,
+        createdAt: tx.createdAt.toISOString(),
+        customer: tx.customer
+          ? { id: tx.customer.id, fullName: tx.customer.fullName }
+          : null,
+        categoryName: tx.category?.name ?? null,
+        cashierName: tx.loggedByUser?.fullName ?? null,
+      })),
+      total,
+      page,
+      limit,
+      totalAmount: aggregate?.totalAmount ?? '0',
+      totalPoints: Number(aggregate?.totalPoints ?? 0),
+    };
   }
 
   // ── GET /transactions/:id ───────────────────────────────────────────────────
@@ -339,7 +436,7 @@ export class TransactionsService {
     tenantId: string,
     customerId: string,
     query: Pick<ListTransactionsQuery, 'page' | 'limit'>,
-  ): Promise<TransactionListResult> {
+  ): Promise<CustomerTransactionListResult> {
     const customer = await this.customerRepo.findOne({
       where: { id: customerId, tenantId },
     });
@@ -350,13 +447,26 @@ export class TransactionsService {
 
     const [data, total] = await this.txRepo.findAndCount({
       where: { tenantId, customer: { id: customerId } as Customer },
-      relations: ['category'],
+      relations: ['category', 'loggedByUser'],
       order: { createdAt: 'DESC' },
       take: limit,
       skip: (page - 1) * limit,
     });
 
-    return { data, total, page, limit };
+    return {
+      data: data.map((tx) => ({
+        id: tx.id,
+        amount: String(tx.amount),
+        pointsEarned: tx.pointsEarned,
+        source: tx.source,
+        createdAt: tx.createdAt.toISOString(),
+        categoryName: tx.category?.name ?? null,
+        cashierName: tx.loggedByUser?.fullName ?? null,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────

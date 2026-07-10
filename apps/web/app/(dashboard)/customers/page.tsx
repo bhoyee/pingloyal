@@ -272,7 +272,11 @@ export default function CustomersPage() {
                     ? Math.min(100, Math.round((customer.pointsBalance / pointsThreshold) * 100))
                     : 0;
                   return (
-                    <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
+                    <tr
+                      key={customer.id}
+                      onClick={() => router.push(`/customers/${customer.id}`)}
+                      className="cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{customer.fullName}</p>
                         <p className="text-xs text-slate-400 font-mono">{customer.phoneE164}</p>

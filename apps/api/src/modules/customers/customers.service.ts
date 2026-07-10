@@ -204,6 +204,7 @@ export class CustomersService {
   async findById(tenantId: string, customerId: string): Promise<Customer> {
     const customer = await this.customerRepo.findOne({
       where: { id: customerId, tenantId },
+      relations: ['tier'],
     });
     if (!customer) {
       throw new NotFoundException('Customer not found');
