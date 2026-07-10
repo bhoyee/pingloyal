@@ -93,6 +93,11 @@ export default function CashierPage() {
     router.push(`/cashier/transaction?customerId=${customer.id}`);
   }
 
+  function handleApplyReward(customer: CustomerLookupResult) {
+    sessionStorage.setItem('cashier_selected_customer', JSON.stringify(customer));
+    router.push(`/cashier/redemption?customerId=${customer.id}`);
+  }
+
   const symbol = tenant?.currency === 'GBP' ? '£' : '₦';
 
   return (
@@ -207,6 +212,7 @@ export default function CashierPage() {
             symbol={symbol}
             tenant={tenant}
             onLogPurchase={handleLogPurchase}
+            onApplyReward={handleApplyReward}
           />
         )}
       </div>
@@ -219,11 +225,13 @@ function CustomerCard({
   symbol,
   tenant,
   onLogPurchase,
+  onApplyReward,
 }: {
   customer: CustomerLookupResult;
   symbol: string;
   tenant: { pointsThreshold: number; rewardValue: number; pointsEarnRate: number } | null;
   onLogPurchase: (c: CustomerLookupResult) => void;
+  onApplyReward: (c: CustomerLookupResult) => void;
 }) {
   const tier = tierStyle(customer.tier);
   const threshold = tenant?.pointsThreshold ?? 1000;
@@ -233,6 +241,7 @@ function CustomerCard({
   const pointsRemaining = Math.max(0, threshold - customer.pointsBalance);
   const spendRemaining = pointsRemaining * earnRate;
   const progressPercent = Math.min(100, customer.progressPercent);
+  const rewardsAvailable = Math.floor(customer.pointsBalance / threshold);
 
   const fromCache = (customer as CustomerLookupResult & { _fromCache?: boolean })._fromCache;
 
@@ -306,8 +315,32 @@ function CustomerCard({
         )}
       </div>
 
-      {/* CTA button */}
-      <div className="px-5 pb-5">
+      {/* Reward available banner */}
+      {rewardsAvailable >= 1 && (
+        <div className="mx-5 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">🎁</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-emerald-800">
+              {rewardsAvailable} reward{rewardsAvailable > 1 ? 's' : ''} available
+            </p>
+            <p className="text-xs text-emerald-600">
+              Worth {symbol}{(rewardsAvailable * rewardValue).toLocaleString()} total
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* CTA buttons */}
+      <div className="px-5 pb-5 flex flex-col gap-2">
+        {rewardsAvailable >= 1 && (
+          <button
+            type="button"
+            onClick={() => onApplyReward(customer)}
+            className="w-full bg-emerald-600 text-white font-bold text-base py-3.5 rounded-xl hover:bg-emerald-700 transition-colors"
+          >
+            Apply Reward 🎁
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onLogPurchase(customer)}

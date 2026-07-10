@@ -86,6 +86,51 @@ export class WaBotService {
       return;
     }
 
+    // Handle redeem keyword — inform the customer how many rewards they can claim
+    const REDEEM_KEYWORDS = [
+      'redeem',
+      'reward',
+      'voucher',
+      'redeem points',
+      'use points',
+      'claim reward',
+    ];
+    if (REDEEM_KEYWORDS.some((kw) => text.includes(kw))) {
+      const currencySymbol = tenant.currency === 'GBP' ? '£' : '₦';
+      const rewardsAvailable = Math.floor(
+        customer.pointsBalance / tenant.pointsThreshold,
+      );
+
+      let redeemMsg: string;
+      if (rewardsAvailable === 0) {
+        const pointsNeeded = tenant.pointsThreshold - customer.pointsBalance;
+        redeemMsg =
+          `Hi ${customer.fullName.split(' ')[0]}! 👋 You need *${pointsNeeded.toLocaleString()} more points*` +
+          ` to unlock a ${currencySymbol}${tenant.rewardValue} reward.\n\n` +
+          `Your current balance: *${customer.pointsBalance.toLocaleString()} pts*`;
+      } else if (rewardsAvailable === 1) {
+        redeemMsg =
+          `Hi ${customer.fullName.split(' ')[0]}! 🎁 You have *1 reward available* worth` +
+          ` *${currencySymbol}${tenant.rewardValue.toLocaleString()}*.\n\n` +
+          `Show this message at the till and ask the cashier to apply your reward!`;
+      } else {
+        const totalValue = rewardsAvailable * Number(tenant.rewardValue);
+        redeemMsg =
+          `Hi ${customer.fullName.split(' ')[0]}! 🎁 You have *${rewardsAvailable} rewards available*` +
+          ` worth *${currencySymbol}${totalValue.toLocaleString()}* total.\n\n` +
+          `Show this message at the till and ask the cashier to apply your rewards!`;
+      }
+
+      const result = await this.sendSessionMessage(tenant, senderPhone, redeemMsg);
+      await this.logBotReply(
+        tenant.id,
+        customer.id,
+        result.success ? TriggerStatus.SENT : TriggerStatus.FAILED,
+        result.messageId ?? null,
+      );
+      return;
+    }
+
     if (
       !isTriggerEnabled(tenant.enabledTriggers, TriggerType.BALANCE_BOT_REPLY)
     ) {

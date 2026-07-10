@@ -75,6 +75,7 @@ export enum TriggerType {
   BALANCE_BOT_REPLY = 'balance_bot_reply',
   WALLET_LOW_BALANCE = 'wallet_low_balance',
   WALLET_ZERO = 'wallet_zero',
+  REWARD_REDEEMED = 'reward_redeemed',
 }
 
 export enum TriggerStatus {

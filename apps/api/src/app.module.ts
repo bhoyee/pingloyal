@@ -35,6 +35,7 @@ import { SupportModule } from './modules/support/support.module';
 import { DemoRequestsModule } from './modules/demo-requests/demo-requests.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { AdminModule } from './admin/admin.module';
+import { RedemptionsModule } from './modules/redemptions/redemptions.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -107,6 +108,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     DemoRequestsModule,
     ContactModule,
     AdminModule,
+    RedemptionsModule,
   ],
   controllers: [AppController],
   providers: [

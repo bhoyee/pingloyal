@@ -7,8 +7,6 @@ import { Transaction } from './entities/transaction.entity';
 import { PointsLedger } from './entities/points-ledger.entity';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
-import { RedemptionsController } from './redemptions.controller';
-import { RedemptionsService } from './redemptions.service';
 
 @Module({
   imports: [
@@ -20,8 +18,8 @@ import { RedemptionsService } from './redemptions.service';
     ]),
     TenantsModule,
   ],
-  controllers: [TransactionsController, RedemptionsController],
-  providers: [TransactionsService, RedemptionsService],
+  controllers: [TransactionsController],
+  providers: [TransactionsService],
   exports: [TransactionsService],
 })
 export class TransactionsModule {}

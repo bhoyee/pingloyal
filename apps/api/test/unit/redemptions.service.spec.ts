@@ -1,17 +1,26 @@
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { RedemptionsService } from '../../src/modules/transactions/redemptions.service';
-import { PointsLedger } from '../../src/modules/transactions/entities/points-ledger.entity';
+import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
+import { BadRequestException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
+import { RedemptionsService } from '../../src/modules/redemptions/redemptions.service';
+import { Redemption } from '../../src/modules/redemptions/entities/redemption.entity';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
 const TENANT_ID = 'tenant-uuid-1';
+const CASHIER_ID = 'cashier-uuid-1';
 const CUSTOMER_ID = 'cust-uuid-1';
+const REDEMPTION_ID = 'redemp-uuid-1';
 
 const mockTenant = {
   id: TENANT_ID,
   pointsThreshold: 1000,
   rewardValue: 500,
+  businessName: 'Test Store',
 };
+
+// ── QueryBuilder mock ─────────────────────────────────────────────────────────
 
 const mockQb = {
   leftJoin: jest.fn().mockReturnThis(),
@@ -23,115 +32,328 @@ const mockQb = {
   skip: jest.fn().mockReturnThis(),
   select: jest.fn().mockReturnThis(),
   getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-  getRawOne: jest.fn().mockResolvedValue({ totalPoints: '0' }),
+  getRawOne: jest.fn().mockResolvedValue({
+    totalRedemptions: '0',
+    totalPointsRedeemed: '0',
+    totalValue: '0',
+  }),
 };
 
-const mockLedgerRepo = {
+const mockRedemptionRepo = {
   createQueryBuilder: jest.fn().mockReturnValue(mockQb),
+};
+
+// ── DataSource / EntityManager mock ──────────────────────────────────────────
+
+const mockEm = {
+  query: jest.fn(),
+};
+
+const mockDataSource = {
+  transaction: jest
+    .fn()
+    .mockImplementation((cb: (em: typeof mockEm) => Promise<unknown>) =>
+      cb(mockEm),
+    ),
 };
 
 const mockTenantsService = {
   findOne: jest.fn().mockResolvedValue(mockTenant),
 };
 
+const mockWaQueue = {
+  add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+};
+
+// ── Test suite ────────────────────────────────────────────────────────────────
+
 describe('RedemptionsService', () => {
   let service: RedemptionsService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockLedgerRepo.createQueryBuilder.mockReturnValue(mockQb);
+    mockRedemptionRepo.createQueryBuilder.mockReturnValue(mockQb);
     mockTenantsService.findOne.mockResolvedValue(mockTenant);
+    mockWaQueue.add.mockResolvedValue({ id: 'job-1' });
 
     const module = await Test.createTestingModule({
       providers: [
         RedemptionsService,
-        { provide: getRepositoryToken(PointsLedger), useValue: mockLedgerRepo },
+        { provide: getDataSourceToken(), useValue: mockDataSource },
+        {
+          provide: getRepositoryToken(Redemption),
+          useValue: mockRedemptionRepo,
+        },
         { provide: TenantsService, useValue: mockTenantsService },
+        { provide: getQueueToken('wa-messages'), useValue: mockWaQueue },
       ],
     }).compile();
 
     service = module.get(RedemptionsService);
   });
 
-  it('T1: returns empty list with zero totals when no redemptions exist', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
-    mockQb.getRawOne.mockResolvedValueOnce({ totalPoints: '0' });
+  // ── createRedemption ────────────────────────────────────────────────────────
 
-    const result = await service.findAll(TENANT_ID, {});
+  it('T1: happy path — 1 reward — deducts points and returns row', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '0' }]) // UPDATE RETURNING
+      .mockResolvedValueOnce(undefined) // INSERT ledger
+      .mockResolvedValueOnce([
+        { id: REDEMPTION_ID, redeemed_at: new Date('2024-03-01') },
+      ]); // INSERT redemptions
 
-    expect(result).toMatchObject({
-      data: [],
-      total: 0,
-      totalPointsRedeemed: 0,
+    const result = await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 1,
     });
+
+    expect(result.id).toBe(REDEMPTION_ID);
+    expect(result.pointsRedeemed).toBe(1000);
+    expect(result.rewardsCount).toBe(1);
+    expect(result.value).toBe(500);
+    expect(result.balanceAfter).toBe(0);
+    expect(result.customerId).toBe(CUSTOMER_ID);
   });
 
-  it('T2: maps a redemption row — pointsRedeemed is abs(delta), cashierName always null', async () => {
+  it('T2: happy path — 3 rewards — points and value scale correctly', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '0' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+
+    const result = await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 3,
+    });
+
+    expect(result.pointsRedeemed).toBe(3000);
+    expect(result.rewardsCount).toBe(3);
+    expect(result.value).toBe(1500);
+  });
+
+  it('T3: insufficient points — throws BadRequestException when UPDATE returns 0 rows', async () => {
+    mockEm.query.mockResolvedValueOnce([]); // empty = no row updated
+
+    await expect(
+      service.createRedemption(TENANT_ID, CASHIER_ID, {
+        customerId: CUSTOMER_ID,
+        rewardsToRedeem: 1,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('T4: atomic UPDATE uses WHERE points_balance >= required points', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '2000' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+
+    await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 1,
+    });
+
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('points_balance >= $1'),
+      expect.arrayContaining([1000]),
+    );
+  });
+
+  it('T5: notes are passed through to the INSERT', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '0' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+
+    await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 1,
+      notes: 'Birthday treat',
+    });
+
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.arrayContaining(['Birthday treat']),
+    );
+  });
+
+  it('T6: cashier_id is included in the redemption INSERT', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '0' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+
+    await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 1,
+    });
+
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.arrayContaining([CASHIER_ID]),
+    );
+  });
+
+  it('T7: queues REWARD_REDEEMED WA message after transaction commits', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '500' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+
+    await service.createRedemption(TENANT_ID, CASHIER_ID, {
+      customerId: CUSTOMER_ID,
+      rewardsToRedeem: 1,
+    });
+
+    expect(mockWaQueue.add).toHaveBeenCalledWith(
+      'send',
+      expect.objectContaining({
+        type: 'reward_redeemed',
+        tenantId: TENANT_ID,
+        customerId: CUSTOMER_ID,
+      }),
+    );
+  });
+
+  it('T8: WA queue failure does not propagate — redemption still succeeds', async () => {
+    mockEm.query
+      .mockResolvedValueOnce([{ points_balance: '0' }])
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date() }]);
+    mockWaQueue.add.mockRejectedValueOnce(new Error('Queue unavailable'));
+
+    await expect(
+      service.createRedemption(TENANT_ID, CASHIER_ID, {
+        customerId: CUSTOMER_ID,
+        rewardsToRedeem: 1,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  // ── getRedemptions ──────────────────────────────────────────────────────────
+
+  it('T9: returns empty list when no redemptions exist', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+
+    const result = await service.getRedemptions(TENANT_ID, {});
+
+    expect(result.data).toHaveLength(0);
+    expect(result.total).toBe(0);
+  });
+
+  it('T10: maps a redemption row with cashierName from join', async () => {
+    const now = new Date('2024-03-01T12:00:00Z');
     mockQb.getManyAndCount.mockResolvedValueOnce([
       [
         {
-          id: 'ledger-1',
-          delta: -1000,
-          balanceAfter: 200,
-          createdAt: new Date('2024-02-01T00:00:00Z'),
-          customer: { id: CUSTOMER_ID },
+          id: REDEMPTION_ID,
+          customerId: CUSTOMER_ID,
+          redeemedAt: now,
+          pointsRedeemed: 1000,
+          rewardsCount: 1,
+          value: '500.00',
+          balanceAfter: 0,
+          cashier: { fullName: 'Ada Okonkwo' },
         },
       ],
       1,
     ]);
-    mockQb.getRawOne.mockResolvedValueOnce({ totalPoints: '1000' });
 
-    const result = await service.findAll(TENANT_ID, {
-      customerId: CUSTOMER_ID,
-    });
+    const result = await service.getRedemptions(TENANT_ID, {});
 
     expect(result.data[0]).toMatchObject({
-      id: 'ledger-1',
+      id: REDEMPTION_ID,
       customerId: CUSTOMER_ID,
       pointsRedeemed: 1000,
       rewardsCount: 1,
       value: 500,
-      balanceAfter: 200,
-      cashierName: null,
+      balanceAfter: 0,
+      cashierName: 'Ada Okonkwo',
     });
-    expect(result.totalPointsRedeemed).toBe(1000);
+    expect(result.total).toBe(1);
   });
 
-  it('T3: rewardsCount scales with multiple thresholds redeemed at once', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([
-      [
-        {
-          id: 'ledger-2',
-          delta: -3000,
-          balanceAfter: 0,
-          createdAt: new Date('2024-02-01T00:00:00Z'),
-          customer: { id: CUSTOMER_ID },
-        },
-      ],
-      1,
-    ]);
-    mockQb.getRawOne.mockResolvedValueOnce({ totalPoints: '3000' });
+  it('T11: filters by customerId when provided', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
 
-    const result = await service.findAll(TENANT_ID, {});
+    await service.getRedemptions(TENANT_ID, { customerId: CUSTOMER_ID });
 
-    expect(result.data[0]).toMatchObject({
-      pointsRedeemed: 3000,
-      rewardsCount: 3,
-      value: 1500,
-    });
-  });
-
-  it('T4: filters by customerId when provided', async () => {
-    await service.findAll(TENANT_ID, { customerId: CUSTOMER_ID });
-
-    expect(mockQb.andWhere).toHaveBeenCalledWith('customer.id = :customerId', {
+    expect(mockQb.andWhere).toHaveBeenCalledWith('r.customerId = :customerId', {
       customerId: CUSTOMER_ID,
     });
   });
 
-  it('T5: caps limit at 100', async () => {
-    await service.findAll(TENANT_ID, { limit: 500 });
+  it('T12: caps limit at 100', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+
+    await service.getRedemptions(TENANT_ID, { limit: 999 });
 
     expect(mockQb.take).toHaveBeenCalledWith(100);
+  });
+
+  it('T13: paginates with page and limit', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+
+    await service.getRedemptions(TENANT_ID, { page: 2, limit: 5 });
+
+    expect(mockQb.take).toHaveBeenCalledWith(5);
+    expect(mockQb.skip).toHaveBeenCalledWith(5);
+  });
+
+  it('T14: cashierName is null when cashier relation is missing', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([
+      [
+        {
+          id: REDEMPTION_ID,
+          customerId: CUSTOMER_ID,
+          redeemedAt: new Date(),
+          pointsRedeemed: 1000,
+          rewardsCount: 1,
+          value: '500.00',
+          balanceAfter: 0,
+          cashier: null,
+        },
+      ],
+      1,
+    ]);
+
+    const result = await service.getRedemptions(TENANT_ID, {});
+
+    expect(result.data[0].cashierName).toBeNull();
+  });
+
+  // ── getStats ────────────────────────────────────────────────────────────────
+
+  it('T15: returns zero stats when no redemptions exist', async () => {
+    mockQb.getRawOne.mockResolvedValueOnce({
+      totalRedemptions: '0',
+      totalPointsRedeemed: '0',
+      totalValue: '0',
+    });
+
+    const result = await service.getStats(TENANT_ID, {});
+
+    expect(result).toEqual({
+      totalRedemptions: 0,
+      totalPointsRedeemed: 0,
+      totalValue: 0,
+    });
+  });
+
+  it('T16: aggregates totalRedemptions, totalPointsRedeemed, totalValue', async () => {
+    mockQb.getRawOne.mockResolvedValueOnce({
+      totalRedemptions: '5',
+      totalPointsRedeemed: '5000',
+      totalValue: '2500.00',
+    });
+
+    const result = await service.getStats(TENANT_ID, {});
+
+    expect(result.totalRedemptions).toBe(5);
+    expect(result.totalPointsRedeemed).toBe(5000);
+    expect(result.totalValue).toBe(2500);
   });
 });
