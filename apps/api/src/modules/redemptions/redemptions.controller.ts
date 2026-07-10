@@ -21,11 +21,12 @@ export class RedemptionsController {
   @Post()
   @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @CurrentUser() user: RequestUser,
-    @Body() dto: CreateRedemptionDto,
-  ) {
-    return this.redemptionsService.createRedemption(user.tenantId, user.userId, dto);
+  create(@CurrentUser() user: RequestUser, @Body() dto: CreateRedemptionDto) {
+    return this.redemptionsService.createRedemption(
+      user.tenantId,
+      user.userId,
+      dto,
+    );
   }
 
   @Get()
@@ -54,6 +55,9 @@ export class RedemptionsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.redemptionsService.getStats(user.tenantId, { startDate, endDate });
+    return this.redemptionsService.getStats(user.tenantId, {
+      startDate,
+      endDate,
+    });
   }
 }

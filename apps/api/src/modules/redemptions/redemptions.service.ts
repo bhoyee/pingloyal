@@ -85,7 +85,9 @@ export class RedemptionsService {
         [tenantId, dto.customerId, -pointsToDeduct, balanceAfter],
       );
 
-      const [redemption] = await em.query<{ id: string; redeemed_at: string }[]>(
+      const [redemption] = await em.query<
+        { id: string; redeemed_at: string }[]
+      >(
         `INSERT INTO redemptions
            (tenant_id, customer_id, cashier_id, rewards_count, points_redeemed, value, balance_after, notes)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -103,7 +105,7 @@ export class RedemptionsService {
       );
 
       const result: RedemptionRow = {
-        id: redemption.id as string,
+        id: redemption.id,
         customerId: dto.customerId,
         redeemedAt: new Date(redemption.redeemed_at).toISOString(),
         pointsRedeemed: pointsToDeduct,
@@ -156,7 +158,9 @@ export class RedemptionsService {
       .skip((page - 1) * limit);
 
     if (query.customerId) {
-      qb.andWhere('r.customerId = :customerId', { customerId: query.customerId });
+      qb.andWhere('r.customerId = :customerId', {
+        customerId: query.customerId,
+      });
     }
     if (query.startDate) {
       qb.andWhere('r.redeemedAt >= :startDate', { startDate: query.startDate });

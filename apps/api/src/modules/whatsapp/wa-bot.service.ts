@@ -121,7 +121,11 @@ export class WaBotService {
           `Show this message at the till and ask the cashier to apply your rewards!`;
       }
 
-      const result = await this.sendSessionMessage(tenant, senderPhone, redeemMsg);
+      const result = await this.sendSessionMessage(
+        tenant,
+        senderPhone,
+        redeemMsg,
+      );
       await this.logBotReply(
         tenant.id,
         customer.id,
