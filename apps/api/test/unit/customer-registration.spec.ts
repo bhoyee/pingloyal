@@ -390,3 +390,48 @@ describe('CustomersService – getTenantInfo', () => {
     );
   });
 });
+
+describe('CustomersService – findById', () => {
+  let service: CustomersService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        CustomersService,
+        { provide: getRepositoryToken(Tenant), useValue: mockTenantRepo },
+        { provide: getRepositoryToken(Customer), useValue: mockCustomerRepo },
+        { provide: REDIS_CLIENT, useValue: mockRedis },
+        {
+          provide: getQueueToken('wa-messages'),
+          useValue: mockWaMessagesQueue,
+        },
+      ],
+    }).compile();
+
+    service = module.get(CustomersService);
+    jest.clearAllMocks();
+  });
+
+  it('T60 — loads the tier relation so the customer detail page can render a tier badge', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue({
+      id: 'cust-1',
+      tenantId: 'tenant-1',
+      tier: { tierLabel: 'VIP' },
+    });
+
+    await service.findById('tenant-1', 'cust-1');
+
+    expect(mockCustomerRepo.findOne).toHaveBeenCalledWith({
+      where: { id: 'cust-1', tenantId: 'tenant-1' },
+      relations: ['tier'],
+    });
+  });
+
+  it('T61 — throws NotFoundException when the customer does not exist for this tenant', async () => {
+    mockCustomerRepo.findOne.mockResolvedValue(null);
+
+    await expect(service.findById('tenant-1', 'missing')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});

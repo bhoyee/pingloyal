@@ -185,9 +185,9 @@ describe('uploadFile', () => {
   it('throws BadRequestException when no integration is saved for the tenant', async () => {
     integrationRepoMock.findOne.mockResolvedValue(null);
     const service = makeService();
-    await expect(
-      service.uploadFile('tenant-1', makeFile()),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.uploadFile('tenant-1', makeFile())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('throws BadRequestException when saved integration is not connectionType=file_export', async () => {
@@ -195,9 +195,9 @@ describe('uploadFile', () => {
       makeIntegration({ connectionType: IntegrationConnectionType.WEBHOOK }),
     );
     const service = makeService();
-    await expect(
-      service.uploadFile('tenant-1', makeFile()),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.uploadFile('tenant-1', makeFile())).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('stores pending job in Redis, emits event, returns jobId', async () => {
@@ -266,7 +266,9 @@ describe('buildTemplate', () => {
     const service = makeService();
     const buf = service.buildTemplate({} as never);
     const text = buf.toString('utf-8');
-    expect(text).toContain('phone,amount,customer_name,category_slug,transaction_id,occurred_at');
+    expect(text).toContain(
+      'phone,amount,customer_name,category_slug,transaction_id,occurred_at',
+    );
   });
 });
 
@@ -398,7 +400,10 @@ describe('processFile — transaction creation', () => {
       fullName: 'Ada',
       phoneE164: '+2348012345678',
     });
-    categoryRepoMock.findOne.mockResolvedValue({ id: 'cat-1', slug: 'groceries' });
+    categoryRepoMock.findOne.mockResolvedValue({
+      id: 'cat-1',
+      slug: 'groceries',
+    });
 
     const service = makeService();
     const payload = makePayload([
@@ -489,7 +494,9 @@ describe('processFile — integration status updates', () => {
     });
 
     const service = makeService();
-    await service.processFile(makePayload([{ phone: '08012345678', amount: '1000' }]));
+    await service.processFile(
+      makePayload([{ phone: '08012345678', amount: '1000' }]),
+    );
 
     expect(integrationRepoMock.update).toHaveBeenCalledWith(
       'integ-1',
@@ -532,7 +539,9 @@ describe('processFile — failure paths', () => {
   it('sets status=failed when the integration no longer exists', async () => {
     integrationRepoMock.findOne.mockResolvedValue(null);
     const service = makeService();
-    await service.processFile(makePayload([{ phone: '08012345678', amount: '1000' }]));
+    await service.processFile(
+      makePayload([{ phone: '08012345678', amount: '1000' }]),
+    );
 
     const job = lastJobUpdate();
     expect(job.status).toBe('failed');
