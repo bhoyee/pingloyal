@@ -20,11 +20,15 @@ import {
   TransactionsService,
   type ListTransactionsQuery,
 } from './transactions.service';
+import { ReconciliationService } from './reconciliation.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @Controller()
 export class TransactionsController {
-  constructor(private readonly txService: TransactionsService) {}
+  constructor(
+    private readonly txService: TransactionsService,
+    private readonly reconciliationService: ReconciliationService,
+  ) {}
 
   // ── POST /transactions ──────────────────────────────────────────────────────
 
@@ -81,6 +85,21 @@ export class TransactionsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.txService.findById(user.tenantId, id);
+  }
+
+  // ── GET /transactions/reconciliation ───────────────────────────────────────
+
+  @Get('transactions/reconciliation')
+  @Roles(UserRole.OWNER)
+  getReconciliation(
+    @CurrentUser() user: RequestUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reconciliationService.getReport(user.tenantId, {
+      startDate,
+      endDate,
+    });
   }
 
   // ── GET /customers/:customerId/transactions ─────────────────────────────────

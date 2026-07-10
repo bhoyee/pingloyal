@@ -5,8 +5,10 @@ import { Customer } from '../customers/entities/customer.entity';
 import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { Transaction } from './entities/transaction.entity';
 import { PointsLedger } from './entities/points-ledger.entity';
+import { Redemption } from '../redemptions/entities/redemption.entity';
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
+import { ReconciliationService } from './reconciliation.service';
 
 @Module({
   imports: [
@@ -15,11 +17,12 @@ import { TransactionsService } from './transactions.service';
       PointsLedger,
       Customer,
       ProductCategory,
+      Redemption,
     ]),
     TenantsModule,
   ],
   controllers: [TransactionsController],
-  providers: [TransactionsService],
-  exports: [TransactionsService],
+  providers: [TransactionsService, ReconciliationService],
+  exports: [TransactionsService, ReconciliationService],
 })
 export class TransactionsModule {}

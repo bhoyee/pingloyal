@@ -21,6 +21,7 @@ import {
   HelpCircle,
   LogOut,
   X,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { api, type TenantMe } from '@/lib/api';
@@ -60,6 +61,10 @@ const NATIVE_MODE: NavItem[] = [
   { href: '/qr-registration', icon: QrCode, label: 'QR Registration', tourId: 'nav-qr-registration' },
 ];
 
+const INTEGRITY: NavItem[] = [
+  { href: '/reconciliation', icon: ShieldCheck, label: 'Reconciliation' },
+];
+
 const SETTINGS: NavItem[] = [
   { href: '/settings', icon: SettingsIcon, label: 'Settings', tourId: 'nav-settings' },
   { href: '/settings/integrations', icon: Plug, label: 'Integration', tourId: 'nav-integration' },
@@ -97,7 +102,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     refetchInterval: 60_000,
   });
 
-  const activeHref = [...OVERVIEW, ...AUTOMATION, ...NATIVE_MODE, ...SETTINGS]
+  const activeHref = [...OVERVIEW, ...AUTOMATION, ...NATIVE_MODE, ...INTEGRITY, ...SETTINGS]
     .filter((item) => !item.external)
     .filter((item) =>
       item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href),
@@ -245,6 +250,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           {renderSection('Overview', OVERVIEW)}
           {renderSection('Automation Engine', AUTOMATION)}
           {tenant?.mode !== 'connected' && renderSection('Native Mode', NATIVE_MODE)}
+          {renderSection('Integrity', INTEGRITY)}
           {renderSection('Settings', SETTINGS)}
         </nav>
 
