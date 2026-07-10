@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users,
+  Receipt,
   Megaphone,
   Zap,
   Bot,
@@ -43,6 +44,7 @@ interface NavItem {
 const OVERVIEW: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', tourId: 'nav-dashboard' },
   { href: '/customers', icon: Users, label: 'Customers', badge: 'customers', tourId: 'nav-customers' },
+  { href: '/transactions', icon: Receipt, label: 'Transactions' },
 ];
 
 const AUTOMATION: NavItem[] = [

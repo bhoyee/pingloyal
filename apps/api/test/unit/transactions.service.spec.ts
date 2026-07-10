@@ -65,12 +65,18 @@ const BASE_DTO: CreateTransactionDto = {
 
 const mockQb = {
   leftJoinAndSelect: jest.fn().mockReturnThis(),
+  leftJoin: jest.fn().mockReturnThis(),
+  select: jest.fn().mockReturnThis(),
+  addSelect: jest.fn().mockReturnThis(),
   where: jest.fn().mockReturnThis(),
   orderBy: jest.fn().mockReturnThis(),
   take: jest.fn().mockReturnThis(),
   skip: jest.fn().mockReturnThis(),
   andWhere: jest.fn().mockReturnThis(),
   getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+  getRawOne: jest
+    .fn()
+    .mockResolvedValue({ totalAmount: '0', totalPoints: '0' }),
 };
 
 const mockTxRepo = {
@@ -351,6 +357,68 @@ describe('TransactionsService', () => {
     expect(result.data).toHaveLength(2);
   });
 
+  it('T24: findAll maps cashierName from loggedByUser and customer summary', async () => {
+    mockQb.getManyAndCount.mockResolvedValueOnce([
+      [
+        {
+          id: TX_ID,
+          amount: 500,
+          pointsEarned: 5,
+          source: 'cashier_app',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          customer: { id: CUSTOMER_ID, fullName: 'Adebayo Okafor' },
+          category: { name: 'Groceries' },
+          loggedByUser: { fullName: 'Chidi Eze' },
+        },
+      ],
+      1,
+    ]);
+
+    const result = await service.findAll(TENANT_ID, {});
+
+    expect(result.data[0]).toMatchObject({
+      id: TX_ID,
+      customer: { id: CUSTOMER_ID, fullName: 'Adebayo Okafor' },
+      categoryName: 'Groceries',
+      cashierName: 'Chidi Eze',
+    });
+  });
+
+  it('T25: findAll filters by cashierId', async () => {
+    await service.findAll(TENANT_ID, { cashierId: 'user-1' });
+
+    expect(mockQb.andWhere).toHaveBeenCalledWith('cashier.id = :cashierId', {
+      cashierId: 'user-1',
+    });
+  });
+
+  it('T26: findAll filters by search (customer fullName ILIKE)', async () => {
+    await service.findAll(TENANT_ID, { search: 'Ade' });
+
+    expect(mockQb.andWhere).toHaveBeenCalledWith(
+      'customer.fullName ILIKE :search',
+      { search: '%Ade%' },
+    );
+  });
+
+  it('T27: findAll caps limit at 10,000', async () => {
+    await service.findAll(TENANT_ID, { limit: 50_000 });
+
+    expect(mockQb.take).toHaveBeenCalledWith(10_000);
+  });
+
+  it('T28: findAll returns period-wide totalAmount/totalPoints from the aggregate query', async () => {
+    mockQb.getRawOne.mockResolvedValueOnce({
+      totalAmount: '15000.50',
+      totalPoints: '120',
+    });
+
+    const result = await service.findAll(TENANT_ID, {});
+
+    expect(result.totalAmount).toBe('15000.50');
+    expect(result.totalPoints).toBe(120);
+  });
+
   // ── findById ──────────────────────────────────────────────────────────────
 
   it('T20: findById throws NotFoundException when transaction not found', async () => {
@@ -359,5 +427,70 @@ describe('TransactionsService', () => {
     await expect(service.findById(TENANT_ID, 'nonexistent-id')).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  // ── findByCustomer ────────────────────────────────────────────────────────
+
+  it('T21: findByCustomer throws NotFoundException when customer not found', async () => {
+    mockCustomerRepo.findOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.findByCustomer(TENANT_ID, 'nonexistent-id', {}),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('T22: findByCustomer maps cashier name from loggedByUser and category name', async () => {
+    mockCustomerRepo.findOne.mockResolvedValueOnce(mockCustomer);
+    mockTxRepo.findAndCount.mockResolvedValueOnce([
+      [
+        {
+          id: TX_ID,
+          amount: 500,
+          pointsEarned: 5,
+          source: 'cashier_app',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          category: { name: 'Groceries' },
+          loggedByUser: { fullName: 'Chidi Eze' },
+        },
+      ],
+      1,
+    ]);
+
+    const result = await service.findByCustomer(TENANT_ID, CUSTOMER_ID, {});
+
+    expect(result.data[0]).toMatchObject({
+      id: TX_ID,
+      amount: '500',
+      pointsEarned: 5,
+      categoryName: 'Groceries',
+      cashierName: 'Chidi Eze',
+    });
+    expect(result.total).toBe(1);
+  });
+
+  it('T23: findByCustomer returns null cashierName/categoryName when absent (e.g. webhook import)', async () => {
+    mockCustomerRepo.findOne.mockResolvedValueOnce(mockCustomer);
+    mockTxRepo.findAndCount.mockResolvedValueOnce([
+      [
+        {
+          id: TX_ID,
+          amount: 500,
+          pointsEarned: 5,
+          source: 'webhook',
+          createdAt: new Date('2024-01-01T00:00:00Z'),
+          category: null,
+          loggedByUser: null,
+        },
+      ],
+      1,
+    ]);
+
+    const result = await service.findByCustomer(TENANT_ID, CUSTOMER_ID, {});
+
+    expect(result.data[0]).toMatchObject({
+      categoryName: null,
+      cashierName: null,
+      source: 'webhook',
+    });
   });
 });
