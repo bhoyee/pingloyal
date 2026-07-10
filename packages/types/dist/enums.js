@@ -73,6 +73,7 @@ var TriggerType;
     TriggerType["BALANCE_BOT_REPLY"] = "balance_bot_reply";
     TriggerType["WALLET_LOW_BALANCE"] = "wallet_low_balance";
     TriggerType["WALLET_ZERO"] = "wallet_zero";
+    TriggerType["REWARD_REDEEMED"] = "reward_redeemed";
 })(TriggerType || (exports.TriggerType = TriggerType = {}));
 var TriggerStatus;
 (function (TriggerStatus) {

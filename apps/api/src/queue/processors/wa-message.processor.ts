@@ -47,6 +47,7 @@ const UTILITY_TYPES = new Set<TriggerType>([
   TriggerType.BALANCE_BOT_REPLY,
   TriggerType.WALLET_LOW_BALANCE,
   TriggerType.WALLET_ZERO,
+  TriggerType.REWARD_REDEEMED,
 ]);
 
 const OWNER_ALERT_TYPES = new Set<TriggerType>([

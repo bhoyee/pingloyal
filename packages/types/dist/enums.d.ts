@@ -59,7 +59,8 @@ export declare enum TriggerType {
     CAMPAIGN_MESSAGE = "campaign_message",
     BALANCE_BOT_REPLY = "balance_bot_reply",
     WALLET_LOW_BALANCE = "wallet_low_balance",
-    WALLET_ZERO = "wallet_zero"
+    WALLET_ZERO = "wallet_zero",
+    REWARD_REDEEMED = "reward_redeemed"
 }
 export declare enum TriggerStatus {
     SENT = "sent",

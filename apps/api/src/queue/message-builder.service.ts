@@ -137,6 +137,19 @@ export class MessageBuilderService {
           ],
         };
 
+      case TriggerType.REWARD_REDEEMED:
+        return {
+          templateName: 'pingloyal_reward_redeemed',
+          variables: [
+            firstName,
+            data.rewardsCount,
+            data.rewardValue,
+            tenant.businessName,
+            data.newBalance,
+            data.progressPercent,
+          ],
+        };
+
       default:
         throw new Error(`Unknown trigger type: ${String(type)}`);
     }
