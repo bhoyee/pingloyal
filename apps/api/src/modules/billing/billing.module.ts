@@ -7,7 +7,9 @@ import { User } from '../auth/entities/user.entity';
 import { WalletTransaction } from './entities/wallet-transaction.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { SignupModule } from '../signup/signup.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { BillingController } from './billing.controller';
+import { StaffBillingController } from './staff-billing.controller';
 import { BillingService } from './billing.service';
 import { WalletController } from './wallet.controller';
 import { UtilityTrackingService } from './utility-tracking.service';
@@ -25,8 +27,9 @@ import { TrialBillingCronService } from './trial-billing.cron';
     ]),
     BullModule.registerQueue({ name: 'wa-messages' }),
     SignupModule,
+    StaffAuthModule,
   ],
-  controllers: [BillingController, WalletController],
+  controllers: [BillingController, WalletController, StaffBillingController],
   providers: [
     BillingService,
     UtilityTrackingService,

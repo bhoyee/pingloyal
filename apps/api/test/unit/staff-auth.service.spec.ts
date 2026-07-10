@@ -10,6 +10,7 @@ jest.mock('bcrypt', () => ({ compare: jest.fn() }));
 import * as bcrypt from 'bcrypt';
 import { Staff } from '../../src/modules/staff-auth/entities/staff.entity';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
+import { StaffRole } from '@pingloyal/types';
 
 const STAFF_ID = 'staff-1';
 
@@ -19,6 +20,8 @@ function makeStaff(overrides: Partial<Staff> = {}): Staff {
     email: 'support@pingloyal.com',
     hashedPassword: 'hashed-pw',
     fullName: 'Ada PingLoyal',
+    role: StaffRole.SUPER_ADMIN,
+    isActive: true,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     ...overrides,
@@ -89,6 +92,7 @@ describe('StaffAuthService', () => {
         id: staff.id,
         email: staff.email,
         fullName: staff.fullName,
+        role: staff.role,
       });
       expect(result.accessToken).toBe('signed-token');
       expect(result.refreshToken).toBe('signed-token');

@@ -24,6 +24,10 @@ async function main() {
   const email = process.env.STAFF_EMAIL;
   const password = process.env.STAFF_PASSWORD;
   const fullName = process.env.STAFF_FULL_NAME ?? 'PingLoyal Support';
+  // This script seeds the very first account, so it defaults to the most
+  // privileged role — every account created afterward goes through the
+  // staff management API instead, which always takes an explicit role.
+  const role = process.env.STAFF_ROLE ?? 'super_admin';
 
   if (!email || !password) {
     console.error(
@@ -49,14 +53,14 @@ async function main() {
   const normalizedEmail = email.toLowerCase().trim();
 
   await dataSource.query(
-    `INSERT INTO "staff" ("email", "hashed_password", "full_name")
-     VALUES ($1, $2, $3)
+    `INSERT INTO "staff" ("email", "hashed_password", "full_name", "role")
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT ("email")
-     DO UPDATE SET "hashed_password" = EXCLUDED."hashed_password", "full_name" = EXCLUDED."full_name"`,
-    [normalizedEmail, hashedPassword, fullName],
+     DO UPDATE SET "hashed_password" = EXCLUDED."hashed_password", "full_name" = EXCLUDED."full_name", "role" = EXCLUDED."role"`,
+    [normalizedEmail, hashedPassword, fullName, role],
   );
 
-  console.log(`Staff account ready: ${normalizedEmail}`);
+  console.log(`Staff account ready: ${normalizedEmail} (${role})`);
   await dataSource.destroy();
 }
 

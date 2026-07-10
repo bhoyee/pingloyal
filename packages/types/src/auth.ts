@@ -1,4 +1,4 @@
-import { PlanTier, UserRole } from './enums';
+import { PlanTier, StaffRole, UserRole } from './enums';
 
 export interface JwtPayload {
   sub: string;      // userId
@@ -23,6 +23,7 @@ export interface RequestUser {
 export interface StaffJwtPayload {
   sub: string; // staffId
   type: 'staff';
+  staffRole: StaffRole;
   iat: number;
   exp: number;
 }
@@ -30,4 +31,5 @@ export interface StaffJwtPayload {
 export interface RequestStaff {
   staffId: string;
   fullName: string;
+  staffRole: StaffRole;
 }

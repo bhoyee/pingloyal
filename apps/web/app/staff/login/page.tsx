@@ -7,6 +7,7 @@ import { ApiError } from '../../../lib/api';
 interface StaffLoginResponse {
   accessToken: string;
   refreshToken: string;
+  staff: { id: string; email: string; fullName: string; role: string };
 }
 
 export default function StaffLoginPage() {
@@ -46,7 +47,9 @@ export default function StaffLoginPage() {
       const data = (await res.json()) as StaffLoginResponse;
       localStorage.setItem('staff_access_token', data.accessToken);
       localStorage.setItem('staff_refresh_token', data.refreshToken);
-      router.replace('/staff/tickets');
+      localStorage.setItem('staff_role', data.staff.role);
+      localStorage.setItem('staff_full_name', data.staff.fullName);
+      router.replace('/staff');
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

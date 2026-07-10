@@ -10,6 +10,7 @@ declare namespace Express {
     planTier?: string;
     staffId?: string;
     fullName?: string;
+    staffRole?: string;
   }
 
   interface Request {

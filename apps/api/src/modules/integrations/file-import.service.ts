@@ -287,7 +287,10 @@ export class FileImportService {
                 isActive: true,
               }),
             );
-          } else if (customer.fullName === 'Unknown' && normalised.customerName) {
+          } else if (
+            customer.fullName === 'Unknown' &&
+            normalised.customerName
+          ) {
             await this.customerRepo.update(customer.id, {
               fullName: normalised.customerName,
             });

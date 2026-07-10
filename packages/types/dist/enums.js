@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WaBusinessCategory = exports.ReportPeriodType = exports.WalletTransactionType = exports.PointsLedgerReason = exports.IntegrationSyncStatus = exports.IntegrationConnectionType = exports.SkipReason = exports.TriggerStatus = exports.TriggerType = exports.CampaignLogStatus = exports.CampaignStatus = exports.CustomerSource = exports.TransactionSource = exports.UserRole = exports.SubscriptionStatus = exports.PlanTier = exports.WaVerificationStatus = exports.TenantMode = void 0;
+exports.WaBusinessCategory = exports.ReportPeriodType = exports.WalletTransactionType = exports.PointsLedgerReason = exports.IntegrationSyncStatus = exports.IntegrationConnectionType = exports.SkipReason = exports.TriggerStatus = exports.TriggerType = exports.CampaignLogStatus = exports.CampaignStatus = exports.CustomerSource = exports.TransactionSource = exports.StaffRole = exports.UserRole = exports.SubscriptionStatus = exports.PlanTier = exports.WaVerificationStatus = exports.TenantMode = void 0;
 var TenantMode;
 (function (TenantMode) {
     TenantMode["NATIVE"] = "native";
@@ -25,6 +25,7 @@ var SubscriptionStatus;
     SubscriptionStatus["ACTIVE"] = "active";
     SubscriptionStatus["PAST_DUE"] = "past_due";
     SubscriptionStatus["SUSPENDED"] = "suspended";
+    SubscriptionStatus["CANCELLED"] = "cancelled";
 })(SubscriptionStatus || (exports.SubscriptionStatus = SubscriptionStatus = {}));
 var UserRole;
 (function (UserRole) {
@@ -32,6 +33,11 @@ var UserRole;
     UserRole["MANAGER"] = "manager";
     UserRole["CASHIER"] = "cashier";
 })(UserRole || (exports.UserRole = UserRole = {}));
+var StaffRole;
+(function (StaffRole) {
+    StaffRole["SUPER_ADMIN"] = "super_admin";
+    StaffRole["SUPPORT_AGENT"] = "support_agent";
+})(StaffRole || (exports.StaffRole = StaffRole = {}));
 var TransactionSource;
 (function (TransactionSource) {
     TransactionSource["CASHIER_APP"] = "cashier_app";
@@ -86,6 +92,7 @@ var SkipReason;
     SkipReason["NOT_OPTED_IN"] = "not_opted_in";
     SkipReason["WALLET_EMPTY"] = "wallet_empty";
     SkipReason["RECENTLY_SENT"] = "recently_sent";
+    SkipReason["WA_NOT_CONNECTED"] = "wa_not_connected";
 })(SkipReason || (exports.SkipReason = SkipReason = {}));
 var IntegrationConnectionType;
 (function (IntegrationConnectionType) {

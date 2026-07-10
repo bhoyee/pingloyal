@@ -30,6 +30,11 @@ export enum UserRole {
   CASHIER = 'cashier',
 }
 
+export enum StaffRole {
+  SUPER_ADMIN = 'super_admin',
+  SUPPORT_AGENT = 'support_agent',
+}
+
 export enum TransactionSource {
   CASHIER_APP = 'cashier_app',
   WEBHOOK = 'webhook',

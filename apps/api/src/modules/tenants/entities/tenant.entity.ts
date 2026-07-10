@@ -131,6 +131,19 @@ export class Tenant {
   @Column({ type: 'varchar', length: 64, nullable: true })
   deletionCancelToken: string | null;
 
+  // ── Staff-initiated soft delete ───────────────────────────────────────────
+  // Distinct from deletionRequestedAt above (self-service, owner-initiated)
+  // and from subscriptionStatus (billing-driven) — this is an administrative
+  // deactivation a staff member can apply or undo at any time.
+  @Column({ type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  deletedByStaffId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  deletionReason: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
