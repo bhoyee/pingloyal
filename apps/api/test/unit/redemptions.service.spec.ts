@@ -52,8 +52,8 @@ const mockEm = {
 const mockDataSource = {
   transaction: jest
     .fn()
-    .mockImplementation(
-      (cb: (em: typeof mockEm) => Promise<unknown>) => cb(mockEm),
+    .mockImplementation((cb: (em: typeof mockEm) => Promise<unknown>) =>
+      cb(mockEm),
     ),
 };
 
@@ -80,7 +80,10 @@ describe('RedemptionsService', () => {
       providers: [
         RedemptionsService,
         { provide: getDataSourceToken(), useValue: mockDataSource },
-        { provide: getRepositoryToken(Redemption), useValue: mockRedemptionRepo },
+        {
+          provide: getRepositoryToken(Redemption),
+          useValue: mockRedemptionRepo,
+        },
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: getQueueToken('wa-messages'), useValue: mockWaQueue },
       ],
@@ -95,7 +98,9 @@ describe('RedemptionsService', () => {
     mockEm.query
       .mockResolvedValueOnce([{ points_balance: '0' }]) // UPDATE RETURNING
       .mockResolvedValueOnce(undefined) // INSERT ledger
-      .mockResolvedValueOnce([{ id: REDEMPTION_ID, redeemed_at: new Date('2024-03-01') }]); // INSERT redemptions
+      .mockResolvedValueOnce([
+        { id: REDEMPTION_ID, redeemed_at: new Date('2024-03-01') },
+      ]); // INSERT redemptions
 
     const result = await service.createRedemption(TENANT_ID, CASHIER_ID, {
       customerId: CUSTOMER_ID,
@@ -148,9 +153,11 @@ describe('RedemptionsService', () => {
       rewardsToRedeem: 1,
     });
 
-    const updateSql: string = mockEm.query.mock.calls[0][0] as string;
-    expect(updateSql).toContain('points_balance >= $1');
-    expect(mockEm.query.mock.calls[0][1]).toContain(1000);
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('points_balance >= $1'),
+      expect.arrayContaining([1000]),
+    );
   });
 
   it('T5: notes are passed through to the INSERT', async () => {
@@ -165,8 +172,11 @@ describe('RedemptionsService', () => {
       notes: 'Birthday treat',
     });
 
-    const insertParams: unknown[] = mockEm.query.mock.calls[2][1] as unknown[];
-    expect(insertParams).toContain('Birthday treat');
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.arrayContaining(['Birthday treat']),
+    );
   });
 
   it('T6: cashier_id is included in the redemption INSERT', async () => {
@@ -180,8 +190,11 @@ describe('RedemptionsService', () => {
       rewardsToRedeem: 1,
     });
 
-    const insertParams: unknown[] = mockEm.query.mock.calls[2][1] as unknown[];
-    expect(insertParams).toContain(CASHIER_ID);
+    expect(mockEm.query).toHaveBeenNthCalledWith(
+      3,
+      expect.anything(),
+      expect.arrayContaining([CASHIER_ID]),
+    );
   });
 
   it('T7: queues REWARD_REDEEMED WA message after transaction commits', async () => {
@@ -268,10 +281,9 @@ describe('RedemptionsService', () => {
 
     await service.getRedemptions(TENANT_ID, { customerId: CUSTOMER_ID });
 
-    expect(mockQb.andWhere).toHaveBeenCalledWith(
-      'r.customerId = :customerId',
-      { customerId: CUSTOMER_ID },
-    );
+    expect(mockQb.andWhere).toHaveBeenCalledWith('r.customerId = :customerId', {
+      customerId: CUSTOMER_ID,
+    });
   });
 
   it('T12: caps limit at 100', async () => {
