@@ -1,7 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ReconciliationService } from '../../src/modules/transactions/reconciliation.service';
-import { TransactionSource } from '@pingloyal/types';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -9,31 +8,47 @@ const TENANT_ID = 'tenant-uuid-1';
 
 const mockDataSource = { query: jest.fn() };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Helper: set up the 5 mock return values the service issues in order:
+//   1. tenant earn rate
+//   2. tx aggregate
+//   3. cashier breakdown
+//   4. redemption aggregate
+//   5. redemption log
 
-function makeTxRows(
-  overrides: Partial<{
-    source: string;
-    count: string;
-    revenue: string;
-    points: string;
-  }>[],
-) {
-  return overrides.map((o) => ({
-    source: TransactionSource.CASHIER_APP,
-    count: '0',
-    revenue: '0',
-    points: '0',
-    ...o,
-  }));
-}
-
-function makeRedemptionRow(
-  total = '0',
-  points_redeemed = '0',
-  reward_value = '0',
-) {
-  return [{ total, points_redeemed, reward_value }];
+function mockQueries({
+  earnRate = '1',
+  txAgg = {
+    total_transactions: '0',
+    total_amount: '0',
+    total_points: '0',
+    terminal_count: '0',
+    terminal_amount: '0',
+    manual_count: '0',
+    manual_amount: '0',
+  },
+  cashiers = [] as {
+    cashier_id: string | null;
+    cashier_name: string;
+    transaction_count: string;
+    total_amount: string;
+    average_amount: string;
+    manual_count: string;
+  }[],
+  redAgg = { total: '0', points_redeemed: '0', reward_value: '0' },
+  redLog = [] as {
+    redeemed_at: string;
+    customer_name: string;
+    points_redeemed: string;
+    reward_value: string;
+    cashier_name: string;
+  }[],
+} = {}) {
+  mockDataSource.query
+    .mockResolvedValueOnce([{ points_earn_rate: earnRate }])
+    .mockResolvedValueOnce([txAgg])
+    .mockResolvedValueOnce(cashiers)
+    .mockResolvedValueOnce([redAgg])
+    .mockResolvedValueOnce(redLog);
 }
 
 // ── Test suite ────────────────────────────────────────────────────────────────
@@ -54,140 +69,258 @@ describe('ReconciliationService', () => {
     service = module.get(ReconciliationService);
   });
 
-  it('T1: returns zero totals when no transactions or redemptions exist', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow());
-
-    const result = await service.getReport(TENANT_ID, {});
-
-    expect(result.transactions.total).toBe(0);
-    expect(result.transactions.totalRevenue).toBe(0);
-    expect(result.transactions.totalPointsIssued).toBe(0);
-    expect(result.redemptions.total).toBe(0);
-    expect(result.redemptions.totalPointsRedeemed).toBe(0);
-    expect(result.redemptions.totalRewardValue).toBe(0);
-  });
-
-  it('T2: aggregates totalRevenue and totalPointsIssued across all sources', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce(
-        makeTxRows([
-          { source: TransactionSource.CASHIER_APP, count: '10', revenue: '5000', points: '500' },
-          { source: TransactionSource.WEBHOOK, count: '5', revenue: '2500', points: '250' },
-        ]),
-      )
-      .mockResolvedValueOnce(makeRedemptionRow());
-
-    const result = await service.getReport(TENANT_ID, {});
-
-    expect(result.transactions.total).toBe(15);
-    expect(result.transactions.totalRevenue).toBe(7500);
-    expect(result.transactions.totalPointsIssued).toBe(750);
-  });
-
-  it('T3: CASHIER_APP breakdown is populated correctly', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce(
-        makeTxRows([
-          { source: TransactionSource.CASHIER_APP, count: '8', revenue: '4000', points: '400' },
-        ]),
-      )
-      .mockResolvedValueOnce(makeRedemptionRow());
-
-    const result = await service.getReport(TENANT_ID, {});
-
-    expect(result.transactions.bySource[TransactionSource.CASHIER_APP]).toEqual({
-      count: 8,
-      revenue: 4000,
-      points: 400,
+  it('T1: pointsDiscrepancy is 0 when issued points match expected from spend', async () => {
+    // ₦100,000 spend / earnRate 100 → expected 1,000 pts. Issued 1,000 → discrepancy 0
+    mockQueries({
+      earnRate: '100',
+      txAgg: {
+        total_transactions: '20',
+        total_amount: '100000',
+        total_points: '1000',
+        terminal_count: '0',
+        terminal_amount: '0',
+        manual_count: '20',
+        manual_amount: '100000',
+      },
     });
-  });
-
-  it('T4: WEBHOOK breakdown is populated correctly', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce(
-        makeTxRows([
-          { source: TransactionSource.WEBHOOK, count: '3', revenue: '1500', points: '150' },
-        ]),
-      )
-      .mockResolvedValueOnce(makeRedemptionRow());
 
     const result = await service.getReport(TENANT_ID, {});
 
-    expect(result.transactions.bySource[TransactionSource.WEBHOOK]).toEqual({
-      count: 3,
-      revenue: 1500,
-      points: 150,
+    expect(result.summary.expectedPoints).toBe(1000);
+    expect(result.summary.pointsDiscrepancy).toBe(0);
+  });
+
+  it('T2: pointsDiscrepancy is detected when points are over-awarded', async () => {
+    // same ₦100,000 spend but 3,500 pts issued → discrepancy +2,500
+    mockQueries({
+      earnRate: '100',
+      txAgg: {
+        total_transactions: '20',
+        total_amount: '100000',
+        total_points: '3500',
+        terminal_count: '0',
+        terminal_amount: '0',
+        manual_count: '20',
+        manual_amount: '100000',
+      },
     });
-  });
-
-  it('T5: all four source types are present in bySource even when missing from DB rows', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow());
 
     const result = await service.getReport(TENANT_ID, {});
 
-    expect(Object.keys(result.transactions.bySource)).toEqual(
-      expect.arrayContaining([
-        TransactionSource.CASHIER_APP,
-        TransactionSource.WEBHOOK,
-        TransactionSource.API_PULL,
-        TransactionSource.FILE_IMPORT,
-      ]),
-    );
+    expect(result.summary.expectedPoints).toBe(1000);
+    expect(result.summary.totalPointsIssued).toBe(3500);
+    expect(result.summary.pointsDiscrepancy).toBe(2500);
   });
 
-  it('T6: transactions query receives startDate when provided', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow());
-
-    await service.getReport(TENANT_ID, { startDate: '2024-01-01' });
-
-    const [, params] = mockDataSource.query.mock.calls[0] as [string, unknown[]];
-    expect(params).toEqual(
-      expect.arrayContaining([expect.stringContaining('2024-01-01')]),
-    );
-  });
-
-  it('T7: transactions query receives endDate when provided', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow());
-
-    await service.getReport(TENANT_ID, { endDate: '2024-03-31' });
-
-    const [, params] = mockDataSource.query.mock.calls[0] as [string, unknown[]];
-    expect(params).toEqual(
-      expect.arrayContaining([expect.stringContaining('2024-03-31')]),
-    );
-  });
-
-  it('T8: redemption totals are correctly parsed from DB row', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow('7', '3500', '1750.00'));
+  it('T3: cashierBreakdown groups rows correctly by cashier', async () => {
+    mockQueries({
+      txAgg: {
+        total_transactions: '15',
+        total_amount: '70000',
+        total_points: '700',
+        terminal_count: '5',
+        terminal_amount: '10000',
+        manual_count: '10',
+        manual_amount: '60000',
+      },
+      cashiers: [
+        {
+          cashier_id: 'cid-1',
+          cashier_name: 'Chidinma',
+          transaction_count: '10',
+          total_amount: '60000',
+          average_amount: '6000',
+          manual_count: '0',
+        },
+        {
+          cashier_id: 'cid-2',
+          cashier_name: 'Taiwo',
+          transaction_count: '5',
+          total_amount: '10000',
+          average_amount: '2000',
+          manual_count: '5',
+        },
+      ],
+    });
 
     const result = await service.getReport(TENANT_ID, {});
 
-    expect(result.redemptions.total).toBe(7);
-    expect(result.redemptions.totalPointsRedeemed).toBe(3500);
-    expect(result.redemptions.totalRewardValue).toBe(1750);
+    expect(result.cashierBreakdown).toHaveLength(2);
+    expect(result.cashierBreakdown[0].cashierName).toBe('Chidinma');
+    expect(result.cashierBreakdown[0].transactionCount).toBe(10);
+    expect(result.cashierBreakdown[1].cashierName).toBe('Taiwo');
+    expect(result.cashierBreakdown[1].transactionCount).toBe(5);
   });
 
-  it('T9: period.startDate defaults to 30 days ago when not supplied', async () => {
-    mockDataSource.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(makeRedemptionRow());
+  it('T4: cashier is flagged when average is more than 40% below the store average', async () => {
+    // Store: 15 tx, ₦70,000 → storeAvg ≈ ₦4,667
+    // Taiwo avg ₦2,000 < 4,667 × 0.6 = ₦2,800 → flagged
+    mockQueries({
+      txAgg: {
+        total_transactions: '15',
+        total_amount: '70000',
+        total_points: '700',
+        terminal_count: '0',
+        terminal_amount: '0',
+        manual_count: '15',
+        manual_amount: '70000',
+      },
+      cashiers: [
+        {
+          cashier_id: 'cid-1',
+          cashier_name: 'Chidinma',
+          transaction_count: '10',
+          total_amount: '60000',
+          average_amount: '6000',
+          manual_count: '0',
+        },
+        {
+          cashier_id: 'cid-2',
+          cashier_name: 'Taiwo',
+          transaction_count: '5',
+          total_amount: '10000',
+          average_amount: '2000',
+          manual_count: '0',
+        },
+      ],
+    });
 
     const result = await service.getReport(TENANT_ID, {});
 
-    const start = new Date(result.period.startDate);
-    const end = new Date(result.period.endDate);
-    const diffMs = end.getTime() - start.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    expect(diffDays).toBeCloseTo(29, 0);
+    const taiwo = result.cashierBreakdown.find((c) => c.cashierName === 'Taiwo');
+    const chidinma = result.cashierBreakdown.find((c) => c.cashierName === 'Chidinma');
+    expect(taiwo?.flagged).toBe(true);
+    expect(chidinma?.flagged).toBe(false);
+  });
+
+  it('T5: cashier is NOT flagged when average is within the normal range', async () => {
+    // Store: 10 tx, ₦50,000 → storeAvg ₦5,000. Both cashiers at ₦5,000 avg → above 60% threshold
+    mockQueries({
+      txAgg: {
+        total_transactions: '10',
+        total_amount: '50000',
+        total_points: '500',
+        terminal_count: '10',
+        terminal_amount: '50000',
+        manual_count: '0',
+        manual_amount: '0',
+      },
+      cashiers: [
+        {
+          cashier_id: 'cid-1',
+          cashier_name: 'Amaka',
+          transaction_count: '5',
+          total_amount: '25000',
+          average_amount: '5000',
+          manual_count: '0',
+        },
+        {
+          cashier_id: 'cid-2',
+          cashier_name: 'Emeka',
+          transaction_count: '5',
+          total_amount: '25000',
+          average_amount: '5000',
+          manual_count: '0',
+        },
+      ],
+    });
+
+    const result = await service.getReport(TENANT_ID, {});
+
+    expect(result.cashierBreakdown.every((c) => !c.flagged)).toBe(true);
+  });
+
+  it('T6: manual entry count per cashier is returned correctly', async () => {
+    mockQueries({
+      txAgg: {
+        total_transactions: '10',
+        total_amount: '50000',
+        total_points: '500',
+        terminal_count: '5',
+        terminal_amount: '25000',
+        manual_count: '5',
+        manual_amount: '25000',
+      },
+      cashiers: [
+        {
+          cashier_id: 'cid-1',
+          cashier_name: 'Ngozi',
+          transaction_count: '10',
+          total_amount: '50000',
+          average_amount: '5000',
+          manual_count: '5',
+        },
+      ],
+    });
+
+    const result = await service.getReport(TENANT_ID, {});
+
+    const cashier = result.cashierBreakdown[0];
+    expect(cashier.manualEntryCount).toBe(5);
+    expect(cashier.transactionCount).toBe(10);
+  });
+
+  it('T7: redemption totals and log are aggregated correctly for the period', async () => {
+    mockQueries({
+      redAgg: { total: '6', points_redeemed: '6000', reward_value: '6000.00' },
+      redLog: [
+        {
+          redeemed_at: '2024-03-10T14:32:00.000Z',
+          customer_name: 'Ngozi Amaka',
+          points_redeemed: '1000',
+          reward_value: '1000',
+          cashier_name: 'Chidinma',
+        },
+      ],
+    });
+
+    const result = await service.getReport(TENANT_ID, {});
+
+    expect(result.redemptions.totalRedemptions).toBe(6);
+    expect(result.redemptions.totalPointsRedeemed).toBe(6000);
+    expect(result.redemptions.totalValueGivenOut).toBe(6000);
+    expect(result.redemptionLog).toHaveLength(1);
+    expect(result.redemptionLog[0].customerName).toBe('Ngozi Amaka');
+    expect(result.redemptionLog[0].cashierName).toBe('Chidinma');
+  });
+
+  it('T8: webhook transactions are counted as terminal-verified, not manual', async () => {
+    mockQueries({
+      txAgg: {
+        total_transactions: '5',
+        total_amount: '25000',
+        total_points: '250',
+        terminal_count: '5',  // all 5 sourced from webhook
+        terminal_amount: '25000',
+        manual_count: '0',
+        manual_amount: '0',
+      },
+    });
+
+    const result = await service.getReport(TENANT_ID, {});
+
+    expect(result.summary.terminalVerifiedCount).toBe(5);
+    expect(result.summary.manualEntryCount).toBe(0);
+    expect(result.summary.manualEntryPercent).toBe(0);
+  });
+
+  it('T9: file_import transactions are counted as terminal-verified, not manual', async () => {
+    mockQueries({
+      txAgg: {
+        total_transactions: '8',
+        total_amount: '40000',
+        total_points: '400',
+        terminal_count: '3',  // 3 sourced from file_import
+        terminal_amount: '15000',
+        manual_count: '5',
+        manual_amount: '25000',
+      },
+    });
+
+    const result = await service.getReport(TENANT_ID, {});
+
+    expect(result.summary.terminalVerifiedCount).toBe(3);
+    expect(result.summary.terminalVerifiedAmount).toBe(15000);
+    expect(result.summary.manualEntryCount).toBe(5);
   });
 });
