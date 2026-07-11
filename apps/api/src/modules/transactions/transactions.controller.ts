@@ -76,18 +76,9 @@ export class TransactionsController {
     return this.txService.findAll(user.tenantId, query);
   }
 
-  // ── GET /transactions/:id ───────────────────────────────────────────────────
-
-  @Get('transactions/:id')
-  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
-  findById(
-    @CurrentUser() user: RequestUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.txService.findById(user.tenantId, id);
-  }
-
   // ── GET /transactions/reconciliation ───────────────────────────────────────
+  // Must be declared before /transactions/:id so Express matches the literal
+  // path segment "reconciliation" before the :id wildcard catches it.
 
   @Get('transactions/reconciliation')
   @Roles(UserRole.OWNER)
@@ -100,6 +91,17 @@ export class TransactionsController {
       startDate,
       endDate,
     });
+  }
+
+  // ── GET /transactions/:id ───────────────────────────────────────────────────
+
+  @Get('transactions/:id')
+  @Roles(UserRole.OWNER, UserRole.MANAGER, UserRole.CASHIER)
+  findById(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.txService.findById(user.tenantId, id);
   }
 
   // ── GET /customers/:customerId/transactions ─────────────────────────────────
