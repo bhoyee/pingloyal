@@ -94,14 +94,14 @@ function CancelledOverlay() {
 function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-white px-4 py-3 text-center text-xs text-slate-400 sm:px-6">
-      Powered by{' '}
+      © {new Date().getFullYear()} – Developed by{' '}
       <a
         href="https://salisu.dev"
         target="_blank"
         rel="noopener noreferrer"
-        className="font-medium text-slate-500 hover:underline"
+        className="font-bold hover:underline"
       >
-        Bhoyee · salisu.dev
+        salisu.dev
       </a>
     </footer>
   );
