@@ -77,7 +77,7 @@ export default function ReconciliationPage() {
 
   const { startDate, endDate } = getDateRange(preset, custom);
 
-  const { data, isLoading, isError } = useQuery<ReconciliationResult>({
+  const { data, isLoading, isError, error } = useQuery<ReconciliationResult>({
     queryKey: ['reconciliation', startDate, endDate],
     queryFn: () =>
       api.get<ReconciliationResult>(
@@ -162,8 +162,11 @@ export default function ReconciliationPage() {
 
       {/* Error */}
       {isError && !isLoading && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-600">
-          Failed to load reconciliation report. Please try again.
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
+          <p className="font-semibold">Failed to load reconciliation report.</p>
+          {error instanceof Error && (
+            <p className="mt-1 font-mono text-xs text-red-500">{error.message}</p>
+          )}
         </div>
       )}
 

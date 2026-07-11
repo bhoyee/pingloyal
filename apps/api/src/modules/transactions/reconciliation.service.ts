@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DateTime } from 'luxon';
@@ -34,41 +34,48 @@ const EMPTY_BREAKDOWN: SourceBreakdown = { count: 0, revenue: 0, points: 0 };
 
 @Injectable()
 export class ReconciliationService {
+  private readonly logger = new Logger(ReconciliationService.name);
+
   constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async getReport(
     tenantId: string,
     query: ReconciliationQuery,
   ): Promise<ReconciliationResult> {
-    const endDate = query.endDate
-      ? DateTime.fromISO(query.endDate).endOf('day').toISO()!
-      : DateTime.now().endOf('day').toISO();
-    const startDate = query.startDate
-      ? DateTime.fromISO(query.startDate).startOf('day').toISO()!
-      : DateTime.now().minus({ days: 29 }).startOf('day').toISO();
+    const end = query.endDate
+      ? DateTime.fromISO(query.endDate).endOf('day')
+      : DateTime.now().endOf('day');
+    const start = query.startDate
+      ? DateTime.fromISO(query.startDate).startOf('day')
+      : DateTime.now().minus({ days: 29 }).startOf('day');
 
-    const [txRows, redemptionRow] = await Promise.all([
-      this.dataSource.query<
-        { source: string; count: string; revenue: string; points: string }[]
-      >(
-        `SELECT
-           source,
-           COUNT(*) AS count,
-           COALESCE(SUM(amount), 0)        AS revenue,
-           COALESCE(SUM(points_earned), 0) AS points
-         FROM transactions
-         WHERE tenant_id = $1
-           AND created_at >= $2
-           AND created_at <= $3
-         GROUP BY source`,
-        [tenantId, startDate, endDate],
-      ),
-      this.dataSource.query<
-        {
-          total: string;
-          points_redeemed: string;
-          reward_value: string;
-        }[]
+    const endIso = end.toISO() ?? end.toFormat("yyyy-MM-dd'T'HH:mm:ss");
+    const startIso = start.toISO() ?? start.toFormat("yyyy-MM-dd'T'HH:mm:ss");
+
+    const txRows = await this.dataSource.query<
+      { source: string; count: string; revenue: string; points: string }[]
+    >(
+      `SELECT
+         source,
+         COUNT(*)                        AS count,
+         COALESCE(SUM(amount), 0)        AS revenue,
+         COALESCE(SUM(points_earned), 0) AS points
+       FROM transactions
+       WHERE tenant_id = $1
+         AND created_at >= $2
+         AND created_at <= $3
+       GROUP BY source`,
+      [tenantId, startIso, endIso],
+    );
+
+    let redemptionTotals = {
+      total: 0,
+      totalPointsRedeemed: 0,
+      totalRewardValue: 0,
+    };
+    try {
+      const rows = await this.dataSource.query<
+        { total: string; points_redeemed: string; reward_value: string }[]
       >(
         `SELECT
            COUNT(*)                          AS total,
@@ -78,9 +85,21 @@ export class ReconciliationService {
          WHERE tenant_id = $1
            AND redeemed_at >= $2
            AND redeemed_at <= $3`,
-        [tenantId, startDate, endDate],
-      ),
-    ]);
+        [tenantId, startIso, endIso],
+      );
+      const r = rows[0];
+      if (r) {
+        redemptionTotals = {
+          total: parseInt(r.total, 10),
+          totalPointsRedeemed: parseInt(r.points_redeemed, 10),
+          totalRewardValue: Number(r.reward_value),
+        };
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Redemptions query failed for tenant=${tenantId}: ${String(err)}`,
+      );
+    }
 
     const bySource: Record<TransactionSource, SourceBreakdown> = {
       [TransactionSource.CASHIER_APP]: { ...EMPTY_BREAKDOWN },
@@ -106,16 +125,10 @@ export class ReconciliationService {
       }
     }
 
-    const r = redemptionRow[0] ?? {
-      total: '0',
-      points_redeemed: '0',
-      reward_value: '0',
-    };
-
     return {
       period: {
-        startDate: DateTime.fromISO(startDate).toISODate()!,
-        endDate: DateTime.fromISO(endDate).toISODate()!,
+        startDate: start.toISODate() ?? start.toFormat('yyyy-MM-dd'),
+        endDate: end.toISODate() ?? end.toFormat('yyyy-MM-dd'),
       },
       transactions: {
         total: totalTx,
@@ -123,11 +136,7 @@ export class ReconciliationService {
         totalPointsIssued: totalPoints,
         bySource,
       },
-      redemptions: {
-        total: parseInt(r.total, 10),
-        totalPointsRedeemed: parseInt(r.points_redeemed, 10),
-        totalRewardValue: Number(r.reward_value),
-      },
+      redemptions: redemptionTotals,
     };
   }
 }
