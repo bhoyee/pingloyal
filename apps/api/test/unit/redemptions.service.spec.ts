@@ -1,9 +1,8 @@
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
+import { getDataSourceToken } from '@nestjs/typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { RedemptionsService } from '../../src/modules/redemptions/redemptions.service';
-import { Redemption } from '../../src/modules/redemptions/entities/redemption.entity';
 import { TenantsService } from '../../src/modules/tenants/tenants.service';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -20,34 +19,14 @@ const mockTenant = {
   businessName: 'Test Store',
 };
 
-// ── QueryBuilder mock ─────────────────────────────────────────────────────────
-
-const mockQb = {
-  leftJoin: jest.fn().mockReturnThis(),
-  addSelect: jest.fn().mockReturnThis(),
-  where: jest.fn().mockReturnThis(),
-  andWhere: jest.fn().mockReturnThis(),
-  orderBy: jest.fn().mockReturnThis(),
-  take: jest.fn().mockReturnThis(),
-  skip: jest.fn().mockReturnThis(),
-  select: jest.fn().mockReturnThis(),
-  getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-  getRawOne: jest.fn().mockResolvedValue({
-    totalRedemptions: '0',
-    totalPointsRedeemed: '0',
-    totalValue: '0',
-  }),
-};
-
-const mockRedemptionRepo = {
-  createQueryBuilder: jest.fn().mockReturnValue(mockQb),
-};
-
-// ── DataSource / EntityManager mock ──────────────────────────────────────────
+// ── EntityManager mock (used inside transaction callback) ─────────────────────
 
 const mockEm = {
   query: jest.fn(),
 };
+
+// ── DataSource mock ────────────────────────────────────────────────────────────
+// `transaction` is used by createRedemption; `query` is used by getRedemptions/getStats
 
 const mockDataSource = {
   transaction: jest
@@ -55,6 +34,7 @@ const mockDataSource = {
     .mockImplementation((cb: (em: typeof mockEm) => Promise<unknown>) =>
       cb(mockEm),
     ),
+  query: jest.fn(),
 };
 
 const mockTenantsService = {
@@ -72,7 +52,6 @@ describe('RedemptionsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockRedemptionRepo.createQueryBuilder.mockReturnValue(mockQb);
     mockTenantsService.findOne.mockResolvedValue(mockTenant);
     mockWaQueue.add.mockResolvedValue({ id: 'job-1' });
 
@@ -80,10 +59,6 @@ describe('RedemptionsService', () => {
       providers: [
         RedemptionsService,
         { provide: getDataSourceToken(), useValue: mockDataSource },
-        {
-          provide: getRepositoryToken(Redemption),
-          useValue: mockRedemptionRepo,
-        },
         { provide: TenantsService, useValue: mockTenantsService },
         { provide: getQueueToken('wa-messages'), useValue: mockWaQueue },
       ],
@@ -234,9 +209,14 @@ describe('RedemptionsService', () => {
   });
 
   // ── getRedemptions ──────────────────────────────────────────────────────────
+  // Service now uses dataSource.query() with two sequential raw SQL calls:
+  //   call 1 → COUNT query  → [{ count: string }]
+  //   call 2 → DATA query   → RawRow[]
 
   it('T9: returns empty list when no redemptions exist', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce([]);
 
     const result = await service.getRedemptions(TENANT_ID, {});
 
@@ -244,23 +224,24 @@ describe('RedemptionsService', () => {
     expect(result.total).toBe(0);
   });
 
-  it('T10: maps a redemption row with cashierName from join', async () => {
+  it('T10: maps a raw row to camelCase RedemptionRow including cashierName', async () => {
     const now = new Date('2024-03-01T12:00:00Z');
-    mockQb.getManyAndCount.mockResolvedValueOnce([
-      [
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '1' }])
+      .mockResolvedValueOnce([
         {
           id: REDEMPTION_ID,
-          customerId: CUSTOMER_ID,
-          redeemedAt: now,
-          pointsRedeemed: 1000,
-          rewardsCount: 1,
+          customer_id: CUSTOMER_ID,
+          customer_name: 'Ada Okonkwo',
+          customer_phone: '+2348012345678',
+          redeemed_at: now.toISOString(),
+          points_redeemed: '1000',
+          rewards_count: '1',
           value: '500.00',
-          balanceAfter: 0,
-          cashier: { fullName: 'Ada Okonkwo' },
+          balance_after: '0',
+          cashier_name: 'Ada Okonkwo',
         },
-      ],
-      1,
-    ]);
+      ]);
 
     const result = await service.getRedemptions(TENANT_ID, {});
 
@@ -277,48 +258,60 @@ describe('RedemptionsService', () => {
   });
 
   it('T11: filters by customerId when provided', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce([]);
 
     await service.getRedemptions(TENANT_ID, { customerId: CUSTOMER_ID });
 
-    expect(mockQb.andWhere).toHaveBeenCalledWith('r.customerId = :customerId', {
-      customerId: CUSTOMER_ID,
-    });
+    expect(mockDataSource.query).toHaveBeenCalledWith(
+      expect.stringContaining('r.customer_id = $'),
+      expect.arrayContaining([CUSTOMER_ID]),
+    );
   });
 
   it('T12: caps limit at 100', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce([]);
 
     await service.getRedemptions(TENANT_ID, { limit: 999 });
 
-    expect(mockQb.take).toHaveBeenCalledWith(100);
+    // Second call is the DATA query; its params array contains [tenantId, 100, offset]
+    const dataParams = mockDataSource.query.mock.calls[1][1] as unknown[];
+    expect(dataParams).toContain(100);
   });
 
-  it('T13: paginates with page and limit', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([[], 0]);
+  it('T13: paginates — offset equals (page-1)*limit', async () => {
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '0' }])
+      .mockResolvedValueOnce([]);
 
     await service.getRedemptions(TENANT_ID, { page: 2, limit: 5 });
 
-    expect(mockQb.take).toHaveBeenCalledWith(5);
-    expect(mockQb.skip).toHaveBeenCalledWith(5);
+    const dataParams = mockDataSource.query.mock.calls[1][1] as unknown[];
+    // params = [tenantId, limit=5, offset=5]
+    expect(dataParams).toContain(5); // limit
+    expect(dataParams[dataParams.length - 1]).toBe(5); // offset = (2-1)*5
   });
 
-  it('T14: cashierName is null when cashier relation is missing', async () => {
-    mockQb.getManyAndCount.mockResolvedValueOnce([
-      [
+  it('T14: cashierName is null when no cashier is linked', async () => {
+    mockDataSource.query
+      .mockResolvedValueOnce([{ count: '1' }])
+      .mockResolvedValueOnce([
         {
           id: REDEMPTION_ID,
-          customerId: CUSTOMER_ID,
-          redeemedAt: new Date(),
-          pointsRedeemed: 1000,
-          rewardsCount: 1,
+          customer_id: CUSTOMER_ID,
+          customer_name: 'Ada Okonkwo',
+          customer_phone: '',
+          redeemed_at: new Date().toISOString(),
+          points_redeemed: '1000',
+          rewards_count: '1',
           value: '500.00',
-          balanceAfter: 0,
-          cashier: null,
+          balance_after: '0',
+          cashier_name: null,
         },
-      ],
-      1,
-    ]);
+      ]);
 
     const result = await service.getRedemptions(TENANT_ID, {});
 
@@ -326,13 +319,12 @@ describe('RedemptionsService', () => {
   });
 
   // ── getStats ────────────────────────────────────────────────────────────────
+  // Service calls dataSource.query() once → [{ total, pts, val }]
 
   it('T15: returns zero stats when no redemptions exist', async () => {
-    mockQb.getRawOne.mockResolvedValueOnce({
-      totalRedemptions: '0',
-      totalPointsRedeemed: '0',
-      totalValue: '0',
-    });
+    mockDataSource.query.mockResolvedValueOnce([
+      { total: '0', pts: '0', val: '0' },
+    ]);
 
     const result = await service.getStats(TENANT_ID, {});
 
@@ -344,11 +336,9 @@ describe('RedemptionsService', () => {
   });
 
   it('T16: aggregates totalRedemptions, totalPointsRedeemed, totalValue', async () => {
-    mockQb.getRawOne.mockResolvedValueOnce({
-      totalRedemptions: '5',
-      totalPointsRedeemed: '5000',
-      totalValue: '2500.00',
-    });
+    mockDataSource.query.mockResolvedValueOnce([
+      { total: '5', pts: '5000', val: '2500.00' },
+    ]);
 
     const result = await service.getStats(TENANT_ID, {});
 
