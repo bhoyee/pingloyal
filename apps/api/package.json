@@ -27,7 +27,8 @@
     "migration:revert": "typeorm migration:revert -d dist/database/data-source.js",
     "seed:jadefy": "ts-node -r tsconfig-paths/register src/database/seeds/seed-jadefy.ts",
     "seed:jadefy:redemptions": "ts-node -r tsconfig-paths/register src/database/seeds/seed-jadefy-redemptions.ts",
-    "seed:staff": "ts-node -r tsconfig-paths/register src/database/seeds/seed-staff.ts"
+    "seed:staff": "ts-node -r tsconfig-paths/register src/database/seeds/seed-staff.ts",
+    "seed:jadefy:reconciliation": "ts-node -r tsconfig-paths/register src/database/seeds/seed-jadefy-reconciliation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",

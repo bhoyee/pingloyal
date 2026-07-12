@@ -22,6 +22,7 @@ import {
   LogOut,
   X,
   ShieldCheck,
+  Gift,
   type LucideIcon,
 } from 'lucide-react';
 import { api, type TenantMe } from '@/lib/api';
@@ -63,6 +64,7 @@ const NATIVE_MODE: NavItem[] = [
 
 const INTEGRITY: NavItem[] = [
   { href: '/reconciliation', icon: ShieldCheck, label: 'Reconciliation' },
+  { href: '/redemptions', icon: Gift, label: 'Redemptions' },
 ];
 
 const SETTINGS: NavItem[] = [

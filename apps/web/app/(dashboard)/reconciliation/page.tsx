@@ -113,6 +113,8 @@ function exportRedemptionCsv(log: RedemptionLogEntry[], period: { start: string;
   URL.revokeObjectURL(url);
 }
 
+const RED_LOG_PAGE_SIZE = 10;
+
 export default function ReconciliationPage() {
   const [preset, setPreset] = useState<DatePreset>('today');
   const [custom, setCustom] = useState({
@@ -120,6 +122,7 @@ export default function ReconciliationPage() {
     end: format(new Date(), 'yyyy-MM-dd'),
   });
   const [howToOpen, setHowToOpen] = useState(false);
+  const [redPage, setRedPage] = useState(1);
 
   const { startDate, endDate } = getDateRange(preset, custom);
 
@@ -197,17 +200,6 @@ export default function ReconciliationPage() {
         )}
       </div>
 
-      {/* ── Loading ───────────────────────────────────────────────────────── */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-24 text-slate-400" role="status">
-          <svg className="mr-2 h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          Loading report…
-        </div>
-      )}
-
       {/* ── Error ─────────────────────────────────────────────────────────── */}
       {isError && !isLoading && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
@@ -219,17 +211,29 @@ export default function ReconciliationPage() {
       )}
 
       {/* ── Report ────────────────────────────────────────────────────────── */}
-      {data && !isLoading && (
+      {(data || isLoading) && !isError && (
         <div className="space-y-6">
 
           {/* ── Section 1: Summary overview ──────────────────────────────── */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Transactions" value={fmt(data.summary.totalTransactions)} />
-            <StatCard label="Total Spend" value={fmtCurrency(data.summary.totalAmountLogged)} />
-            <StatCard label="Points Issued" value={fmt(data.summary.totalPointsIssued)} />
-            <StatCard label="Rewards Given" value={fmtCurrency(data.redemptions.totalValueGivenOut)} />
+            {isLoading ? (
+              <>
+                <SkeletonStatCard />
+                <SkeletonStatCard />
+                <SkeletonStatCard />
+                <SkeletonStatCard />
+              </>
+            ) : (
+              <>
+                <StatCard label="Transactions" value={fmt(data!.summary.totalTransactions)} />
+                <StatCard label="Total Spend" value={fmtCurrency(data!.summary.totalAmountLogged)} />
+                <StatCard label="Points Issued" value={fmt(data!.summary.totalPointsIssued)} />
+                <StatCard label="Rewards Given" value={fmtCurrency(data!.redemptions.totalValueGivenOut)} />
+              </>
+            )}
           </div>
 
+          {data && (<>
           {/* Points integrity card */}
           <PointsIntegrityCard
             discrepancy={data.summary.pointsDiscrepancy}
@@ -378,18 +382,26 @@ export default function ReconciliationPage() {
 
           {/* ── Section 3: Redemption log ─────────────────────────────────── */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold text-slate-800">
                 Rewards redeemed this period
               </h2>
-              {data.redemptionLog.length > 0 && (
-                <button
-                  onClick={() => exportRedemptionCsv(data.redemptionLog, data.period)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              <div className="flex items-center gap-2">
+                {data.redemptionLog.length > 0 && (
+                  <button
+                    onClick={() => exportRedemptionCsv(data.redemptionLog, data.period)}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    Export CSV
+                  </button>
+                )}
+                <a
+                  href="/redemptions"
+                  className="rounded-lg border border-[#0DC56A]/40 bg-[#0DC56A]/5 px-3 py-1.5 text-xs font-medium text-[#0a9f54] hover:bg-[#0DC56A]/10"
                 >
-                  Export Redemption Log CSV
-                </button>
-              )}
+                  View all redemptions →
+                </a>
+              </div>
             </div>
 
             {data.redemptionLog.length === 0 ? (
@@ -415,46 +427,98 @@ export default function ReconciliationPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {data.redemptionLog.map((row, idx) => (
-                        <tr key={idx}>
-                          <td className="py-3 pr-4 text-slate-500">
-                            {new Date(row.redeemedAt).toLocaleString('en-NG', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </td>
-                          <td className="py-3 pr-4 font-medium text-slate-700">
-                            {row.customerName}
-                          </td>
-                          <td className="py-3 pr-4 text-right text-slate-600">
-                            {fmt(row.pointsRedeemed)} pts
-                          </td>
-                          <td className="py-3 pr-4 text-right text-slate-600">
-                            ₦{row.rewardValue.toLocaleString()}
-                          </td>
-                          <td className="py-3 text-slate-600">{row.cashierName}</td>
-                        </tr>
-                      ))}
+                      {data.redemptionLog
+                        .slice((redPage - 1) * RED_LOG_PAGE_SIZE, redPage * RED_LOG_PAGE_SIZE)
+                        .map((row, idx) => (
+                          <tr key={idx}>
+                            <td className="py-3 pr-4 text-slate-500">
+                              {new Date(row.redeemedAt).toLocaleString('en-NG', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </td>
+                            <td className="py-3 pr-4 font-medium text-slate-700">
+                              {row.customerName}
+                            </td>
+                            <td className="py-3 pr-4 text-right text-slate-600">
+                              {fmt(row.pointsRedeemed)} pts
+                            </td>
+                            <td className="py-3 pr-4 text-right text-slate-600">
+                              ₦{row.rewardValue.toLocaleString()}
+                            </td>
+                            <td className="py-3 text-slate-600">{row.cashierName}</td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination controls */}
+                {data.redemptionLog.length > RED_LOG_PAGE_SIZE && (
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+                    <span>
+                      Showing {((redPage - 1) * RED_LOG_PAGE_SIZE) + 1}–
+                      {Math.min(redPage * RED_LOG_PAGE_SIZE, data.redemptionLog.length)} of{' '}
+                      {data.redemptionLog.length}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setRedPage((p) => Math.max(1, p - 1))}
+                        disabled={redPage === 1}
+                        className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        ← Prev
+                      </button>
+                      {Array.from(
+                        { length: Math.ceil(data.redemptionLog.length / RED_LOG_PAGE_SIZE) },
+                        (_, i) => i + 1,
+                      ).map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setRedPage(n)}
+                          className={`rounded px-2.5 py-1 font-medium ${
+                            n === redPage
+                              ? 'bg-[#0DC56A] text-white'
+                              : 'hover:bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() =>
+                          setRedPage((p) =>
+                            Math.min(Math.ceil(data.redemptionLog.length / RED_LOG_PAGE_SIZE), p + 1),
+                          )
+                        }
+                        disabled={redPage * RED_LOG_PAGE_SIZE >= data.redemptionLog.length}
+                        className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
 
           {/* ── Section 4: How to use this data ─────────────────────────── */}
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 shadow-sm">
             <button
               onClick={() => setHowToOpen((v) => !v)}
               className="flex w-full items-center justify-between p-5 text-left"
             >
-              <span className="text-sm font-semibold text-slate-700">
+              <span className="flex items-center gap-2.5 text-sm font-semibold text-amber-900">
+                <span className="inline-flex shrink-0 items-center rounded-md bg-amber-500 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-white">
+                  NOTE
+                </span>
                 How to use this report with your existing POS / till system
               </span>
               <svg
-                className={`h-4 w-4 text-slate-400 transition-transform ${howToOpen ? 'rotate-180' : ''}`}
+                className={`h-4 w-4 shrink-0 text-amber-500 transition-transform ${howToOpen ? 'rotate-180' : ''}`}
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -467,8 +531,8 @@ export default function ReconciliationPage() {
             </button>
 
             {howToOpen && (
-              <div className="border-t border-slate-100 p-5 text-sm text-slate-600">
-                <ol className="space-y-3 list-decimal list-inside">
+              <div className="border-t border-amber-200 p-5 text-sm text-amber-900">
+                <ol className="list-decimal list-inside space-y-3">
                   <li>
                     Compare total rewards redeemed (
                     <span className="font-semibold">
@@ -488,6 +552,7 @@ export default function ReconciliationPage() {
               </div>
             )}
           </div>
+          </>)}
         </div>
       )}
     </div>
@@ -496,11 +561,20 @@ export default function ReconciliationPage() {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
+function SkeletonStatCard() {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+      <div className="mt-3 h-8 w-28 animate-pulse rounded-lg bg-slate-200" />
+    </div>
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900 animate-fade-in-up">{value}</p>
     </div>
   );
 }
