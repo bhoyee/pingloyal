@@ -190,7 +190,7 @@ export default function RedemptionsPage() {
 
       {/* ── Summary stats ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md cursor-default">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Total Redemptions
           </p>
@@ -202,7 +202,7 @@ export default function RedemptionsPage() {
             </p>
           )}
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md cursor-default">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Points Redeemed
           </p>
@@ -214,7 +214,7 @@ export default function RedemptionsPage() {
             </p>
           )}
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#0DC56A]/30 hover:shadow-md cursor-default">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Total Value Given Out
           </p>
@@ -416,8 +416,14 @@ export default function RedemptionsPage() {
                           <td className="px-5 py-3.5 text-right text-slate-500">
                             {fmt(row.balanceAfter)} pts
                           </td>
-                          <td className="px-5 py-3.5 text-slate-600">
-                            {row.cashierName ?? <span className="text-slate-300">—</span>}
+                          <td className="px-5 py-3.5">
+                            {row.cashierName ? (
+                              <span className="text-xs font-medium text-indigo-400">
+                                {row.cashierName}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-300">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
