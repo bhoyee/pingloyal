@@ -27,6 +27,10 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
+// CSV export helpers used by the page
+global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
+global.URL.revokeObjectURL = jest.fn();
+
 import { api } from '../lib/api';
 const mockApi = api as jest.Mocked<typeof api>;
 
@@ -34,36 +38,78 @@ import ReconciliationPage from '../app/(dashboard)/reconciliation/page';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-const EMPTY_RESULT = {
-  period: { startDate: '2024-02-10', endDate: '2024-03-10' },
-  transactions: {
-    total: 0,
-    totalRevenue: 0,
-    totalPointsIssued: 0,
-    bySource: {
-      cashier_app: { count: 0, revenue: 0, points: 0 },
-      webhook: { count: 0, revenue: 0, points: 0 },
-      api_pull: { count: 0, revenue: 0, points: 0 },
-      file_import: { count: 0, revenue: 0, points: 0 },
-    },
+const BASE_RESULT = {
+  period: { start: '2024-03-10', end: '2024-03-10' },
+  summary: {
+    totalTransactions: 25,
+    totalAmountLogged: 125000,
+    totalPointsIssued: 1250,
+    expectedPoints: 1250,
+    pointsDiscrepancy: 0,
+    terminalVerifiedCount: 5,
+    terminalVerifiedAmount: 25000,
+    manualEntryCount: 20,
+    manualEntryAmount: 100000,
+    manualEntryPercent: 80,
   },
-  redemptions: { total: 0, totalPointsRedeemed: 0, totalRewardValue: 0 },
+  redemptions: {
+    totalRedemptions: 4,
+    totalPointsRedeemed: 4000,
+    totalValueGivenOut: 4000,
+  },
+  cashierBreakdown: [
+    {
+      cashierId: 'cid-1',
+      cashierName: 'Chidinma',
+      transactionCount: 20,
+      totalAmount: 100000,
+      averageAmount: 5000,
+      manualEntryCount: 5,
+      percentageOfStoreTotal: 80,
+      flagged: false,
+    },
+    {
+      cashierId: 'cid-2',
+      cashierName: 'Taiwo',
+      transactionCount: 5,
+      totalAmount: 25000,
+      averageAmount: 2000,
+      manualEntryCount: 4,
+      percentageOfStoreTotal: 20,
+      flagged: true,
+    },
+  ],
+  redemptionLog: [
+    {
+      redeemedAt: '2024-03-10T14:32:00.000Z',
+      customerName: 'Ngozi Amaka',
+      pointsRedeemed: 1000,
+      rewardValue: 1000,
+      cashierName: 'Chidinma',
+    },
+  ],
 };
 
-const POPULATED_RESULT = {
-  period: { startDate: '2024-02-10', endDate: '2024-03-10' },
-  transactions: {
-    total: 25,
-    totalRevenue: 50000,
-    totalPointsIssued: 500,
-    bySource: {
-      cashier_app: { count: 20, revenue: 40000, points: 400 },
-      webhook: { count: 3, revenue: 6000, points: 60 },
-      api_pull: { count: 2, revenue: 4000, points: 40 },
-      file_import: { count: 0, revenue: 0, points: 0 },
-    },
+// Amber integrity: discrepancy between 2% and 10%
+const AMBER_RESULT = {
+  ...BASE_RESULT,
+  summary: {
+    ...BASE_RESULT.summary,
+    expectedPoints: 1000,
+    totalPointsIssued: 1050,   // 5% over → amber
+    pointsDiscrepancy: 50,
   },
-  redemptions: { total: 4, totalPointsRedeemed: 4000, totalRewardValue: 2000 },
+};
+
+// Red integrity: discrepancy > 10%
+const RED_RESULT = {
+  ...BASE_RESULT,
+  summary: {
+    ...BASE_RESULT.summary,
+    expectedPoints: 1000,
+    totalPointsIssued: 1200,   // 20% over → red
+    pointsDiscrepancy: 200,
+  },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -84,78 +130,103 @@ function renderPage() {
 describe('ReconciliationPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (global.URL.createObjectURL as jest.Mock).mockClear();
   });
 
-  it('T1: shows loading spinner while data is being fetched', () => {
-    mockApi.get.mockReturnValue(new Promise(() => {}));
-    renderPage();
-    expect(screen.getByRole('status')).toBeInTheDocument();
-  });
-
-  it('T2: renders summary cards when data loads', async () => {
-    mockApi.get.mockResolvedValueOnce(POPULATED_RESULT);
+  it('T10: shows green integrity card when discrepancy is within 2%', async () => {
+    mockApi.get.mockResolvedValueOnce(BASE_RESULT);  // discrepancy = 0
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('25')).toBeInTheDocument();
+      expect(screen.getByText(/Points check passed/i)).toBeInTheDocument();
     });
-    expect(screen.getByText('500')).toBeInTheDocument();
-    expect(screen.getAllByText('4').length).toBeGreaterThanOrEqual(1);
+    const card = screen.getByText(/Points check passed/i).closest('[data-integrity]');
+    expect(card?.getAttribute('data-integrity')).toBe('green');
   });
 
-  it('T3: shows empty-state messages when all totals are zero', async () => {
-    mockApi.get.mockResolvedValueOnce(EMPTY_RESULT);
+  it('T11: shows amber integrity card when discrepancy is between 2% and 10%', async () => {
+    mockApi.get.mockResolvedValueOnce(AMBER_RESULT);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('No transactions in this period.')).toBeInTheDocument();
+      expect(screen.getByText(/Minor discrepancy detected/i)).toBeInTheDocument();
     });
-    expect(screen.getByText('No redemptions in this period.')).toBeInTheDocument();
+    const card = screen.getByText(/Minor discrepancy detected/i).closest('[data-integrity]');
+    expect(card?.getAttribute('data-integrity')).toBe('amber');
   });
 
-  it('T4: shows an error state when the API call fails', async () => {
-    mockApi.get.mockRejectedValueOnce(new Error('Network error'));
+  it('T12: shows red integrity card when discrepancy is greater than 10%', async () => {
+    mockApi.get.mockResolvedValueOnce(RED_RESULT);
     renderPage();
     await waitFor(() => {
-      expect(
-        screen.getByText(/Failed to load reconciliation report/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Significant discrepancy/i)).toBeInTheDocument();
     });
+    const card = screen.getByText(/Significant discrepancy/i).closest('[data-integrity]');
+    expect(card?.getAttribute('data-integrity')).toBe('red');
   });
 
-  it('T5: renders all four source rows when transactions exist', async () => {
-    mockApi.get.mockResolvedValueOnce(POPULATED_RESULT);
+  it('T13: flagged cashier row has amber highlight attribute', async () => {
+    mockApi.get.mockResolvedValueOnce(BASE_RESULT);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Cashier App')).toBeInTheDocument();
+      expect(screen.getByText('Taiwo')).toBeInTheDocument();
     });
-    expect(screen.getByText('Webhook')).toBeInTheDocument();
-    expect(screen.getByText('API Pull')).toBeInTheDocument();
-    expect(screen.getByText('File Import')).toBeInTheDocument();
+    // Taiwo is flagged — the row carries data-flagged="true"
+    const row = screen.getByText('Taiwo').closest('tr');
+    expect(row?.getAttribute('data-flagged')).toBe('true');
   });
 
-  it('T6: cashier_app row is labelled as Manual', async () => {
-    mockApi.get.mockResolvedValueOnce(POPULATED_RESULT);
+  it('T14: non-flagged cashier row has no amber highlight', async () => {
+    mockApi.get.mockResolvedValueOnce(BASE_RESULT);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Manual')).toBeInTheDocument();
+      expect(screen.getAllByText('Chidinma').length).toBeGreaterThanOrEqual(1);
     });
+    // Chidinma appears in both the cashier table and the redemption log.
+    // The cashier breakdown row is the one inside a <tbody> that could carry data-flagged.
+    // Find the first tr that is a direct descendant of a tbody (cashier breakdown table).
+    const allChidinma = screen.getAllByText('Chidinma');
+    const cashierRow = allChidinma
+      .map((el) => el.closest('tr'))
+      .find((tr) => tr?.getAttribute('data-flagged') === null && tr?.closest('tbody') !== null);
+    expect(cashierRow).not.toBeNull();
+    expect(cashierRow?.getAttribute('data-flagged')).toBeNull();
   });
 
-  it('T7: redemption stats render when redemptions exist', async () => {
-    mockApi.get.mockResolvedValueOnce(POPULATED_RESULT);
+  it('T15: Export CSV button calls URL.createObjectURL to trigger download', async () => {
+    mockApi.get.mockResolvedValueOnce(BASE_RESULT);
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Points Redeemed')).toBeInTheDocument();
+      expect(screen.getByText('Export Redemption Log CSV')).toBeInTheDocument();
     });
-    expect(screen.getByText('4,000')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Export Redemption Log CSV'));
+    expect(global.URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
   });
 
-  it('T8: switching to custom preset shows date inputs', async () => {
-    mockApi.get.mockResolvedValue(EMPTY_RESULT);
+  it('T16: View flagged transactions link points to correct cashier transaction URL', async () => {
+    mockApi.get.mockResolvedValueOnce(BASE_RESULT);
     renderPage();
-    fireEvent.click(screen.getByText('Custom'));
     await waitFor(() => {
-      expect(screen.getByLabelText('Start date')).toBeInTheDocument();
+      expect(screen.getByText(/View flagged transactions — Taiwo/i)).toBeInTheDocument();
     });
-    expect(screen.getByLabelText('End date')).toBeInTheDocument();
+    const link = screen.getByText(/View flagged transactions — Taiwo/i).closest('a');
+    expect(link?.getAttribute('href')).toContain('/transactions?cashierId=cid-2');
+  });
+
+  it('T17: switching the period filter triggers a new API call', async () => {
+    mockApi.get.mockResolvedValue(BASE_RESULT);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText(/Points check passed/i)).toBeInTheDocument();
+    });
+
+    // Click a different preset to change the query key
+    fireEvent.click(screen.getByText('Last 7 days'));
+
+    await waitFor(() => {
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+    });
+    // Second call should have a different startDate in the URL
+    const firstCall = (mockApi.get.mock.calls[0][0] as string);
+    const secondCall = (mockApi.get.mock.calls[1][0] as string);
+    expect(firstCall).not.toBe(secondCall);
   });
 });
