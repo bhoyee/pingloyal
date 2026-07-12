@@ -101,13 +101,11 @@ async function main() {
     }
 
     // ── Idempotent cleanup ────────────────────────────────────────────────────
-    const del = await manager.query(
+    await manager.query(
       `DELETE FROM redemptions WHERE tenant_id = $1 AND notes = $2`,
       [tenant.id, SEED_NOTE],
     );
-    console.log(
-      `[seed:redemptions] Removed ${String(del[1] ?? 0)} old seed redemptions`,
-    );
+    console.log('[seed:redemptions] Removed old seed redemptions');
 
     // ── Build redemption records ──────────────────────────────────────────────
     //
@@ -219,8 +217,12 @@ async function main() {
 
     console.log(`[seed:redemptions] Inserted ${inserted} redemption records`);
     console.log(`[seed:redemptions] Total rewards redeemed: ${totalRewards}`);
-    console.log(`[seed:redemptions] Total points redeemed: ${totalPoints.toLocaleString()}`);
-    console.log(`[seed:redemptions] Total reward value: ₦${totalValue.toLocaleString()}`);
+    console.log(
+      `[seed:redemptions] Total points redeemed: ${totalPoints.toLocaleString()}`,
+    );
+    console.log(
+      `[seed:redemptions] Total reward value: ₦${totalValue.toLocaleString()}`,
+    );
   });
 
   await SeedDataSource.destroy();

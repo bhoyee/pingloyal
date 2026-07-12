@@ -153,7 +153,8 @@ export class ReconciliationService {
     );
 
     // Store-wide average used for the flagging threshold
-    const storeAvg = totalTransactions > 0 ? totalAmount / totalTransactions : 0;
+    const storeAvg =
+      totalTransactions > 0 ? totalAmount / totalTransactions : 0;
 
     const cashierBreakdown: CashierBreakdown[] = cashierRows.map((row) => {
       const txCount = parseInt(row.transaction_count, 10);

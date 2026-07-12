@@ -187,8 +187,12 @@ describe('ReconciliationService', () => {
 
     const result = await service.getReport(TENANT_ID, {});
 
-    const taiwo = result.cashierBreakdown.find((c) => c.cashierName === 'Taiwo');
-    const chidinma = result.cashierBreakdown.find((c) => c.cashierName === 'Chidinma');
+    const taiwo = result.cashierBreakdown.find(
+      (c) => c.cashierName === 'Taiwo',
+    );
+    const chidinma = result.cashierBreakdown.find(
+      (c) => c.cashierName === 'Chidinma',
+    );
     expect(taiwo?.flagged).toBe(true);
     expect(chidinma?.flagged).toBe(false);
   });
@@ -290,7 +294,7 @@ describe('ReconciliationService', () => {
         total_transactions: '5',
         total_amount: '25000',
         total_points: '250',
-        terminal_count: '5',  // all 5 sourced from webhook
+        terminal_count: '5', // all 5 sourced from webhook
         terminal_amount: '25000',
         manual_count: '0',
         manual_amount: '0',
@@ -310,7 +314,7 @@ describe('ReconciliationService', () => {
         total_transactions: '8',
         total_amount: '40000',
         total_points: '400',
-        terminal_count: '3',  // 3 sourced from file_import
+        terminal_count: '3', // 3 sourced from file_import
         terminal_amount: '15000',
         manual_count: '5',
         manual_amount: '25000',
