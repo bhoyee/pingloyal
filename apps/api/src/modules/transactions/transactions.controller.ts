@@ -93,6 +93,20 @@ export class TransactionsController {
     });
   }
 
+  // ── POST /transactions/:id/void ────────────────────────────────────────────
+  // Must be declared before /transactions/:id so the literal "void" is matched
+  // before the :id wildcard.
+
+  @Post('transactions/:id/void')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  voidTransaction(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.txService.voidTransaction(user.tenantId, id, user.userId);
+  }
+
   // ── GET /transactions/:id ───────────────────────────────────────────────────
 
   @Get('transactions/:id')

@@ -17,7 +17,8 @@ export declare enum SubscriptionStatus {
     TRIALING = "trialing",
     ACTIVE = "active",
     PAST_DUE = "past_due",
-    SUSPENDED = "suspended"
+    SUSPENDED = "suspended",
+    CANCELLED = "cancelled"
 }
 export declare enum UserRole {
     OWNER = "owner",
@@ -71,7 +72,8 @@ export declare enum TriggerStatus {
 export declare enum SkipReason {
     NOT_OPTED_IN = "not_opted_in",
     WALLET_EMPTY = "wallet_empty",
-    RECENTLY_SENT = "recently_sent"
+    RECENTLY_SENT = "recently_sent",
+    WA_NOT_CONNECTED = "wa_not_connected"
 }
 export declare enum IntegrationConnectionType {
     WEBHOOK = "webhook",
@@ -89,7 +91,8 @@ export declare enum PointsLedgerReason {
     REDEMPTION = "redemption",
     BIRTHDAY_BONUS = "birthday_bonus",
     ADMIN_ADJUSTMENT = "admin_adjustment",
-    IMPORT_SEED = "import_seed"
+    IMPORT_SEED = "import_seed",
+    VOID = "void"
 }
 export declare enum WalletTransactionType {
     TOPUP = "topup",

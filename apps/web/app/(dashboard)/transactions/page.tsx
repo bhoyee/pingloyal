@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow, isToday, differenceInCalendarDays } from 'date-fns';
 import { api, type TenantMe } from '@/lib/api';
 
@@ -16,6 +16,9 @@ interface TransactionLogRow {
   customer: { id: string; fullName: string } | null;
   categoryName: string | null;
   cashierName: string | null;
+  isFlagged: boolean;
+  flagReason: string | null;
+  voidedAt: string | null;
 }
 
 interface TransactionListResponse {
@@ -124,6 +127,7 @@ function SkeletonRow() {
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const [preset, setPreset] = useState<DateRangePreset>('today');
   const [customStart, setCustomStart] = useState('');
@@ -133,6 +137,8 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [jumpPage, setJumpPage] = useState('');
+  const [voidingId, setVoidingId] = useState<string | null>(null);
+  const voidingRef = useRef(false);
 
   useEffect(() => {
     if (!localStorage.getItem('access_token')) {
@@ -246,6 +252,30 @@ export default function TransactionsPage() {
     }
     setJumpPage('');
   }
+
+  const handleVoid = useCallback(async (tx: TransactionLogRow) => {
+    if (voidingRef.current) return;
+    const customerName = tx.customer?.fullName ?? 'this customer';
+    const confirmed = window.confirm(
+      `Void this transaction?\n\n` +
+      `Customer: ${customerName}\n` +
+      `Amount: ₦${Number(tx.amount).toLocaleString()}\n` +
+      `Points: +${tx.pointsEarned}\n\n` +
+      `This will deduct ${tx.pointsEarned} pts from the customer's balance (balance may go negative). This cannot be undone.`
+    );
+    if (!confirmed) return;
+    voidingRef.current = true;
+    setVoidingId(tx.id);
+    try {
+      await api.post(`/api/v1/transactions/${tx.id}/void`, {});
+      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    } catch {
+      window.alert('Failed to void transaction. Please try again.');
+    } finally {
+      voidingRef.current = false;
+      setVoidingId(null);
+    }
+  }, [queryClient]);
 
   if (!allowed) {
     return null;
@@ -439,14 +469,34 @@ export default function TransactionsPage() {
               ) : (
                 rows.map((tx) => {
                   const badge = SOURCE_BADGES[tx.source] ?? { label: tx.source, classes: 'bg-slate-100 text-slate-600' };
+                  const isVoided = !!tx.voidedAt;
+                  const isFlaggedOpen = tx.isFlagged && !isVoided;
+                  const rowClass = isFlaggedOpen
+                    ? 'bg-red-50 border-l-4 border-l-red-400'
+                    : isVoided
+                    ? 'bg-slate-50 opacity-60'
+                    : 'hover:bg-slate-50 transition-colors';
+                  const canVoid = !isVoided && profile?.role === 'owner' || profile?.role === 'manager';
                   return (
-                    <tr key={tx.id} data-testid="tx-row" className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-xs text-slate-500">{formatRowTime(tx.createdAt)}</td>
+                    <tr key={tx.id} data-testid="tx-row" className={rowClass}>
+                      <td className="px-4 py-3 text-xs text-slate-500">
+                        <div>{formatRowTime(tx.createdAt)}</div>
+                        {isFlaggedOpen && (
+                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                            ⚠ Flagged
+                          </span>
+                        )}
+                        {isVoided && (
+                          <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                            Voided
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         {tx.customer ? (
                           <button
                             onClick={() => router.push(`/customers/${tx.customer!.id}`)}
-                            className="cursor-pointer font-medium text-[#0F1E35] hover:underline"
+                            className={`cursor-pointer font-medium hover:underline ${isFlaggedOpen ? 'text-red-700' : 'text-[#0F1E35]'}`}
                           >
                             {tx.customer.fullName}
                           </button>
@@ -454,10 +504,15 @@ export default function TransactionsPage() {
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right text-slate-700">
+                      <td className={`px-4 py-3 text-right ${isFlaggedOpen ? 'font-semibold text-red-700' : 'text-slate-700'}`}>
                         ₦{Number(tx.amount).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-emerald-600">+{tx.pointsEarned}</td>
+                      <td className={`px-4 py-3 font-semibold ${isFlaggedOpen ? 'text-red-600' : isVoided ? 'text-slate-400 line-through' : 'text-emerald-600'}`}>
+                        +{tx.pointsEarned}
+                        {isFlaggedOpen && tx.flagReason && (
+                          <span className="ml-1 text-[10px] font-normal text-red-400" title={tx.flagReason}>ⓘ</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-600">
                         {tx.cashierName ? tx.cashierName.split(' ')[0] : '—'}
                       </td>
@@ -467,14 +522,25 @@ export default function TransactionsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {tx.customer && (
-                          <button
-                            onClick={() => router.push(`/customers/${tx.customer!.id}?tab=transactions`)}
-                            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-400"
-                          >
-                            View
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {tx.customer && (
+                            <button
+                              onClick={() => router.push(`/customers/${tx.customer!.id}?tab=transactions`)}
+                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-400"
+                            >
+                              View
+                            </button>
+                          )}
+                          {canVoid && !isVoided && (
+                            <button
+                              onClick={() => void handleVoid(tx)}
+                              disabled={voidingId === tx.id}
+                              className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:border-red-400 hover:bg-red-100 disabled:opacity-50"
+                            >
+                              {voidingId === tx.id ? 'Voiding…' : 'Void'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

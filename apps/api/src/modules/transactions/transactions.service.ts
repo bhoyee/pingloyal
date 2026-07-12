@@ -21,13 +21,21 @@ import { Transaction } from './entities/transaction.entity';
 import { PointsLedger } from './entities/points-ledger.entity';
 import type { CreateTransactionDto } from './dto/create-transaction.dto';
 
-// ── Pure calculation helper (exported for direct unit testing) ────────────────
+// ── Pure calculation helpers (exported for direct unit testing) ───────────────
 
 export function calculatePointsEarned(
   amount: string,
   earnRate: number,
 ): number {
   return Math.floor(parseFloat(amount) / earnRate);
+}
+
+export function isPointsOverIssued(
+  pointsEarned: number,
+  amount: string,
+  earnRate: number,
+): boolean {
+  return pointsEarned > Math.floor(parseFloat(amount) / earnRate);
 }
 
 // ── Response shape ─────────────────────────────────────────────────────────────
@@ -58,6 +66,9 @@ export interface TransactionLogRow {
   customer: { id: string; fullName: string } | null;
   categoryName: string | null;
   cashierName: string | null;
+  isFlagged: boolean;
+  flagReason: string | null;
+  voidedAt: string | null;
 }
 
 export interface TransactionListResult {
@@ -172,11 +183,16 @@ export class TransactionsService {
 
     // Step 3 — Calculate points earned
     // earnRate is "currency units per point" (e.g. 100 = spend ₦100 to earn 1 point)
-    const pointsEarned = calculatePointsEarned(
-      dto.amount,
-      Number(tenant.pointsEarnRate),
-    );
+    const earnRate = Number(tenant.pointsEarnRate);
+    const pointsEarned = calculatePointsEarned(dto.amount, earnRate);
     const newBalance = customer.pointsBalance + pointsEarned;
+
+    // Auto-flag if points exceed what the earn rate formula would produce
+    // (guards against future manual-override features or misconfigured earnRate)
+    const isFlagged = isPointsOverIssued(pointsEarned, dto.amount, earnRate);
+    const flagReason = isFlagged
+      ? `Auto-flagged: ${pointsEarned} pts issued, expected ${Math.floor(parseFloat(dto.amount) / earnRate)} pts for ₦${dto.amount} at ₦${earnRate}/pt`
+      : null;
 
     // Pre-generate ID so ledger can reference it before we query back
     const transactionId = uuidv4();
@@ -204,8 +220,9 @@ export class TransactionsService {
         `INSERT INTO transactions
            (id, tenant_id, customer_id, category_id, logged_by_user_id,
             amount, points_earned, points_balance_after,
-            source, idempotency_key, notes, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10, $11, $12)`,
+            source, idempotency_key, notes, created_at,
+            is_flagged, flag_reason)
+         VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8, $9, $10, $11, $12, $13, $14)`,
         [
           transactionId,
           tenantId,
@@ -219,6 +236,8 @@ export class TransactionsService {
           dto.idempotencyKey,
           dto.notes ?? null,
           occurredAt,
+          isFlagged,
+          flagReason,
         ],
       );
 
@@ -410,6 +429,9 @@ export class TransactionsService {
           : null,
         categoryName: tx.category?.name ?? null,
         cashierName: tx.loggedByUser?.fullName ?? null,
+        isFlagged: tx.isFlagged,
+        flagReason: tx.flagReason,
+        voidedAt: tx.voidedAt ? tx.voidedAt.toISOString() : null,
       })),
       total,
       page,
@@ -467,6 +489,86 @@ export class TransactionsService {
       page,
       limit,
     };
+  }
+
+  // ── POST /transactions/:id/void ─────────────────────────────────────────────
+
+  async voidTransaction(
+    tenantId: string,
+    txId: string,
+    voidedByUserId: string,
+  ): Promise<void> {
+    const [tx] = await this.dataSource.query<
+      {
+        id: string;
+        customer_id: string;
+        points_earned: string;
+        voided_at: string | null;
+      }[]
+    >(
+      `SELECT id, customer_id, points_earned, voided_at
+       FROM transactions WHERE id = $1 AND tenant_id = $2`,
+      [txId, tenantId],
+    );
+
+    if (!tx) throw new NotFoundException('Transaction not found');
+    if (tx.voided_at)
+      throw new BadRequestException('Transaction already voided');
+
+    const pts = parseInt(tx.points_earned, 10);
+    if (pts === 0)
+      throw new BadRequestException(
+        'Transaction has zero points — nothing to void',
+      );
+
+    await this.dataSource.transaction(async (em) => {
+      // Mark transaction as voided and flagged
+      await em.query(
+        `UPDATE transactions
+         SET voided_at         = NOW(),
+             voided_by_user_id = $1,
+             is_flagged        = true,
+             flag_reason       = COALESCE(flag_reason, 'Voided by manager')
+         WHERE id = $2`,
+        [voidedByUserId, txId],
+      );
+
+      // Deduct from customer — balance CAN go negative (debt state blocks redemption)
+      const [updated] = await em.query<{ points_balance: string }[]>(
+        `UPDATE customers
+         SET points_balance  = points_balance  - $1,
+             lifetime_points = lifetime_points - $1,
+             updated_at      = NOW()
+         WHERE id = $2 AND tenant_id = $3
+         RETURNING points_balance`,
+        [pts, tx.customer_id, tenantId],
+      );
+
+      const balanceAfter = Number(updated?.points_balance ?? 0);
+
+      // Compensating ledger entry
+      await em.query(
+        `INSERT INTO points_ledger
+           (id, tenant_id, customer_id, delta, reason, ref_transaction_id, balance_after)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          uuidv4(),
+          tenantId,
+          tx.customer_id,
+          -pts,
+          PointsLedgerReason.VOID,
+          txId,
+          balanceAfter,
+        ],
+      );
+    });
+
+    void this.redis
+      .del(
+        `dashboard:summary:${tenantId}`,
+        `dashboard:top-spenders:${tenantId}`,
+      )
+      .catch(() => null);
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────

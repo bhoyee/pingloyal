@@ -106,6 +106,7 @@ export enum PointsLedgerReason {
   BIRTHDAY_BONUS = 'birthday_bonus',
   ADMIN_ADJUSTMENT = 'admin_adjustment',
   IMPORT_SEED = 'import_seed',
+  VOID = 'void',
 }
 
 export enum WalletTransactionType {

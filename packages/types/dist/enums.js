@@ -25,6 +25,7 @@ var SubscriptionStatus;
     SubscriptionStatus["ACTIVE"] = "active";
     SubscriptionStatus["PAST_DUE"] = "past_due";
     SubscriptionStatus["SUSPENDED"] = "suspended";
+    SubscriptionStatus["CANCELLED"] = "cancelled";
 })(SubscriptionStatus || (exports.SubscriptionStatus = SubscriptionStatus = {}));
 var UserRole;
 (function (UserRole) {
@@ -87,6 +88,7 @@ var SkipReason;
     SkipReason["NOT_OPTED_IN"] = "not_opted_in";
     SkipReason["WALLET_EMPTY"] = "wallet_empty";
     SkipReason["RECENTLY_SENT"] = "recently_sent";
+    SkipReason["WA_NOT_CONNECTED"] = "wa_not_connected";
 })(SkipReason || (exports.SkipReason = SkipReason = {}));
 var IntegrationConnectionType;
 (function (IntegrationConnectionType) {
@@ -108,6 +110,7 @@ var PointsLedgerReason;
     PointsLedgerReason["BIRTHDAY_BONUS"] = "birthday_bonus";
     PointsLedgerReason["ADMIN_ADJUSTMENT"] = "admin_adjustment";
     PointsLedgerReason["IMPORT_SEED"] = "import_seed";
+    PointsLedgerReason["VOID"] = "void";
 })(PointsLedgerReason || (exports.PointsLedgerReason = PointsLedgerReason = {}));
 var WalletTransactionType;
 (function (WalletTransactionType) {

@@ -64,6 +64,18 @@ export class Transaction {
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isFlagged: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  flagReason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  voidedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  voidedByUserId: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

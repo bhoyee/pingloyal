@@ -54,6 +54,8 @@ describe('RedemptionsService', () => {
     jest.clearAllMocks();
     mockTenantsService.findOne.mockResolvedValue(mockTenant);
     mockWaQueue.add.mockResolvedValue({ id: 'job-1' });
+    // Default for the flag-check query in createRedemption: no open flags
+    mockDataSource.query.mockResolvedValue([{ count: '0' }]);
 
     const module = await Test.createTestingModule({
       providers: [

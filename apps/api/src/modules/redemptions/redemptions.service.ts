@@ -66,6 +66,18 @@ export class RedemptionsService {
     const pointsToDeduct = dto.rewardsToRedeem * tenant.pointsThreshold;
     const value = dto.rewardsToRedeem * Number(tenant.rewardValue);
 
+    // Block redemption if the customer has any open flagged transactions
+    const [flagCheck] = await this.dataSource.query<{ count: string }[]>(
+      `SELECT COUNT(*) AS count FROM transactions
+       WHERE customer_id = $1 AND tenant_id = $2 AND is_flagged = true AND voided_at IS NULL`,
+      [dto.customerId, tenantId],
+    );
+    if (parseInt(flagCheck?.count ?? '0', 10) > 0) {
+      throw new BadRequestException(
+        'This account has flagged transactions under review. Redemption is blocked until all flags are resolved by a manager.',
+      );
+    }
+
     const row = await this.dataSource.transaction(async (em) => {
       // Atomic deduction — WHERE clause prevents double-spend under concurrent requests
       const updated = await em.query<{ points_balance: string }[]>(
