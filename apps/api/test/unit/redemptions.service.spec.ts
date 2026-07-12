@@ -277,9 +277,12 @@ describe('RedemptionsService', () => {
 
     await service.getRedemptions(TENANT_ID, { limit: 999 });
 
-    // Second call is the DATA query; its params array contains [tenantId, 100, offset]
-    const dataParams = mockDataSource.query.mock.calls[1][1] as unknown[];
-    expect(dataParams).toContain(100);
+    // Second call is the DATA query; params = [tenantId, 100, offset]
+    expect(mockDataSource.query).toHaveBeenNthCalledWith(
+      2,
+      expect.any(String),
+      expect.arrayContaining([100]),
+    );
   });
 
   it('T13: paginates — offset equals (page-1)*limit', async () => {
@@ -289,10 +292,12 @@ describe('RedemptionsService', () => {
 
     await service.getRedemptions(TENANT_ID, { page: 2, limit: 5 });
 
-    const dataParams = mockDataSource.query.mock.calls[1][1] as unknown[];
-    // params = [tenantId, limit=5, offset=5]
-    expect(dataParams).toContain(5); // limit
-    expect(dataParams[dataParams.length - 1]).toBe(5); // offset = (2-1)*5
+    // DATA query params: [tenantId, limit=5, offset=5]
+    expect(mockDataSource.query).toHaveBeenNthCalledWith(
+      2,
+      expect.any(String),
+      [TENANT_ID, 5, 5],
+    );
   });
 
   it('T14: cashierName is null when no cashier is linked', async () => {
