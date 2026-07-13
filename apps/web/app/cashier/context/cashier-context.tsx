@@ -82,6 +82,19 @@ export function CashierProvider({ children }: { children: React.ReactNode }) {
     void loadTenant();
   }, [loadTenant]);
 
+  // Re-fetch tenant config when the tab becomes visible again (e.g. cashier
+  // switches back from another app). Ensures rewardValue/pointsThreshold are
+  // never stale if the owner updated settings while the PWA was in background.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void loadTenant();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadTenant]);
+
   // ── Server heartbeat ────────────────────────────────────────────────────────
   // navigator.onLine only detects device-level connectivity, not server reachability.
   // We ping the API every 20 s so the indicator reflects actual server availability.

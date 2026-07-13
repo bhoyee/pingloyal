@@ -25,6 +25,7 @@ import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { Tenant } from '../tenants/entities/tenant.entity';
 import { Customer } from './entities/customer.entity';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 const IDEMPOTENCY_TTL_S = 86_400; // 24 hours
 
@@ -70,6 +71,7 @@ export class CustomersService {
     private readonly customerRepo: Repository<Customer>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async register(
@@ -197,6 +199,16 @@ export class CustomersService {
         `dashboard:top-spenders:${customer.tenantId}`,
       )
       .catch(() => null);
+
+    if (isNew) {
+      void this.activityLogService.log({
+        tenantId: customer.tenantId,
+        action: 'customer.registered',
+        entityType: 'customer',
+        entityId: customer.id,
+        description: `New customer ${customer.fullName} (${customer.phoneE164}) registered`,
+      });
+    }
 
     return result;
   }

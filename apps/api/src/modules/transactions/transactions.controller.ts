@@ -41,7 +41,7 @@ export class TransactionsController {
     @Body() dto: CreateTransactionDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.txService.create(user.tenantId, user.userId, dto);
+    const result = await this.txService.create(user.tenantId, user.userId, dto, undefined, user.role);
     if (result.alreadyProcessed) {
       res.status(HttpStatus.OK);
     }
@@ -104,7 +104,7 @@ export class TransactionsController {
     @CurrentUser() user: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.txService.voidTransaction(user.tenantId, id, user.userId);
+    return this.txService.voidTransaction(user.tenantId, id, user.userId, user.role);
   }
 
   // ── GET /transactions/:id ───────────────────────────────────────────────────

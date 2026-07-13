@@ -2,11 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BrandMark } from './AuthSplitLayout';
 
-// Real claims already made elsewhere on the marketing site (FeaturesGrid:
-// "Cashier PWA — works offline", "queue locally ... sync the moment
-// connectivity returns") — kept consistent, not reinvented for this page.
 const POINTS = [
-  'Works offline — syncs the moment you’re back online',
+  'Works offline — syncs the moment you're back online',
   'Awards points the instant a sale is logged',
   'No extra hardware — runs in any browser',
 ];
@@ -14,16 +11,19 @@ const POINTS = [
 export function CashierAuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-white">
-      {/* This panel is PingLoyal's own brand pitch for the cashier tool —
-          the store-specific identity (logo/name) lives in the form panel
-          on the right instead, since this page is white-labeled per
-          tenant. */}
       <div className="relative hidden w-[42%] shrink-0 overflow-hidden lg:flex lg:flex-col">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/cashier-bg.jpg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center"
+        />
         <div
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(130% 90% at 0% 100%, rgba(13,197,106,0.28) 0%, rgba(10,22,40,0) 55%), linear-gradient(165deg, #0A1628 0%, #081d14 55%, #061309 100%)',
+              'radial-gradient(130% 90% at 0% 100%, rgba(13,197,106,0.30) 0%, rgba(10,22,40,0.05) 55%), linear-gradient(165deg, rgba(10,22,40,0.78) 0%, rgba(8,29,20,0.72) 55%, rgba(6,19,9,0.82) 100%)',
           }}
         />
         <div className="relative z-10 flex flex-1 flex-col px-12 py-12">

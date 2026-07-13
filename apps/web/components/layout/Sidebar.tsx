@@ -23,6 +23,7 @@ import {
   X,
   ShieldCheck,
   Gift,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 import { api, type TenantMe } from '@/lib/api';
@@ -65,6 +66,7 @@ const NATIVE_MODE: NavItem[] = [
 const INTEGRITY: NavItem[] = [
   { href: '/reconciliation', icon: ShieldCheck, label: 'Reconciliation' },
   { href: '/redemptions', icon: Gift, label: 'Redemptions' },
+  { href: '/activity', icon: ClipboardList, label: 'Activity Log' },
 ];
 
 const SETTINGS: NavItem[] = [
@@ -294,6 +296,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </Link>
           <button
             onClick={() => {
+              void api.post('/api/v1/auth/logout', {}).catch(() => null);
               localStorage.removeItem('access_token');
               localStorage.removeItem('refresh_token');
               window.location.href = '/login';

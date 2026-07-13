@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import {
+  ActivityLog,
   Campaign,
   CampaignLog,
   Customer,
@@ -27,6 +28,7 @@ import {
 } from './entities';
 
 const ALL_ENTITIES = [
+  ActivityLog,
   Tenant,
   TierConfig,
   ProductCategory,

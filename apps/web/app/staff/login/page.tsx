@@ -46,7 +46,7 @@ export default function StaffLoginPage() {
       const data = (await res.json()) as StaffLoginResponse;
       localStorage.setItem('staff_access_token', data.accessToken);
       localStorage.setItem('staff_refresh_token', data.refreshToken);
-      router.replace('/staff/tickets');
+      router.replace('/staff');
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

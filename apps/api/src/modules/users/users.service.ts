@@ -108,6 +108,19 @@ export class UsersService {
     };
   }
 
+  async resetCashierPassword(
+    tenantId: string,
+    userId: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId, tenantId, role: UserRole.CASHIER },
+    });
+    if (!user) throw new NotFoundException('Cashier not found');
+    user.hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await this.userRepo.save(user);
+  }
+
   async deleteCashier(tenantId: string, userId: string) {
     const user = await this.userRepo.findOne({
       where: { id: userId, tenantId, role: UserRole.CASHIER },

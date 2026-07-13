@@ -5,6 +5,101 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow, isToday, differenceInCalendarDays } from 'date-fns';
 import { api, type TenantMe } from '@/lib/api';
 
+function VoidConfirmModal({
+  tx,
+  loading,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  tx: TransactionLogRow;
+  loading: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !loading) onCancel();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [loading, onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(15,30,53,0.45)' }}
+      onClick={() => { if (!loading) onCancel(); }}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start gap-3 border-b border-slate-100 px-6 py-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-base">
+            ⚠️
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Void Transaction</h2>
+            <p className="text-xs text-slate-500 mt-0.5">This action is permanent and cannot be undone.</p>
+          </div>
+        </div>
+
+        {/* Transaction details */}
+        <div className="px-6 pt-5 pb-4">
+          <div className="rounded-xl border border-red-100 bg-red-50 divide-y divide-red-100 mb-4">
+            <div className="flex items-center justify-between px-4 py-3 text-sm">
+              <span className="text-slate-500">Customer</span>
+              <span className="font-medium text-slate-900">{tx.customer?.fullName ?? '—'}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 text-sm">
+              <span className="text-slate-500">Transaction amount</span>
+              <span className="font-medium text-slate-900">₦{Number(tx.amount).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3 text-sm">
+              <span className="text-slate-500">Points to deduct</span>
+              <span className="font-semibold text-red-600">−{tx.pointsEarned.toLocaleString()} pts</span>
+            </div>
+          </div>
+
+          <p className="text-xs leading-relaxed text-slate-500">
+            Voiding will deduct <strong className="text-slate-700">{tx.pointsEarned.toLocaleString()} points</strong> from{' '}
+            <strong className="text-slate-700">{tx.customer?.fullName ?? 'this customer'}</strong>&apos;s balance.
+            If the customer has already redeemed these points, their balance will go negative and future
+            redemptions will be blocked until the debt is cleared.
+          </p>
+
+          {error && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-400 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {loading ? 'Voiding…' : 'Void Transaction'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type DateRangePreset = 'today' | 'last7' | 'month' | 'custom';
 
 interface TransactionLogRow {
@@ -16,6 +111,7 @@ interface TransactionLogRow {
   customer: { id: string; fullName: string } | null;
   categoryName: string | null;
   cashierName: string | null;
+  cashierRole: string | null;
   isFlagged: boolean;
   flagReason: string | null;
   voidedAt: string | null;
@@ -40,7 +136,18 @@ interface Profile {
   role: string;
 }
 
-const PAGE_SIZE = 50;
+function getRoleFromToken(): string | null {
+  try {
+    const token = localStorage.getItem('access_token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1])) as { role?: string };
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 const SOURCE_BADGES: Record<string, { label: string; classes: string }> = {
   cashier_app: { label: 'PWA', classes: 'bg-slate-100 text-slate-600' },
@@ -113,6 +220,18 @@ function formatRowTime(value: string): string {
   return format(date, 'EEE d MMM HH:mm');
 }
 
+function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | 'ellipsis')[] = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+  if (left > 2) pages.push('ellipsis');
+  for (let i = left; i <= right; i++) pages.push(i);
+  if (right < total - 1) pages.push('ellipsis');
+  pages.push(total);
+  return pages;
+}
+
 function SkeletonRow() {
   return (
     <tr>
@@ -136,8 +255,11 @@ export default function TransactionsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<20 | 50 | 100>(20);
   const [jumpPage, setJumpPage] = useState('');
+  const [voidTx, setVoidTx] = useState<TransactionLogRow | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
+  const [voidError, setVoidError] = useState<string | null>(null);
   const voidingRef = useRef(false);
 
   useEffect(() => {
@@ -158,13 +280,15 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [preset, customStart, customEnd, cashierId]);
+  }, [preset, customStart, customEnd, cashierId, pageSize]);
 
   const { data: profile } = useQuery<Profile>({
     queryKey: ['auth-me'],
     queryFn: () => api.get<Profile>('/api/v1/auth/me'),
     enabled: mounted,
   });
+
+  const effectiveRole = profile?.role ?? (mounted ? getRoleFromToken() : null);
 
   useEffect(() => {
     if (profile && profile.role !== 'owner' && profile.role !== 'manager') {
@@ -191,12 +315,12 @@ export default function TransactionsPage() {
   const isLiveView = preset === 'today';
 
   const { data, isLoading, isFetching } = useQuery<TransactionListResponse>({
-    queryKey: ['transactions', preset, customStart, customEnd, cashierId, search, page, timezone],
+    queryKey: ['transactions', preset, customStart, customEnd, cashierId, search, page, pageSize, timezone],
     queryFn: () => {
       const { startDate, endDate } = computeRange(preset, timezone, customStart, customEnd);
       const params = new URLSearchParams({
         page: String(page),
-        limit: String(PAGE_SIZE),
+        limit: String(pageSize),
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
       });
@@ -222,7 +346,7 @@ export default function TransactionsPage() {
     void api
       .get<TransactionListResponse>(`/api/v1/transactions?${params.toString()}`)
       .then(({ data: rows }) => {
-        const header = 'Date,Customer,Amount,Points,Cashier,Source\n';
+        const header = 'Date,Customer,Amount,Points,Initiated By,Role,Source\n';
         const csvRows = rows.map((tx) =>
           [
             new Date(tx.createdAt).toISOString(),
@@ -230,6 +354,7 @@ export default function TransactionsPage() {
             tx.amount,
             tx.pointsEarned,
             `"${(tx.cashierName ?? '').replace(/"/g, '""')}"`,
+            tx.cashierRole ?? '',
             tx.source,
           ].join(','),
         );
@@ -253,29 +378,22 @@ export default function TransactionsPage() {
     setJumpPage('');
   }
 
-  const handleVoid = useCallback(async (tx: TransactionLogRow) => {
-    if (voidingRef.current) return;
-    const customerName = tx.customer?.fullName ?? 'this customer';
-    const confirmed = window.confirm(
-      `Void this transaction?\n\n` +
-      `Customer: ${customerName}\n` +
-      `Amount: ₦${Number(tx.amount).toLocaleString()}\n` +
-      `Points: +${tx.pointsEarned}\n\n` +
-      `This will deduct ${tx.pointsEarned} pts from the customer's balance (balance may go negative). This cannot be undone.`
-    );
-    if (!confirmed) return;
+  const handleVoidConfirm = useCallback(async () => {
+    if (!voidTx || voidingRef.current) return;
     voidingRef.current = true;
-    setVoidingId(tx.id);
+    setVoidingId(voidTx.id);
+    setVoidError(null);
     try {
-      await api.post(`/api/v1/transactions/${tx.id}/void`, {});
+      await api.post(`/api/v1/transactions/${voidTx.id}/void`, {});
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-    } catch {
-      window.alert('Failed to void transaction. Please try again.');
+      setVoidTx(null);
+    } catch (err) {
+      setVoidError(err instanceof Error ? err.message : 'Failed to void transaction. Please try again.');
     } finally {
       voidingRef.current = false;
       setVoidingId(null);
     }
-  }, [queryClient]);
+  }, [voidTx, queryClient]);
 
   if (!allowed) {
     return null;
@@ -286,7 +404,7 @@ export default function TransactionsPage() {
   const totalAmount = Number(data?.totalAmount ?? 0);
   const totalPoints = data?.totalPoints ?? 0;
   const avgPerTransaction = total > 0 ? totalAmount / total : 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isConnectedMode = tenant?.mode === 'connected';
 
   const today = new Date().toISOString().split('T')[0];
@@ -383,31 +501,44 @@ export default function TransactionsPage() {
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20 sm:w-64"
           />
+
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-sm font-medium text-slate-500">Rows:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) as 20 | 50 | 100)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0F1E35]/20"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n} per page</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-6">
         {/* Summary bar */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
             <p className="text-xs font-medium text-slate-400">Transactions</p>
             <p data-testid="summary-count" className="mt-1 text-xl font-bold text-slate-900">
               {total.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
             <p className="text-xs font-medium text-slate-400">Total Spend</p>
             <p data-testid="summary-spend" className="mt-1 text-xl font-bold text-slate-900">
               ₦{totalAmount.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-md">
             <p className="text-xs font-medium text-slate-400">Points Issued</p>
             <p data-testid="summary-points" className="mt-1 text-xl font-bold text-emerald-600">
               {totalPoints.toLocaleString()}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
             <p className="text-xs font-medium text-slate-400">Avg / Transaction</p>
             <p data-testid="summary-avg" className="mt-1 text-xl font-bold text-slate-900">
               ₦{Math.round(avgPerTransaction).toLocaleString()}
@@ -424,7 +555,7 @@ export default function TransactionsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Customer</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Amount</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Points</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Cashier</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Initiated By</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Source</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Action</th>
               </tr>
@@ -472,11 +603,11 @@ export default function TransactionsPage() {
                   const isVoided = !!tx.voidedAt;
                   const isFlaggedOpen = tx.isFlagged && !isVoided;
                   const rowClass = isFlaggedOpen
-                    ? 'bg-red-50 border-l-4 border-l-red-400'
+                    ? 'border-l-4 border-l-red-400 bg-red-50 transition-colors duration-150 hover:bg-red-100/60'
                     : isVoided
-                    ? 'bg-slate-50 opacity-60'
-                    : 'hover:bg-slate-50 transition-colors';
-                  const canVoid = !isVoided && profile?.role === 'owner' || profile?.role === 'manager';
+                    ? 'border-l-4 border-l-transparent bg-slate-50 opacity-60 transition-all duration-150 hover:opacity-80'
+                    : 'border-l-4 border-l-transparent transition-all duration-150 hover:bg-emerald-50/50 hover:border-l-emerald-400';
+                  const canVoid = !isVoided && (effectiveRole === 'owner' || effectiveRole === 'manager');
                   return (
                     <tr key={tx.id} data-testid="tx-row" className={rowClass}>
                       <td className="px-4 py-3 text-xs text-slate-500">
@@ -513,8 +644,19 @@ export default function TransactionsPage() {
                           <span className="ml-1 text-[10px] font-normal text-red-400" title={tx.flagReason}>ⓘ</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {tx.cashierName ? tx.cashierName.split(' ')[0] : '—'}
+                      <td className="px-4 py-3">
+                        {tx.cashierName ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-slate-700">{tx.cashierName}</span>
+                            {tx.cashierRole && (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                {tx.cashierRole}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.classes}`}>
@@ -531,9 +673,9 @@ export default function TransactionsPage() {
                               View
                             </button>
                           )}
-                          {canVoid && !isVoided && (
+                          {canVoid && (
                             <button
-                              onClick={() => void handleVoid(tx)}
+                              onClick={() => { setVoidError(null); setVoidTx(tx); }}
                               disabled={voidingId === tx.id}
                               className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600 hover:border-red-400 hover:bg-red-100 disabled:opacity-50"
                             >
@@ -549,28 +691,53 @@ export default function TransactionsPage() {
             </tbody>
           </table>
           {!isLoading && rows.length > 0 && (
-            <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-              <span data-testid="pagination-summary">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()}
+            <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <span data-testid="pagination-summary" className="text-xs text-slate-400">
+                Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString()} transactions
               </span>
               {totalPages > 1 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  {/* Previous */}
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                    className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Prev
+                    ← Prev
                   </button>
-                  <span>Page {page} of {totalPages}</span>
+
+                  {/* Numbered pages */}
+                  {getPageNumbers(page, totalPages).map((p, i) =>
+                    p === 'ellipsis' ? (
+                      <span key={`ell-${i}`} className="flex h-8 w-8 items-center justify-center text-xs text-slate-400">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-medium transition-colors ${
+                          p === page
+                            ? 'border-[#0F1E35] bg-[#0F1E35] text-white'
+                            : 'border-slate-200 text-slate-600 hover:border-emerald-300 hover:text-emerald-700'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ),
+                  )}
+
+                  {/* Next */}
                   <button
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300 disabled:opacity-40"
+                    className="flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Next
+                    Next →
                   </button>
-                  <form onSubmit={handleJumpToPage} className="flex items-center gap-1">
+
+                  {/* Jump to page */}
+                  <form onSubmit={handleJumpToPage} className="ml-2 flex items-center gap-1">
                     <input
                       type="number"
                       data-testid="jump-to-page-input"
@@ -579,11 +746,11 @@ export default function TransactionsPage() {
                       value={jumpPage}
                       onChange={(e) => setJumpPage(e.target.value)}
                       placeholder="Go to…"
-                      className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-slate-700"
+                      className="h-8 w-16 rounded-lg border border-slate-200 px-2 text-xs text-slate-700 focus:border-[#0F1E35] focus:outline-none focus:ring-1 focus:ring-[#0F1E35]/20"
                     />
                     <button
                       type="submit"
-                      className="rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:border-emerald-300"
+                      className="h-8 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
                     >
                       Go
                     </button>
@@ -594,6 +761,16 @@ export default function TransactionsPage() {
           )}
         </div>
       </div>
+
+      {voidTx && (
+        <VoidConfirmModal
+          tx={voidTx}
+          loading={voidingId === voidTx.id}
+          error={voidError}
+          onCancel={() => { if (!voidingId) setVoidTx(null); }}
+          onConfirm={() => void handleVoidConfirm()}
+        />
+      )}
     </div>
   );
 }

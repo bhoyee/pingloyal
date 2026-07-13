@@ -13,4 +13,14 @@ export interface RequestUser {
     role: UserRole;
     planTier: PlanTier;
 }
+export interface StaffJwtPayload {
+    sub: string;
+    type: 'staff';
+    iat: number;
+    exp: number;
+}
+export interface RequestStaff {
+    staffId: string;
+    fullName: string;
+}
 //# sourceMappingURL=auth.d.ts.map

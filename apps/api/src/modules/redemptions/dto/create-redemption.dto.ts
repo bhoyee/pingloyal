@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsInt,
   IsOptional,
@@ -11,6 +12,7 @@ export class CreateRedemptionDto {
   @IsUUID()
   customerId: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   rewardsToRedeem: number;

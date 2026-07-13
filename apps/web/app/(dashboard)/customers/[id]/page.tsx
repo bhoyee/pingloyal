@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { maskPhone } from '@pingloyal/utils';
 import { api, ApiError, type TenantMe } from '@/lib/api';
 import { CustomerOverview } from './CustomerOverview';
 import { CustomerTransactions } from './CustomerTransactions';
@@ -126,7 +125,7 @@ export default function CustomerDetailPage() {
             `/api/v1/customers/${id}/transactions?page=1&limit=3`,
           ),
           api.get<{ totalPointsRedeemed: number }>(
-            `/api/v1/redemptions?customerId=${id}&page=1&limit=1`,
+            `/api/v1/redemptions/stats?customerId=${id}`,
           ),
           api.get<TriggerLogSummary[]>(`/api/v1/trigger-logs?customerId=${id}&limit=1`),
           api.get<{ count: number }>(`/api/v1/trigger-logs/count?customerId=${id}`),
@@ -209,7 +208,7 @@ export default function CustomerDetailPage() {
               </div>
               <div>
                 <p className="text-xl font-bold text-slate-900">{customer.fullName}</p>
-                <p className="text-sm text-slate-500 font-mono">{maskPhone(customer.phoneE164)}</p>
+                <p className="text-sm text-slate-500 font-mono">{customer.phoneE164}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="text-xs text-slate-400">
                     Joined {formatDistanceToNow(new Date(customer.createdAt), { addSuffix: true })}

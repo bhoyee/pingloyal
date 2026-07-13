@@ -75,7 +75,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke refresh token' })
   logout(@CurrentUser() user: RequestUser) {
-    return this.authService.logout(user.userId);
+    return this.authService.logout(user);
   }
 
   @Get('me')

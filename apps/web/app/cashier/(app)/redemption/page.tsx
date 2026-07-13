@@ -58,6 +58,12 @@ export default function RedemptionPage() {
   async function handleConfirm() {
     if (state.status !== 'confirming') return;
 
+    const rewardsToRedeem = Math.floor(state.rewardsToRedeem);
+    if (!Number.isFinite(rewardsToRedeem) || rewardsToRedeem < 1) {
+      setState({ status: 'error', message: 'Invalid reward count — please go back and try again.' });
+      return;
+    }
+
     setState({ status: 'submitting' });
     try {
       const result = await cashierApi.post<{
@@ -66,7 +72,7 @@ export default function RedemptionPage() {
         balanceAfter: number;
       }>('/redemptions', {
         customerId: state.customer.id,
-        rewardsToRedeem: state.rewardsToRedeem,
+        rewardsToRedeem,
       });
 
       setState({
@@ -87,8 +93,9 @@ export default function RedemptionPage() {
 
   function handleSelectRewards(count: number) {
     if (state.status !== 'ready') return;
-    setState({ status: 'confirming', customer: state.customer, rewardsToRedeem: count });
-    setSelectedRewards(count);
+    const safe = Number.isFinite(count) && count >= 1 ? Math.floor(count) : 1;
+    setState({ status: 'confirming', customer: state.customer, rewardsToRedeem: safe });
+    setSelectedRewards(safe);
   }
 
   function handleBack() {
@@ -264,7 +271,8 @@ export default function RedemptionPage() {
           <button
             type="button"
             onClick={() => {
-              const next = Math.max(1, selectedRewards - 1);
+              const current = Number.isFinite(selectedRewards) ? selectedRewards : 1;
+              const next = Math.max(1, current - 1);
               setSelectedRewards(next);
               setState({ status: 'ready', customer, maxRewards });
             }}
@@ -274,12 +282,14 @@ export default function RedemptionPage() {
             −
           </button>
           <span className="text-4xl font-bold text-gray-900 w-12 text-center">
-            {selectedRewards}
+            {Number.isFinite(selectedRewards) ? selectedRewards : 1}
           </span>
           <button
             type="button"
             onClick={() => {
-              const next = Math.min(maxRewards, selectedRewards + 1);
+              const current = Number.isFinite(selectedRewards) ? selectedRewards : 1;
+              const safeMax = Number.isFinite(maxRewards) ? maxRewards : current;
+              const next = Math.min(safeMax, current + 1);
               setSelectedRewards(next);
               setState({ status: 'ready', customer, maxRewards });
             }}

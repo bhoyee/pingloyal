@@ -140,6 +140,7 @@ function BottomNav() {
   const registerHref = tenantSlug ? `/register/${tenantSlug}` : '#';
 
   function handleLogout() {
+    void cashierApi.post('/api/v1/auth/logout', {}).catch(() => null);
     localStorage.removeItem('cashier_token');
     const loginUrl = tenantSlug
       ? `/cashier/login?t=${tenantSlug}`

@@ -66,10 +66,12 @@ export class RedemptionsController {
   @Roles(UserRole.OWNER, UserRole.MANAGER)
   getStats(
     @CurrentUser() user: RequestUser,
+    @Query('customerId') customerId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return this.redemptionsService.getStats(user.tenantId, {
+      customerId,
       startDate,
       endDate,
     });

@@ -23,6 +23,11 @@ import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 export class StaffTicketsController {
   constructor(private readonly support: SupportService) {}
 
+  @Get('counts')
+  getCounts() {
+    return this.support.getTicketCountsForStaff();
+  }
+
   @Get()
   findAll(@Query('status') status?: string) {
     return this.support.findAllForStaff(status);

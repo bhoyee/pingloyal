@@ -20,6 +20,7 @@ import { ProductCategory } from '../tenants/entities/product-category.entity';
 import { Transaction } from './entities/transaction.entity';
 import { PointsLedger } from './entities/points-ledger.entity';
 import type { CreateTransactionDto } from './dto/create-transaction.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 // ── Pure calculation helpers (exported for direct unit testing) ───────────────
 
@@ -66,6 +67,7 @@ export interface TransactionLogRow {
   customer: { id: string; fullName: string } | null;
   categoryName: string | null;
   cashierName: string | null;
+  cashierRole: string | null;
   isFlagged: boolean;
   flagReason: string | null;
   voidedAt: string | null;
@@ -131,6 +133,7 @@ export class TransactionsService {
     @InjectQueue('wa-messages') private readonly waMessagesQueue: Queue,
     @InjectQueue('trigger-check') private readonly triggerCheckQueue: Queue,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   // ── POST /transactions ──────────────────────────────────────────────────────
@@ -140,6 +143,7 @@ export class TransactionsService {
     userId: string | null,
     dto: CreateTransactionDto,
     source: TransactionSource = TransactionSource.CASHIER_APP,
+    actorRole?: string,
   ): Promise<TransactionResult> {
     // Step 1 — Idempotency check (before any other DB query)
     const existing = await this.txRepo.findOne({
@@ -333,7 +337,19 @@ export class TransactionsService {
       )
       .catch(() => null);
 
-    return this.buildResult(savedTx, tenant.pointsThreshold, false);
+    const result = this.buildResult(savedTx, tenant.pointsThreshold, false);
+
+    void this.activityLogService.log({
+      tenantId,
+      actorId: userId,
+      actorRole: actorRole ?? null,
+      action: 'transaction.created',
+      entityType: 'transaction',
+      entityId: result.id,
+      description: `₦${Number(result.amount).toLocaleString()} sale for ${result.customer.fullName} (+${result.pointsEarned} pts)`,
+    });
+
+    return result;
   }
 
   // ── GET /transactions ───────────────────────────────────────────────────────
@@ -396,7 +412,7 @@ export class TransactionsService {
         .leftJoinAndSelect('tx.customer', 'customer')
         .leftJoinAndSelect('tx.category', 'category')
         .leftJoin('tx.loggedByUser', 'cashier')
-        .addSelect(['cashier.id', 'cashier.fullName']),
+        .addSelect(['cashier.id', 'cashier.fullName', 'cashier.role']),
     )
       .orderBy('tx.createdAt', 'DESC')
       .take(limit)
@@ -429,6 +445,7 @@ export class TransactionsService {
           : null,
         categoryName: tx.category?.name ?? null,
         cashierName: tx.loggedByUser?.fullName ?? null,
+        cashierRole: tx.loggedByUser?.role ?? null,
         isFlagged: tx.isFlagged,
         flagReason: tx.flagReason,
         voidedAt: tx.voidedAt ? tx.voidedAt.toISOString() : null,
@@ -497,6 +514,7 @@ export class TransactionsService {
     tenantId: string,
     txId: string,
     voidedByUserId: string,
+    actorRole?: string,
   ): Promise<void> {
     const [tx] = await this.dataSource.query<
       {
@@ -504,10 +522,15 @@ export class TransactionsService {
         customer_id: string;
         points_earned: string;
         voided_at: string | null;
+        amount: string;
+        customer_name: string | null;
       }[]
     >(
-      `SELECT id, customer_id, points_earned, voided_at
-       FROM transactions WHERE id = $1 AND tenant_id = $2`,
+      `SELECT t.id, t.customer_id, t.points_earned, t.voided_at, t.amount,
+              c.full_name AS customer_name
+       FROM transactions t
+       LEFT JOIN customers c ON c.id = t.customer_id
+       WHERE t.id = $1 AND t.tenant_id = $2`,
       [txId, tenantId],
     );
 
@@ -569,6 +592,16 @@ export class TransactionsService {
         `dashboard:top-spenders:${tenantId}`,
       )
       .catch(() => null);
+
+    void this.activityLogService.log({
+      tenantId,
+      actorId: voidedByUserId,
+      actorRole: actorRole ?? null,
+      action: 'transaction.voided',
+      entityType: 'transaction',
+      entityId: txId,
+      description: `₦${Number(tx.amount).toLocaleString()} transaction voided for ${tx.customer_name ?? 'Unknown'} (−${pts} pts)`,
+    });
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────

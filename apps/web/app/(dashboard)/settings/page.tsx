@@ -82,6 +82,11 @@ interface CashierUser {
   isActive: boolean;
 }
 
+interface PwModal {
+  cashierId: string;
+  cashierName: string;
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
@@ -105,6 +110,14 @@ export default function SettingsPage() {
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [pwModal, setPwModal] = useState<PwModal | null>(null);
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwShowNew, setPwShowNew] = useState(false);
+  const [pwShowConfirm, setPwShowConfirm] = useState(false);
 
   const businessForm = useForm<BusinessFormValues>({
     resolver: zodResolver(businessSchema),
@@ -282,6 +295,29 @@ export default function SettingsPage() {
         err instanceof ApiError ? err.message : 'Failed to request account deletion',
       );
       setDeleteLoading(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!pwModal) return;
+    if (pwNew.length < 8) {
+      setPwError('Password must be at least 8 characters');
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError('Passwords do not match');
+      return;
+    }
+    setPwLoading(true);
+    setPwError(null);
+    try {
+      await api.patch(`/api/v1/users/cashiers/${pwModal.cashierId}/password`, { newPassword: pwNew });
+      setPwModal(null);
+      showToast(`Password updated for ${pwModal.cashierName}`);
+    } catch (e) {
+      setPwError(e instanceof ApiError ? e.message : 'Failed to update password');
+    } finally {
+      setPwLoading(false);
     }
   }
 
@@ -751,6 +787,22 @@ export default function SettingsPage() {
                   >
                     {member.isActive ? 'Active' : 'Inactive'}
                   </span>
+                  {member.role === 'Cashier' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPwNew('');
+                        setPwConfirm('');
+                        setPwError(null);
+                        setPwShowNew(false);
+                        setPwShowConfirm(false);
+                        setPwModal({ cashierId: member.id, cashierName: member.name });
+                      }}
+                      className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-400 hover:text-slate-900"
+                    >
+                      Set Password
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -798,6 +850,83 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Set cashier password modal ──────────────────────────────────────── */}
+      {pwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-100 px-6 py-4">
+              <h3 className="text-base font-semibold text-slate-900">Set Password</h3>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Update the login password for <span className="font-medium text-slate-700">{pwModal.cashierName}</span>
+              </p>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="pwNew">New password</Label>
+                <div className="relative">
+                  <Input
+                    id="pwNew"
+                    type={pwShowNew ? 'text' : 'password'}
+                    value={pwNew}
+                    onChange={(e) => setPwNew(e.target.value)}
+                    placeholder="Min 8 characters"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPwShowNew((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700"
+                  >
+                    {pwShowNew ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="pwConfirm">Confirm new password</Label>
+                <div className="relative">
+                  <Input
+                    id="pwConfirm"
+                    type={pwShowConfirm ? 'text' : 'password'}
+                    value={pwConfirm}
+                    onChange={(e) => setPwConfirm(e.target.value)}
+                    placeholder="Re-enter password"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setPwShowConfirm((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700"
+                  >
+                    {pwShowConfirm ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+
+              {pwError && <p className="text-sm text-red-600">{pwError}</p>}
+
+              <div className="flex justify-end gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPwModal(null)}
+                  disabled={pwLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleResetPassword()}
+                  loading={pwLoading}
+                >
+                  Update Password
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete account confirmation modal ───────────────────────────────── */}
       {deleteModalOpen && (

@@ -8,6 +8,7 @@ import { Tenant } from './entities/tenant.entity';
 import { ProductCategory } from './entities/product-category.entity';
 import { TierConfig } from './entities/tier-config.entity';
 import { TenantsController } from './tenants.controller';
+import { AdminTenantsController } from './admin-tenants.controller';
 import { TenantsService } from './tenants.service';
 import { TierService } from './tier.service';
 import { QuarterlyResetCron } from './quarterly-reset.cron';
@@ -19,7 +20,7 @@ import { AccountDeletionCronService } from './account-deletion.cron';
     StorageModule,
     RedisModule,
   ],
-  controllers: [TenantsController],
+  controllers: [TenantsController, AdminTenantsController],
   providers: [
     TenantsService,
     TierService,
