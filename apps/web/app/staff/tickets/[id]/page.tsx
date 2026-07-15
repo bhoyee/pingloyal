@@ -44,6 +44,7 @@ export default function StaffTicketPage() {
     queryClient.setQueryData<TicketDetailResponse>(['staff-ticket', ticketId], (prev) =>
       prev ? { ticket: updated, messages: prev.messages } : prev,
     );
+    void queryClient.invalidateQueries({ queryKey: ['staff-ticket-counts'] });
   }
 
   return (

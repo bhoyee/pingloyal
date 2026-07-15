@@ -17,7 +17,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, QueryFailedError, Repository } from 'typeorm';
 import Redis from 'ioredis';
 import { PlanTier, UserRole } from '@pingloyal/types';
-import type { JwtPayload } from '@pingloyal/types';
+import type { JwtPayload, RequestUser } from '@pingloyal/types';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { MailerService } from '../../common/mailer/mailer.service';
 import { Tenant } from '../tenants/entities/tenant.entity';
@@ -28,6 +28,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 const BCRYPT_ROUNDS = 12;
 const VERIFICATION_EXPIRY_HOURS = 24;
@@ -71,6 +72,7 @@ export class AuthService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Tenant) private readonly tenantRepo: Repository<Tenant>,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -110,6 +112,17 @@ export class AuthService {
     await this.userRepo.update(user.id, { lastLoginAt: new Date() });
 
     const tokens = await this.issueTokens(user, user.tenant);
+
+    void this.activityLogService.log({
+      tenantId: user.tenant.id,
+      actorId: user.id,
+      actorRole: user.role,
+      actorName: user.fullName,
+      action: 'auth.login',
+      entityType: 'user',
+      entityId: user.id,
+      description: `${user.fullName} signed in`,
+    });
 
     return {
       ...tokens,
@@ -265,8 +278,17 @@ export class AuthService {
 
   // ── Logout ────────────────────────────────────────────────────────────────
 
-  async logout(userId: string): Promise<{ message: string }> {
-    await this.redis.del(`refresh:${userId}`);
+  async logout(user: RequestUser): Promise<{ message: string }> {
+    await this.redis.del(`refresh:${user.userId}`);
+    void this.activityLogService.log({
+      tenantId: user.tenantId,
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'auth.logout',
+      entityType: 'user',
+      entityId: user.userId,
+      description: `${user.role} signed out`,
+    });
     return { message: 'Logged out successfully' };
   }
 

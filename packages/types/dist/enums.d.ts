@@ -95,7 +95,8 @@ export declare enum PointsLedgerReason {
     REDEMPTION = "redemption",
     BIRTHDAY_BONUS = "birthday_bonus",
     ADMIN_ADJUSTMENT = "admin_adjustment",
-    IMPORT_SEED = "import_seed"
+    IMPORT_SEED = "import_seed",
+    VOID = "void"
 }
 export declare enum WalletTransactionType {
     TOPUP = "topup",

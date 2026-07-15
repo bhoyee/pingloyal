@@ -115,6 +115,7 @@ var PointsLedgerReason;
     PointsLedgerReason["BIRTHDAY_BONUS"] = "birthday_bonus";
     PointsLedgerReason["ADMIN_ADJUSTMENT"] = "admin_adjustment";
     PointsLedgerReason["IMPORT_SEED"] = "import_seed";
+    PointsLedgerReason["VOID"] = "void";
 })(PointsLedgerReason || (exports.PointsLedgerReason = PointsLedgerReason = {}));
 var WalletTransactionType;
 (function (WalletTransactionType) {

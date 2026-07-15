@@ -41,7 +41,7 @@ export class TransactionsController {
     @Body() dto: CreateTransactionDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.txService.create(user.tenantId, user.userId, dto);
+    const result = await this.txService.create(user.tenantId, user.userId, dto, undefined, user.role);
     if (result.alreadyProcessed) {
       res.status(HttpStatus.OK);
     }
@@ -91,6 +91,20 @@ export class TransactionsController {
       startDate,
       endDate,
     });
+  }
+
+  // ── POST /transactions/:id/void ────────────────────────────────────────────
+  // Must be declared before /transactions/:id so the literal "void" is matched
+  // before the :id wildcard.
+
+  @Post('transactions/:id/void')
+  @Roles(UserRole.OWNER, UserRole.MANAGER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  voidTransaction(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.txService.voidTransaction(user.tenantId, id, user.userId, user.role);
   }
 
   // ── GET /transactions/:id ───────────────────────────────────────────────────

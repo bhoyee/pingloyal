@@ -2,7 +2,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { LayoutDashboard, Users, LifeBuoy, Building2, FileText, LogOut, X } from 'lucide-react';
+import { staffApi } from '@/lib/api';
 
 interface NavItem {
   href: string;
@@ -33,6 +35,23 @@ export function StaffSidebar({ open = false, onClose }: StaffSidebarProps) {
     setStaffRole(localStorage.getItem('staff_role'));
     setFullName(localStorage.getItem('staff_full_name'));
   }, []);
+
+  const { data: templateCounts } = useQuery<{ pending: number; in_progress: number }>({
+    queryKey: ['staff-template-counts'],
+    queryFn: () => staffApi.get('/staff/template-requests/counts'),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  });
+
+  const { data: ticketCounts } = useQuery<{ open: number; in_progress: number }>({
+    queryKey: ['staff-ticket-counts'],
+    queryFn: () => staffApi.get('/staff/tickets/counts'),
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  });
+
+  const pendingTemplates = templateCounts?.pending ?? 0;
+  const openTickets = (ticketCounts?.open ?? 0) + (ticketCounts?.in_progress ?? 0);
 
   const items = NAV_ITEMS.filter((item) => !item.superAdminOnly || staffRole === 'super_admin');
 
@@ -86,6 +105,10 @@ export function StaffSidebar({ open = false, onClose }: StaffSidebarProps) {
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-3">
           {items.map((item) => {
             const Icon = item.icon;
+            const badge =
+              item.href === '/staff/template-requests' && pendingTemplates > 0 ? pendingTemplates :
+              item.href === '/staff/tickets' && openTickets > 0 ? openTickets :
+              null;
             return (
               <Link
                 key={item.href}
@@ -98,7 +121,12 @@ export function StaffSidebar({ open = false, onClose }: StaffSidebarProps) {
                 }`}
               >
                 <Icon size={17} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badge !== null && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white leading-none">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
               </Link>
             );
           })}

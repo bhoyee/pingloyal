@@ -38,6 +38,7 @@ import { AdminModule } from './admin/admin.module';
 import { RedemptionsModule } from './modules/redemptions/redemptions.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { UsersModule } from './modules/users/users.module';
+import { ActivityLogModule } from './modules/activity-log/activity-log.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
@@ -62,25 +63,14 @@ import { createWinstonConfig } from './common/logger/winston.config';
         process.env.LOG_LEVEL ?? 'info',
       ),
     ),
-    // Every named throttler below applies to every route by default — routes
-    // that need a tight limit (login, register, campaign send, etc.) set their
-    // own `@Throttle()` override, which takes precedence over these defaults.
-    // Keep these defaults generous so unrelated routes (e.g. GET /tenants/me)
-    // aren't 429'd by a bucket meant for a different endpoint.
+    // Only the `default` bucket applies globally — every unannotated route gets
+    // 300 req/min per tenant. Route-specific throttlers (login, transactions,
+    // demo_request, etc.) are declared inline via @Throttle() on their own
+    // controllers and do NOT need to live here; putting them here causes every
+    // unannotated route to inherit them, which previously throttled dashboard
+    // read endpoints to 5 req/min (demo_request / contact_form bucket).
     ThrottlerModule.forRoot([
-      { name: 'login', ttl: 900_000, limit: 1000 },
-      { name: 'register_account', ttl: 3_600_000, limit: 1000 },
-      { name: 'customer_reg', ttl: 60_000, limit: 30 },
-      { name: 'tenant_info', ttl: 60_000, limit: 30 },
-      { name: 'webhook_gupshup', ttl: 60_000, limit: 500 },
-      { name: 'webhook_integration', ttl: 60_000, limit: 200 },
-      { name: 'lookup', ttl: 60_000, limit: 60 },
-      { name: 'transactions', ttl: 60_000, limit: 120 },
-      { name: 'dashboard', ttl: 60_000, limit: 30 },
-      { name: 'campaign_send', ttl: 60_000, limit: 1000 },
-      { name: 'demo_request', ttl: 60_000, limit: 5 },
-      { name: 'contact_form', ttl: 60_000, limit: 5 },
-      { name: 'default', ttl: 60_000, limit: 100 },
+      { name: 'default', ttl: 60_000, limit: 300 },
     ]),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
@@ -109,6 +99,7 @@ import { createWinstonConfig } from './common/logger/winston.config';
     ContactModule,
     AdminModule,
     RedemptionsModule,
+    ActivityLogModule,
   ],
   controllers: [AppController],
   providers: [

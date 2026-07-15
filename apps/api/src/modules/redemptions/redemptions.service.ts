@@ -6,6 +6,7 @@ import { Queue } from 'bullmq';
 import { TriggerType } from '@pingloyal/types';
 import { TenantsService } from '../tenants/tenants.service';
 import type { CreateRedemptionDto } from './dto/create-redemption.dto';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 export interface RedemptionRow {
   id: string;
@@ -55,6 +56,7 @@ export class RedemptionsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly tenantsService: TenantsService,
     @InjectQueue('wa-messages') private readonly waQueue: Queue,
+    private readonly activityLogService: ActivityLogService,
   ) {}
 
   async createRedemption(
@@ -63,12 +65,38 @@ export class RedemptionsService {
     dto: CreateRedemptionDto,
   ): Promise<RedemptionRow> {
     const tenant = await this.tenantsService.findOne(tenantId);
-    const pointsToDeduct = dto.rewardsToRedeem * tenant.pointsThreshold;
-    const value = dto.rewardsToRedeem * Number(tenant.rewardValue);
+
+    const rewards = Math.floor(Number(dto.rewardsToRedeem));
+    const threshold = Math.floor(Number(tenant.pointsThreshold));
+    const rewardVal = Number(tenant.rewardValue);
+
+    if (!Number.isFinite(rewards) || rewards < 1) {
+      throw new BadRequestException('rewardsToRedeem must be a positive integer');
+    }
+    if (!Number.isFinite(threshold) || threshold < 1) {
+      throw new BadRequestException('Reward threshold is not configured — contact support');
+    }
+
+    const pointsToDeduct = rewards * threshold;
+    const value = rewards * (Number.isFinite(rewardVal) ? rewardVal : 0);
+
+    // Block redemption if the customer has any open flagged transactions
+    const [flagCheck] = await this.dataSource.query<{ count: string }[]>(
+      `SELECT COUNT(*) AS count FROM transactions
+       WHERE customer_id = $1 AND tenant_id = $2 AND is_flagged = true AND voided_at IS NULL`,
+      [dto.customerId, tenantId],
+    );
+    if (parseInt(flagCheck?.count ?? '0', 10) > 0) {
+      throw new BadRequestException(
+        'This account has flagged transactions under review. Redemption is blocked until all flags are resolved by a manager.',
+      );
+    }
 
     const row = await this.dataSource.transaction(async (em) => {
-      // Atomic deduction — WHERE clause prevents double-spend under concurrent requests
-      const updated = await em.query<{ points_balance: string }[]>(
+      // Atomic deduction — WHERE clause prevents double-spend under concurrent requests.
+      // em.query() inside a transaction returns [rowsArray, affectedCount], so we
+      // extract the rows array from index [0] before accessing individual rows.
+      const updateResult = await em.query<{ points_balance: string }[]>(
         `UPDATE customers
          SET points_balance = points_balance - $1
          WHERE id = $2
@@ -77,12 +105,15 @@ export class RedemptionsService {
          RETURNING points_balance`,
         [pointsToDeduct, dto.customerId, tenantId],
       );
+      const updatedRows = (
+        Array.isArray(updateResult[0]) ? updateResult[0] : updateResult
+      ) as { points_balance: string }[];
 
-      if (updated.length === 0) {
+      if (updatedRows.length === 0) {
         throw new BadRequestException('Insufficient points');
       }
 
-      const balanceAfter = Number(updated[0].points_balance);
+      const balanceAfter = Number(updatedRows[0].points_balance);
 
       await em.query(
         `INSERT INTO points_ledger (tenant_id, customer_id, delta, reason, balance_after)
@@ -90,7 +121,7 @@ export class RedemptionsService {
         [tenantId, dto.customerId, -pointsToDeduct, balanceAfter],
       );
 
-      const [redemption] = await em.query<
+      const insertResult = await em.query<
         { id: string; redeemed_at: string }[]
       >(
         `INSERT INTO redemptions
@@ -101,13 +132,17 @@ export class RedemptionsService {
           tenantId,
           dto.customerId,
           cashierId,
-          dto.rewardsToRedeem,
+          rewards,
           pointsToDeduct,
           value,
           balanceAfter,
           dto.notes ?? null,
         ],
       );
+      const insertedRows = (
+        Array.isArray(insertResult[0]) ? insertResult[0] : insertResult
+      ) as { id: string; redeemed_at: string }[];
+      const redemption = insertedRows[0];
 
       const result: RedemptionRow = {
         id: redemption.id,
@@ -116,7 +151,7 @@ export class RedemptionsService {
         customerPhone: '',
         redeemedAt: new Date(redemption.redeemed_at).toISOString(),
         pointsRedeemed: pointsToDeduct,
-        rewardsCount: dto.rewardsToRedeem,
+        rewardsCount: rewards,
         value,
         balanceAfter,
         cashierName: null,
@@ -131,11 +166,11 @@ export class RedemptionsService {
         tenantId,
         customerId: dto.customerId,
         data: {
-          rewardsCount: String(dto.rewardsToRedeem),
+          rewardsCount: String(rewards),
           rewardValue: String(value),
           newBalance: String(row.balanceAfter),
           progressPercent: String(
-            Math.round((row.balanceAfter / tenant.pointsThreshold) * 100),
+            Math.round((row.balanceAfter / threshold) * 100),
           ),
         },
       });
@@ -144,6 +179,16 @@ export class RedemptionsService {
         `Failed to queue REWARD_REDEEMED WA message for tenant=${tenantId}: ${String(err)}`,
       );
     }
+
+    void this.activityLogService.log({
+      tenantId,
+      actorId: cashierId,
+      actorRole: 'cashier',
+      action: 'redemption.created',
+      entityType: 'redemption',
+      entityId: row.id,
+      description: `${rewards} reward${rewards > 1 ? 's' : ''} redeemed — ₦${value.toLocaleString()} value (${row.pointsRedeemed} pts deducted)`,
+    });
 
     return row;
   }
@@ -263,11 +308,15 @@ export class RedemptionsService {
 
   async getStats(
     tenantId: string,
-    query: { startDate?: string; endDate?: string },
+    query: { startDate?: string; endDate?: string; customerId?: string },
   ): Promise<RedemptionStats> {
     const params: unknown[] = [tenantId];
     const conditions: string[] = ['r.tenant_id = $1'];
 
+    if (query.customerId) {
+      params.push(query.customerId);
+      conditions.push(`r.customer_id = $${params.length}`);
+    }
     if (query.startDate) {
       params.push(query.startDate);
       conditions.push(`r.redeemed_at >= $${params.length}`);

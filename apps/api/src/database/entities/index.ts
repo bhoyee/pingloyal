@@ -21,3 +21,4 @@ export { ReportSchedule } from '../../modules/reports/entities/report-schedule.e
 export { Staff } from '../../modules/staff-auth/entities/staff.entity';
 export { SupportTicket } from '../../modules/support/entities/support-ticket.entity';
 export { SupportTicketMessage } from '../../modules/support/entities/support-ticket-message.entity';
+export { ActivityLog } from '../../modules/activity-log/entities/activity-log.entity';

@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import {
   BadRequestException,
   ConflictException,
@@ -463,6 +464,206 @@ export class TenantsService {
     });
 
     return { businessName: tenant.businessName };
+  }
+
+  // ── Staff admin methods ────────────────────────────────────────────────────
+
+  async adminGetStats() {
+    const rows: { status: string; count: string }[] = await this.dataSource.query(
+      `SELECT subscription_status AS status, COUNT(*) AS count
+       FROM tenants
+       WHERE deletion_requested_at IS NULL
+       GROUP BY subscription_status`,
+    );
+    const map: Record<string, number> = {};
+    let total = 0;
+    for (const r of rows) {
+      map[r.status] = parseInt(r.count, 10);
+      total += parseInt(r.count, 10);
+    }
+    return {
+      total,
+      trialing: map['trialing'] ?? 0,
+      active: map['active'] ?? 0,
+      pastDue: map['past_due'] ?? 0,
+      suspended: map['suspended'] ?? 0,
+      cancelled: map['cancelled'] ?? 0,
+    };
+  }
+
+  async adminListTenants(query: { search?: string; status?: string; page: number }) {
+    const limit = 20;
+    const offset = (query.page - 1) * limit;
+    const params: unknown[] = [];
+    const conditions: string[] = ['t.deletion_requested_at IS NULL'];
+
+    if (query.search) {
+      params.push(`%${query.search.toLowerCase()}%`);
+      conditions.push(`(LOWER(t.business_name) LIKE $${params.length} OR LOWER(t.slug) LIKE $${params.length})`);
+    }
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`t.subscription_status = $${params.length}`);
+    }
+
+    const where = conditions.join(' AND ');
+    const countRows: { count: string }[] = await this.dataSource.query(
+      `SELECT COUNT(*) AS count FROM tenants t WHERE ${where}`,
+      params,
+    );
+    const total = parseInt(countRows[0]?.count ?? '0', 10);
+
+    const dataParams = [...params, limit, offset];
+    type Row = {
+      id: string; business_name: string; slug: string; plan_tier: string;
+      subscription_status: string; created_at: string;
+      owner_email: string | null; owner_name: string | null; user_count: string;
+    };
+    const rows: Row[] = await this.dataSource.query(
+      `SELECT t.id, t.business_name, t.slug, t.plan_tier, t.subscription_status, t.created_at,
+              u.email AS owner_email, u.full_name AS owner_name,
+              (SELECT COUNT(*) FROM users WHERE tenant_id = t.id) AS user_count
+       FROM tenants t
+       LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'owner'
+       WHERE ${where}
+       ORDER BY t.created_at DESC
+       LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+      dataParams,
+    );
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        businessName: r.business_name,
+        slug: r.slug,
+        planTier: r.plan_tier,
+        subscriptionStatus: r.subscription_status,
+        createdAt: r.created_at,
+        ownerEmail: r.owner_email,
+        ownerName: r.owner_name,
+        userCount: parseInt(r.user_count, 10),
+      })),
+      total,
+      page: query.page,
+      limit,
+    };
+  }
+
+  async adminGetTenant(id: string) {
+    type Row = {
+      id: string; business_name: string; slug: string; plan_tier: string;
+      subscription_status: string; trial_ends_at: string | null;
+      created_at: string; logo_url: string | null;
+      currency: string; timezone: string; points_threshold: number;
+      reward_value: string; marketing_wallet_balance: string;
+      owner_email: string | null; owner_name: string | null;
+    };
+    const rows: Row[] = await this.dataSource.query(
+      `SELECT t.id, t.business_name, t.slug, t.plan_tier, t.subscription_status,
+              t.trial_ends_at, t.created_at, t.logo_url, t.currency, t.timezone,
+              t.points_threshold, t.reward_value, t.marketing_wallet_balance,
+              u.email AS owner_email, u.full_name AS owner_name
+       FROM tenants t
+       LEFT JOIN users u ON u.tenant_id = t.id AND u.role = 'owner'
+       WHERE t.id = $1
+       LIMIT 1`,
+      [id],
+    );
+    if (!rows[0]) throw new NotFoundException('Tenant not found');
+    const r = rows[0];
+    return {
+      id: r.id,
+      businessName: r.business_name,
+      slug: r.slug,
+      planTier: r.plan_tier,
+      subscriptionStatus: r.subscription_status,
+      trialEndsAt: r.trial_ends_at,
+      createdAt: r.created_at,
+      logoUrl: r.logo_url,
+      currency: r.currency,
+      timezone: r.timezone,
+      pointsThreshold: r.points_threshold,
+      rewardValue: Number(r.reward_value),
+      marketingWalletBalance: Number(r.marketing_wallet_balance),
+      ownerEmail: r.owner_email,
+      ownerName: r.owner_name,
+    };
+  }
+
+  async adminCreateTenant(dto: { businessName: string; ownerEmail: string; ownerFullName: string; planTier?: string }) {
+    const slug = await this.generateUniqueSlug(dto.businessName);
+    const existing = await this.userRepo.findOne({ where: { email: dto.ownerEmail.toLowerCase() } });
+    if (existing) throw new ConflictException('A user with this email already exists');
+
+    const tempPassword = crypto.randomBytes(8).toString('hex');
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+    const tenant = await this.dataSource.transaction(async (em) => {
+      const t = em.create(Tenant, {
+        businessName: dto.businessName,
+        slug,
+        planTier: (dto.planTier as any) ?? 'starter',
+        subscriptionStatus: 'active' as any,
+      });
+      const saved = await em.save(Tenant, t);
+
+      const user = em.create(User, {
+        tenantId: saved.id,
+        email: dto.ownerEmail.toLowerCase(),
+        hashedPassword,
+        fullName: dto.ownerFullName,
+        role: UserRole.OWNER,
+        isActive: true,
+        emailVerifiedAt: new Date(),
+      });
+      await em.save(User, user);
+      return saved;
+    });
+
+    return {
+      id: tenant.id,
+      businessName: tenant.businessName,
+      slug: tenant.slug,
+      ownerEmail: dto.ownerEmail.toLowerCase(),
+      temporaryPassword: tempPassword,
+    };
+  }
+
+  async adminUpdateTenant(id: string, dto: { businessName?: string; planTier?: string; subscriptionStatus?: string }) {
+    const tenant = await this.tenantRepo.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const updates: Partial<Tenant> = {};
+    if (dto.businessName) updates.businessName = dto.businessName;
+    if (dto.planTier) updates.planTier = dto.planTier as any;
+    if (dto.subscriptionStatus) updates.subscriptionStatus = dto.subscriptionStatus as any;
+
+    await this.tenantRepo.update(id, updates);
+    await this.redis.del(`tenant:${id}`);
+
+    return { ...tenant, ...updates };
+  }
+
+  async adminDeleteTenant(id: string) {
+    const tenant = await this.tenantRepo.findOne({ where: { id } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    await this.tenantRepo.update(id, { deletionRequestedAt: new Date() });
+    await this.redis.del(`tenant:${id}`);
+  }
+
+  private async generateUniqueSlug(businessName: string): Promise<string> {
+    const base = businessName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    let slug = base;
+    let attempt = 0;
+    while (await this.tenantRepo.findOne({ where: { slug } })) {
+      attempt++;
+      slug = `${base}-${attempt}`;
+    }
+    return slug;
   }
 }
 

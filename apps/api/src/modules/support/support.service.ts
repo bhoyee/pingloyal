@@ -225,6 +225,19 @@ export class SupportService {
 
   // ── Staff-facing ───────────────────────────────────────────────────────────
 
+  async getTicketCountsForStaff(): Promise<{ open: number; in_progress: number }> {
+    const rows = await this.ticketRepo
+      .createQueryBuilder('t')
+      .select('t.status', 'status')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('t.status IN (:...statuses)', { statuses: ['open', 'in_progress'] })
+      .groupBy('t.status')
+      .getRawMany<{ status: string; cnt: string }>();
+    const counts: Record<string, number> = {};
+    for (const r of rows) counts[r.status] = Number(r.cnt);
+    return { open: counts['open'] ?? 0, in_progress: counts['in_progress'] ?? 0 };
+  }
+
   findAllForStaff(status?: string): Promise<SupportTicket[]> {
     return this.ticketRepo.find({
       where: status ? { status: status as SupportTicket['status'] } : {},
