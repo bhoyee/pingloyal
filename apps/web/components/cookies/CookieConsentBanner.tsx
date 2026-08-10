@@ -72,18 +72,30 @@ export function CookieConsentBanner() {
     // covers the full viewport, so clicks on the page behind it are blocked
     // until a choice is made.
     <div className="fixed inset-0 z-[9999] flex items-end justify-center p-4 sm:items-center">
-      <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl sm:p-8">
+      <div className="w-full max-w-lg rounded-2xl border border-gray-700 bg-[#0A1628] p-6 shadow-2xl sm:p-8">
         {!managing ? (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/10 text-2xl">
-              🍪
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0DC56A]/20 text-2xl">
+                🍪
+              </div>
+              {!mandatory && (
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close"
+                  className="mt-1 text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
             </div>
-            <h2 className="mt-4 text-xl font-bold text-[#0A1628]">We value your privacy</h2>
-            <p className="mt-2 text-[15px] leading-relaxed text-gray-600">
+            <h2 className="mt-4 text-xl font-bold text-white">We value your privacy</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-gray-300">
               We use cookies to keep you signed in and, with your permission, to understand how
               PingLoyal is used. Choose what you&apos;re comfortable with — you can change this
               any time from our{' '}
-              <a href="/cookies" className="font-medium text-[#0A1628] underline">
+              <a href="/cookies" className="font-medium text-[#0DC56A] underline">
                 Cookie Policy
               </a>
               .
@@ -99,14 +111,14 @@ export function CookieConsentBanner() {
               <button
                 type="button"
                 onClick={rejectNonEssential}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-[#0A1628] hover:border-[#0A1628]"
+                className="flex-1 rounded-lg border border-gray-600 px-4 py-3 text-sm font-medium text-gray-200 hover:border-gray-400"
               >
                 Reject non-essential
               </button>
               <button
                 type="button"
                 onClick={() => setManaging(true)}
-                className="flex-1 rounded-lg px-4 py-3 text-sm font-medium text-gray-500 hover:text-[#0A1628]"
+                className="flex-1 rounded-lg px-4 py-3 text-sm font-medium text-gray-400 hover:text-white"
               >
                 Manage preferences
               </button>
@@ -114,31 +126,43 @@ export function CookieConsentBanner() {
           </>
         ) : (
           <>
-            <h2 className="text-xl font-bold text-[#0A1628]">Cookie preferences</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-white">Cookie preferences</h2>
+              {!mandatory && (
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close"
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
             <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-700 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-[#0A1628]">Strictly necessary</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="text-sm font-medium text-white">Strictly necessary</p>
+                  <p className="mt-0.5 text-xs text-gray-400">
                     Keeps you signed in and remembers basic preferences. Always on.
                   </p>
                 </div>
                 <ToggleSwitch checked disabled onChange={() => undefined} />
               </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-700 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-[#0A1628]">Analytics</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="text-sm font-medium text-white">Analytics</p>
+                  <p className="mt-0.5 text-xs text-gray-400">
                     Helps us understand how PingLoyal is used. Not currently active — your choice
                     is saved for when it is.
                   </p>
                 </div>
                 <ToggleSwitch checked={analytics} onChange={setAnalytics} />
               </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-700 px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-[#0A1628]">Marketing</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
+                  <p className="text-sm font-medium text-white">Marketing</p>
+                  <p className="mt-0.5 text-xs text-gray-400">
                     Used to measure the performance of our ads. Not currently active.
                   </p>
                 </div>
@@ -146,19 +170,10 @@ export function CookieConsentBanner() {
               </div>
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
-              {!mandatory && (
-                <button
-                  type="button"
-                  onClick={close}
-                  className="rounded-lg px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-[#0A1628]"
-                >
-                  Cancel
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setManaging(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-[#0A1628] hover:border-[#0A1628]"
+                className="rounded-lg border border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-200 hover:border-gray-400"
               >
                 Back
               </button>

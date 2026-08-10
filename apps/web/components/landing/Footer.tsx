@@ -73,7 +73,8 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-gray-200 pt-8 sm:flex-row">
           <p className="text-sm text-gray-400">
-            © 2025 PingLoyal — Operated by Bhoyee Global Enterprise
+            © {new Date().getFullYear()} PingLoyal — Dev by{' '}
+            <a href="https://salisu.dev" className="hover:text-[#0A1628]">salisu.dev</a>
           </p>
           <p className="text-sm text-gray-400">
             Lagos, Nigeria ·{' '}
