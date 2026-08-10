@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { api, ApiError, type Campaign, type CampaignStatus, type Category, type TenantMe, type TierConfig } from '@/lib/api';
@@ -36,7 +35,7 @@ function deliveryRatePercent(c: Campaign): number | null {
   return Math.round((c.deliveredCount / c.sentCount) * 100);
 }
 
-export default function CampaignsPage() {
+function CampaignsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFilter = (searchParams.get('status') ?? 'all') as CampaignStatus | 'all';
@@ -397,4 +396,8 @@ export default function CampaignsPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><CampaignsPage /></Suspense>;
 }

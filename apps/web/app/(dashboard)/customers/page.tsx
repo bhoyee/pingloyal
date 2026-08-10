@@ -1,5 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useEffect, useState } from 'react';
@@ -50,7 +50,7 @@ function SkeletonRow() {
   );
 }
 
-export default function CustomersPage() {
+function CustomersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
@@ -354,4 +354,8 @@ export default function CustomersPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><CustomersPage /></Suspense>;
 }

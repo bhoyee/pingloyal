@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, publicPost, ApiError, type TenantMe } from '@/lib/api';
@@ -11,7 +10,7 @@ interface LoginResponse {
   refreshToken?: string;
 }
 
-export default function LoginPage() {
+function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -142,4 +141,8 @@ export default function LoginPage() {
       </div>
     </AuthSplitLayout>
   );
+}
+
+export default function Page() {
+  return <Suspense><LoginPage /></Suspense>;
 }

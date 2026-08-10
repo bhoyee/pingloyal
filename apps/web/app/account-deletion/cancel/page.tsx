@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { publicPost, ApiError } from '@/lib/api';
 
@@ -10,7 +9,7 @@ interface CancelResponse {
 
 type Status = 'loading' | 'success' | 'error';
 
-export default function CancelAccountDeletionPage() {
+function CancelAccountDeletionPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<Status>('loading');
@@ -101,3 +100,6 @@ export default function CancelAccountDeletionPage() {
   );
 }
 
+export default function Page() {
+  return <Suspense><CancelAccountDeletionPage /></Suspense>;
+}

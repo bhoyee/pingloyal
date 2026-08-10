@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { api, ApiError, type TenantMe } from '@/lib/api';
@@ -84,7 +83,7 @@ function isTab(value: string | null): value is Tab {
   return TABS.some((t) => t.key === value);
 }
 
-export default function CustomerDetailPage() {
+function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -285,4 +284,8 @@ export default function CustomerDetailPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><CustomerDetailPage /></Suspense>;
 }

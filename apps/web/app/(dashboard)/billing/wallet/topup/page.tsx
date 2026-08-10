@@ -1,5 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
@@ -27,7 +27,7 @@ function formatWithCommas(value: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-export default function TopupPage() {
+function TopupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [rawAmount, setRawAmount] = useState('');
@@ -247,4 +247,8 @@ export default function TopupPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><TopupPage /></Suspense>;
 }

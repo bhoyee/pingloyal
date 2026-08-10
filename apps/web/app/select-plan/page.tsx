@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { publicGet, ApiError } from '@/lib/api';
 
@@ -25,7 +24,7 @@ const PLAN_COPY: Record<string, { tagline: string; popular: boolean }> = {
   connect: { tagline: 'For multi-location & existing POS', popular: false },
 };
 
-export default function SelectPlanPage() {
+function SelectPlanPage() {
   const router = useRouter();
   const params = useSearchParams();
   const signupToken = params.get('token') ?? '';
@@ -145,4 +144,8 @@ export default function SelectPlanPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><SelectPlanPage /></Suspense>;
 }

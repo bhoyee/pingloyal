@@ -1,7 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cashierApi, ApiError, type CustomerLookupResult } from '@/lib/api';
 import { useCashier } from '../../context/cashier-context';
@@ -16,7 +14,7 @@ type PageState =
   | { status: 'success'; customerName: string; rewardsRedeemed: number; valueRedeemed: number; balanceAfter: number }
   | { status: 'error'; message: string };
 
-export default function RedemptionPage() {
+function RedemptionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { tenant } = useCashier();
@@ -349,4 +347,8 @@ export default function RedemptionPage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><RedemptionPage /></Suspense>;
 }

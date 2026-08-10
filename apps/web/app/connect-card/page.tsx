@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { publicGet, publicPost, ApiError } from '@/lib/api';
 
@@ -21,7 +20,7 @@ interface StartTrialResponse {
   checkoutUrl?: string;
 }
 
-export default function ConnectCardPage() {
+function ConnectCardPage() {
   const params = useSearchParams();
   const signupToken = params.get('token') ?? '';
   const planTier = params.get('plan') ?? '';
@@ -134,4 +133,8 @@ export default function ConnectCardPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><ConnectCardPage /></Suspense>;
 }

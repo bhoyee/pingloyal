@@ -1,6 +1,5 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { publicGet, ApiError } from '@/lib/api';
 
@@ -10,7 +9,7 @@ interface SignupStatusResponse {
   refreshToken?: string;
 }
 
-export default function SignupCompletePage() {
+function SignupCompletePage() {
   const router = useRouter();
   const params = useSearchParams();
   const signupToken = params.get('token') ?? '';
@@ -153,4 +152,8 @@ export default function SignupCompletePage() {
       <p className="text-slate-600">Confirming your payment…</p>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><SignupCompletePage /></Suspense>;
 }

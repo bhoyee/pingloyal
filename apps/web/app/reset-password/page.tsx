@@ -1,10 +1,9 @@
 'use client';
-export const dynamic = 'force-dynamic';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { publicPost, ApiError } from '@/lib/api';
 
-export default function ResetPasswordPage() {
+function ResetPasswordPage() {
   const router = useRouter();
   const params = useSearchParams();
   const email = params.get('email') ?? '';
@@ -207,4 +206,8 @@ export default function ResetPasswordPage() {
       </div>
     </div>
   );
+}
+
+export default function Page() {
+  return <Suspense><ResetPasswordPage /></Suspense>;
 }
