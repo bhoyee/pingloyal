@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { BrandMark } from './AuthSplitLayout';
 
 const POINTS = [
-  'Works offline — syncs the moment you're back online',
+  "Works offline — syncs the moment you're back online",
   'Awards points the instant a sale is logged',
   'No extra hardware — runs in any browser',
 ];
