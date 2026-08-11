@@ -37,10 +37,7 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           {/* Brand — spans 2 cols on md */}
           <div className="col-span-2 md:col-span-2">
-            {/* Logo shown white on dark bg */}
-            <div className="brightness-0 invert">
-              <Logo />
-            </div>
+            <Logo light />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-gray-400">
               WhatsApp loyalty automation for African SMBs — retail, food, and
               service businesses alike. Turn every visit into a loyal customer.
