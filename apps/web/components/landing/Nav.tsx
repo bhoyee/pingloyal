@@ -53,11 +53,22 @@ export function Nav() {
       {/* Mobile dropdown menu */}
       {open && (
         <div className="border-t border-gray-200 bg-white px-6 pb-5 sm:hidden">
-          <nav className="flex flex-col gap-4 py-4">
-            <a href="/#how-it-works" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600 hover:text-[#0A1628]">How it works</a>
-            <a href="/#features" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600 hover:text-[#0A1628]">Features</a>
-            <a href="/#pricing" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600 hover:text-[#0A1628]">Pricing</a>
-            <a href="/#testimonials" onClick={() => setOpen(false)} className="text-sm font-medium text-gray-600 hover:text-[#0A1628]">Case studies</a>
+          <nav className="flex flex-col py-2">
+            {[
+              { label: 'How it works', href: '/#how-it-works' },
+              { label: 'Features', href: '/#features' },
+              { label: 'Pricing', href: '/#pricing' },
+              { label: 'Case studies', href: '/#testimonials' },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-[#0A1628]"
+              >
+                {item.label}
+              </a>
+            ))}
           </nav>
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
             <Link
