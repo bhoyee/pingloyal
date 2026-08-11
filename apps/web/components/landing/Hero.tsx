@@ -14,8 +14,8 @@ export default function Hero() {
           {/* ── Left column ── */}
           <div className="space-y-8">
             {/* Badge — static, no blinking dot */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 shadow-sm">
-              <span className="text-base">🇳🇬</span>
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-4 py-2 shadow-sm">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#0DC56A]" />
               <span className="text-sm font-medium text-gray-600">
                 Now live in Nigeria — 14-day free trial
               </span>
@@ -46,7 +46,7 @@ export default function Hero() {
                 href="#how-it-works"
                 className="group inline-flex items-center gap-2.5 text-base font-medium text-[#0A1628]"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:border-[#0DC56A] group-hover:bg-[#0DC56A]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#0A1628] bg-white shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:border-[#0DC56A] group-hover:bg-[#0DC56A]">
                   <svg
                     width="12"
                     height="14"
