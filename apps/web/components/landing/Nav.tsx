@@ -63,11 +63,11 @@ export function Nav() {
             <Link
               href="/login"
               onClick={() => setOpen(false)}
-              className="rounded-lg border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-[#0A1628] hover:border-[#0A1628]"
+              className="rounded-lg border border-[#0A1628] bg-[#0A1628] px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-[#1a3050]"
             >
               Sign in
             </Link>
-            <BookDemoButton className="rounded-lg border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-[#0A1628] hover:border-[#0A1628]">
+            <BookDemoButton className="rounded-lg border border-[#0DC56A] px-4 py-2.5 text-center text-sm font-medium text-[#0DC56A] hover:bg-[#0DC56A] hover:text-white">
               Book a demo
             </BookDemoButton>
           </div>
