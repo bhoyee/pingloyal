@@ -97,7 +97,7 @@ function RoleCard({ role }: { role: Role }) {
       </div>
 
       <a
-        href={`mailto:careers@pingloyal.com?subject=${encodeURIComponent(
+        href={`mailto:hello@pingloyal.com?subject=${encodeURIComponent(
           `Application: ${role.title}`,
         )}`}
         className="mt-6 inline-flex rounded-lg bg-[#0A1628] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#16294a]"
@@ -132,7 +132,7 @@ export default function CareersPage() {
           <p className="mt-10 text-center text-sm text-gray-500">
             Don&apos;t see a fit but think you&apos;d be great here?{' '}
             <a
-              href="mailto:careers@pingloyal.com"
+              href="mailto:hello@pingloyal.com"
               className="font-medium text-[#0A1628] underline"
             >
               Reach out anyway
