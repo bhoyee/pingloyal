@@ -9,11 +9,11 @@ export const metadata = {
 const VALUES = [
   {
     title: 'Built for how Nigerian SMBs actually work',
-    body: 'No POS overhaul, no app your customers have to download — WhatsApp is where they already are, so that's where loyalty happens, whether you run a store, a salon, or a restaurant.',
+    body: "No POS overhaul, no app your customers have to download — WhatsApp is where they already are, so that is where loyalty happens, whether you run a store, a salon, or a restaurant.",
   },
   {
     title: 'Simple enough to run without a dev team',
-    body: 'Most of our merchants are small, busy teams. If a feature needs a manual to use, we've done it wrong.',
+    body: "Most of our merchants are small, busy teams. If a feature needs a manual to use, we have done it wrong.",
   },
   {
     title: 'We charge for value delivered, not seats',
