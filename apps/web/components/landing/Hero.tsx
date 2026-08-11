@@ -14,8 +14,7 @@ export default function Hero() {
           {/* ── Left column ── */}
           <div className="space-y-8">
             {/* Badge — static, no blinking dot */}
-            <div className="inline-flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-4 py-2 shadow-sm">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#0DC56A]" />
+            <div className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-2 shadow-sm">
               <span className="text-sm font-medium text-gray-600">
                 Now live in Nigeria — 14-day free trial
               </span>
