@@ -56,14 +56,18 @@ export default function ContactPage() {
   return (
     <>
       <Nav />
-      <main className="bg-white px-6 py-16 lg:px-8">
-        <div className="mx-auto max-w-xl">
+      <section className="bg-[#0A1628] px-6 py-16 lg:px-8">
+        <div className="mx-auto max-w-xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0DC56A]">Get in touch</p>
-          <h1 className="mt-2 text-3xl font-bold text-[#0A1628] lg:text-4xl">Contact us</h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-gray-600">
+          <h1 className="mt-3 text-3xl font-bold text-white lg:text-5xl">Contact us</h1>
+          <p className="mt-4 text-[15px] leading-relaxed text-white/60">
             Questions about pricing, a feature, or anything else? Send us a message and
             we&apos;ll reply by email — usually within a business day.
           </p>
+        </div>
+      </section>
+      <main className="bg-white px-6 py-12 lg:px-8">
+        <div className="mx-auto max-w-xl">
 
           <form
             onSubmit={form.handleSubmit(onSubmit)}

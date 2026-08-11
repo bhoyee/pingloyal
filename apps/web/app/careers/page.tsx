@@ -112,16 +112,20 @@ export default function CareersPage() {
   return (
     <>
       <Nav />
-      <main className="bg-white px-6 py-16 lg:px-8">
-        <div className="mx-auto max-w-3xl">
+      <section className="bg-[#0A1628] px-6 py-16 lg:px-8">
+        <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0DC56A]">Careers</p>
-          <h1 className="mt-2 text-3xl font-bold text-[#0A1628] lg:text-4xl">
+          <h1 className="mt-3 text-3xl font-bold text-white lg:text-5xl">
             Help Nigerian retail businesses grow
           </h1>
-          <p className="mt-3 text-[15px] leading-relaxed text-gray-600">
-            We&apos;re a small team based in Lagos, building tools that help local retailers keep
-            their customers coming back. Here&apos;s what we&apos;re hiring for right now.
+          <p className="mt-4 text-[15px] leading-relaxed text-white/60">
+            We are a small team based in Lagos, building tools that help local retailers keep
+            their customers coming back. Here is what we are hiring for right now.
           </p>
+        </div>
+      </section>
+      <main className="bg-white px-6 py-12 lg:px-8">
+        <div className="mx-auto max-w-3xl">
 
           <div className="mt-10 space-y-6">
             {ROLES.map((role) => (

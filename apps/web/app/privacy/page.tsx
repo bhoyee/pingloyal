@@ -18,11 +18,15 @@ export default function PrivacyPage() {
   return (
     <>
       <Nav />
-      <main className="bg-white px-6 py-16 lg:px-8">
-        <div className="mx-auto max-w-3xl">
+      <section className="bg-[#0A1628] px-6 py-16 lg:px-8">
+        <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-[#0DC56A]">Legal</p>
-          <h1 className="mt-2 text-3xl font-bold text-[#0A1628] lg:text-4xl">Privacy Policy</h1>
-          <p className="mt-3 text-sm text-gray-500">Last updated: 25 June 2026</p>
+          <h1 className="mt-3 text-3xl font-bold text-white lg:text-5xl">Privacy Policy</h1>
+          <p className="mt-3 text-sm text-white/50">Last updated: 25 June 2026</p>
+        </div>
+      </section>
+      <main className="bg-white px-6 py-12 lg:px-8">
+        <div className="mx-auto max-w-3xl">
 
           <Section title="1. Who we are">
             <p>
