@@ -45,11 +45,8 @@ export function Nav() {
           </BookDemoButton>
         </div>
 
-        {/* Mobile: Start free trial + hamburger */}
-        <div className="flex items-center gap-2 sm:hidden">
-          <Link href="/register" className="rounded-lg bg-[#0DC56A] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#0ab55e]">
-            Start free trial
-          </Link>
+        {/* Mobile: hamburger only */}
+        <div className="flex items-center sm:hidden">
           <button
             onClick={() => setOpen(!open)}
             aria-label="Toggle menu"
@@ -81,6 +78,13 @@ export function Nav() {
             ))}
           </nav>
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
+            <Link
+              href="/register"
+              onClick={() => setOpen(false)}
+              className="rounded-lg bg-[#0DC56A] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#0ab55e]"
+            >
+              Start free trial →
+            </Link>
             <Link
               href="/login"
               onClick={() => setOpen(false)}
