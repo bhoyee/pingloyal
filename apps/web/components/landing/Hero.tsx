@@ -71,8 +71,8 @@ export default function Hero() {
 
             {/* Trust bar */}
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0DC56A]/30 bg-[#0DC56A]/5 px-3 py-1.5 text-sm font-medium text-[#0DC56A]">
-                🚀 Now in early access — be among the first stores in Lagos
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                🚀 Now in early access — be among the first stores in Nigeria
               </span>
             </div>
           </div>
