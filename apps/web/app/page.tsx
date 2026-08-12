@@ -7,6 +7,34 @@ import Testimonials from '@/components/landing/Testimonials';
 import { Nav } from '@/components/landing/Nav';
 import { Footer } from '@/components/landing/Footer';
 
+// ── Social Proof Strip ────────────────────────────────────────────────────────
+
+function SocialProofStrip() {
+  const stats = [
+    { value: '14-day', label: 'Free trial — no card needed' },
+    { value: '95%', label: 'WhatsApp open rate in Nigeria' },
+    { value: '₦0', label: 'Setup cost — ever' },
+    { value: '10min', label: 'Average time to go live' },
+  ];
+
+  return (
+    <div className="bg-[#0A1628] px-6 py-12 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="text-center">
+              <p className="text-3xl font-bold text-[#0DC56A] lg:text-4xl">
+                {s.value}
+              </p>
+              <p className="mt-1 text-sm text-white/60">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Features Grid ─────────────────────────────────────────────────────────────
 
 function FeaturesGrid() {
@@ -224,6 +252,7 @@ export default function LandingPage() {
       <Nav />
       <main>
         <Hero />
+        <SocialProofStrip />
         <HowItWorks />
         <MessagesSection />
         <FeaturesGrid />
