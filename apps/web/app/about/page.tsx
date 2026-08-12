@@ -21,12 +21,6 @@ const VALUES = [
   },
 ];
 
-const STATS = [
-  { value: '200+', label: 'Stores onboarded' },
-  { value: '50K+', label: 'Loyalty messages sent' },
-  { value: '34%', label: 'Avg. repeat visit increase' },
-  { value: '10 min', label: 'Average setup time' },
-];
 
 export default function AboutPage() {
   return (
@@ -50,17 +44,6 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Stats */}
-        <section className="border-b border-gray-100 px-6 py-12 lg:px-8">
-          <div className="mx-auto max-w-4xl grid grid-cols-2 gap-8 sm:grid-cols-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="text-center">
-                <p className="text-3xl font-bold text-[#0A1628]">{s.value}</p>
-                <p className="mt-1 text-sm text-gray-500">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
 
         <div className="mx-auto max-w-3xl px-6 py-16 lg:px-8 space-y-16">
 

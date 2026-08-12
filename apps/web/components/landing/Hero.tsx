@@ -70,23 +70,10 @@ export default function Hero() {
             </div>
 
             {/* Trust bar */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {['AO', 'CK', 'BI', 'NK'].map((initials, i) => (
-                  <div
-                    key={initials}
-                    className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white"
-                    style={{ background: ['#0A1628', '#0DC56A', '#6366f1', '#f59e0b'][i] }}
-                  >
-                    {initials}
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-gray-600">
-                Trusted by{' '}
-                <span className="font-semibold text-[#0A1628]">200+ stores</span>{' '}
-                across Lagos
-              </p>
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#0DC56A]/30 bg-[#0DC56A]/5 px-3 py-1.5 text-sm font-medium text-[#0DC56A]">
+                🚀 Now in early access — be among the first stores in Lagos
+              </span>
             </div>
           </div>
 

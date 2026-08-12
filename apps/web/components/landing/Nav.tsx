@@ -15,11 +15,21 @@ export function Nav() {
         </Link>
 
         {/* Centre links — desktop only */}
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
-          <a href="/#how-it-works" className="text-sm font-medium text-gray-600 transition-colors hover:text-[#0A1628]">How it works</a>
-          <a href="/#features" className="text-sm font-medium text-gray-600 transition-colors hover:text-[#0A1628]">Features</a>
-          <a href="/#pricing" className="text-sm font-medium text-gray-600 transition-colors hover:text-[#0A1628]">Pricing</a>
-          <a href="/#testimonials" className="text-sm font-medium text-gray-600 transition-colors hover:text-[#0A1628]">Case studies</a>
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+          {[
+            { label: 'How it works', href: '/#how-it-works' },
+            { label: 'Features', href: '/#features' },
+            { label: 'Pricing', href: '/#pricing' },
+            { label: 'Case studies', href: '/#testimonials' },
+          ].map((item) => (
+            <a
+              key={item.href}
+              href={item.href}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-[#0A1628]"
+            >
+              {item.label}
+            </a>
+          ))}
         </nav>
 
         {/* Desktop CTAs */}
