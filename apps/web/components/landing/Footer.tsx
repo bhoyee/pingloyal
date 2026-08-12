@@ -118,8 +118,21 @@ export function Footer() {
         {/* Divider */}
         <div className="mt-12 border-t border-white/10" />
 
-        {/* Bottom bar */}
-        <div className="flex flex-col items-center justify-between gap-3 py-6 sm:flex-row">
+      </div>
+
+      {/* PINGLOYAL watermark with copyright bar overlaid on top */}
+      <div className="relative overflow-hidden">
+        {/* Watermark — background layer */}
+        <div className="pointer-events-none select-none text-center">
+          <p
+            className="whitespace-nowrap bg-gradient-to-r from-[#0DC56A]/20 via-white/5 to-transparent bg-clip-text text-transparent font-black leading-none tracking-tighter"
+            style={{ fontSize: 'clamp(36px, 10vw, 180px)' }}
+          >
+            PINGLOYAL
+          </p>
+        </div>
+        {/* Copyright bar — sits on top of the watermark */}
+        <div className="absolute inset-0 mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-2 px-6 sm:flex-row sm:justify-between lg:px-8">
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} PingLoyal · Lagos, Nigeria ·{' '}
             <a href="mailto:hello@pingloyal.com" className="hover:text-white">
@@ -133,16 +146,6 @@ export function Footer() {
             </a>
           </p>
         </div>
-      </div>
-
-      {/* PINGLOYAL watermark — decorative, sits at the very bottom */}
-      <div className="pointer-events-none select-none overflow-hidden text-center">
-        <p
-          className="whitespace-nowrap bg-gradient-to-r from-[#0DC56A]/20 via-white/5 to-transparent bg-clip-text text-transparent font-black leading-none tracking-tighter"
-          style={{ fontSize: 'clamp(36px, 10vw, 180px)' }}
-        >
-          PINGLOYAL
-        </p>
       </div>
     </footer>
   );
