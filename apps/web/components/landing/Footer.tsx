@@ -120,20 +120,20 @@ export function Footer() {
 
       </div>
 
-      {/* PINGLOYAL watermark with copyright bar overlaid on top */}
+      {/* Copyright bar on top of PINGLOYAL watermark */}
       <div className="relative overflow-hidden">
-        {/* Watermark — background layer */}
-        <div className="pointer-events-none select-none text-center">
+        {/* Watermark — absolutely behind, sized large so it fills and clips nicely */}
+        <div className="pointer-events-none select-none absolute inset-0 flex items-center justify-center overflow-hidden">
           <p
             className="whitespace-nowrap bg-gradient-to-r from-[#0DC56A]/20 via-white/5 to-transparent bg-clip-text text-transparent font-black leading-none tracking-tighter"
-            style={{ fontSize: 'clamp(36px, 10vw, 180px)' }}
+            style={{ fontSize: 'clamp(80px, 22vw, 220px)' }}
           >
             PINGLOYAL
           </p>
         </div>
-        {/* Copyright bar — sits on top of the watermark */}
-        <div className="absolute inset-0 mx-auto flex w-full max-w-6xl flex-col items-center justify-center gap-2 px-6 sm:flex-row sm:justify-between lg:px-8">
-          <p className="text-sm text-gray-500">
+        {/* Copyright bar — normal flow, always fully visible */}
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-6 py-8 sm:flex-row lg:px-8">
+          <p className="text-center text-sm text-gray-500 sm:text-left">
             © {new Date().getFullYear()} PingLoyal · Lagos, Nigeria ·{' '}
             <a href="mailto:hello@pingloyal.com" className="hover:text-white">
               hello@pingloyal.com
